@@ -20,7 +20,7 @@ web app
 features (aiming to be working fine both PC and mobile including ios)
 - play in background including mobile locked
 - auto play next, when last finishes
-- (mobile) (ios) "now playing" card
+- (mobile) (ios) "now playing" card compatibility
     - prev/stop/next buttons
 
 ---
