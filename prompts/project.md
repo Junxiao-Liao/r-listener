@@ -22,3 +22,7 @@ features (aiming to be working fine both PC and mobile including ios)
 - auto play next, when last finishes
 - (mobile) (ios) "now playing" card
     - prev/stop/next buttons
+
+---
+
+i18n: EN, CN
