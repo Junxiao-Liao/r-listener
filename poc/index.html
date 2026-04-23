@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Audio Playback PoCs</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="page shell">
+      <section class="hero card">
+        <p class="eyebrow">Proof of concept</p>
+        <h1>Mobile audio playback PoCs</h1>
+        <p>
+          Two standalone experiments validate the highest-risk browser behaviors using only local mock audio files.
+        </p>
+      </section>
+
+      <section class="grid">
+        <article class="card">
+          <h2>PoC 1: Background Play</h2>
+          <p>Checks HTML audio playback, Media Session metadata, and lock-screen media actions.</p>
+          <a class="button" href="./background-play/">Open background-play PoC</a>
+        </article>
+
+        <article class="card">
+          <h2>PoC 2: Auto-play Next Track</h2>
+          <p>Checks whether the next track can start automatically after the first track ends.</p>
+          <a class="button" href="./auto-play-next/">Open auto-play-next PoC</a>
+        </article>
+      </section>
+
+      <section class="card checklist">
+        <h2>Run locally</h2>
+        <ol>
+          <li>Start a local server from the repo root with <code>python3 -m http.server</code>.</li>
+          <li>Open <code>http://localhost:8000/poc/</code>.</li>
+          <li>Test on a mobile browser, then lock the screen or background the browser.</li>
+        </ol>
+      </section>
+    </main>
+  </body>
+</html>

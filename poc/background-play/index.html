@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>PoC 1: Background Play</title>
+    <link rel="stylesheet" href="../styles.css" />
+  </head>
+  <body>
+    <main class="page shell">
+      <section class="hero card">
+        <p class="eyebrow">PoC 1</p>
+        <h1>Background play and Media Session API</h1>
+        <p>
+          Start playback, lock the device, then use the system media controls to verify the page stays in sync.
+        </p>
+        <a href="../">Back to PoC index</a>
+      </section>
+
+      <div class="split">
+        <section class="card now-playing">
+          <div class="artwork">
+            <img id="artwork" alt="Current track artwork" src="../assets/artwork/night-drive-1.svg" />
+          </div>
+
+          <div class="meta">
+            <div class="status" id="playback-status">Paused</div>
+            <h2 id="track-title">Night Drive I</h2>
+            <p id="track-artist">Local fixture</p>
+            <p id="track-album">Background play validation</p>
+          </div>
+
+          <div class="controls">
+            <button class="secondary" id="previous-button" type="button">Previous</button>
+            <button id="play-button" type="button">Play</button>
+            <button class="secondary" id="pause-button" type="button">Pause</button>
+            <button class="secondary" id="next-button" type="button">Next</button>
+          </div>
+
+          <div class="audio-shell card">
+            <audio id="audio" controls preload="auto"></audio>
+          </div>
+        </section>
+
+        <section class="shell">
+          <section class="card">
+            <h2>Media Session support</h2>
+            <p class="mono" id="media-session-support">Checking support...</p>
+            <ul class="facts">
+              <li>Track metadata is pushed to the Media Session API when the track changes.</li>
+              <li>Play, pause, previous, and next handlers are registered when supported.</li>
+              <li>The log below records both page events and media action callbacks.</li>
+            </ul>
+          </section>
+
+          <section class="card">
+            <h2>Queue</h2>
+            <ol class="track-list queue" id="queue"></ol>
+          </section>
+
+          <section class="card">
+            <h2>Event log</h2>
+            <ol class="log" id="log"></ol>
+          </section>
+        </section>
+      </div>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
