@@ -1,0 +1,15 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"app_name": "r-listener",
+	"nav_lists": "Lists",
+	"nav_tracks": "Tracks",
+	"auth_sign_in": "Sign in",
+	"auth_sign_up": "Sign up",
+	"auth_sign_out": "Sign out",
+	"auth_email": "Email",
+	"auth_password": "Password",
+	"player_prev": "Previous",
+	"player_next": "Next",
+	"player_play": "Play",
+	"player_pause": "Pause"
+}

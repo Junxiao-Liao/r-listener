@@ -1,0 +1,15 @@
+{
+	"$schema": "https://inlang.com/schema/inlang-message-format",
+	"app_name": "r-听",
+	"nav_lists": "歌单",
+	"nav_tracks": "曲目",
+	"auth_sign_in": "登录",
+	"auth_sign_up": "注册",
+	"auth_sign_out": "退出登录",
+	"auth_email": "邮箱",
+	"auth_password": "密码",
+	"player_prev": "上一首",
+	"player_next": "下一首",
+	"player_play": "播放",
+	"player_pause": "暂停"
+}
