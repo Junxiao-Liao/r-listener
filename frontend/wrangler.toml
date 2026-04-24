@@ -1,0 +1,8 @@
+name = "r-listener-frontend"
+compatibility_date = "2026-04-01"
+pages_build_output_dir = ".svelte-kit/cloudflare"
+
+# Backend Worker URL. Override per-environment via `wrangler pages secret put`
+# or the Pages dashboard. For local dev, set `BACKEND_URL` in `.dev.vars`.
+[vars]
+BACKEND_URL = "http://127.0.0.1:8787"
