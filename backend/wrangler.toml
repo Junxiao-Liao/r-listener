@@ -1,0 +1,27 @@
+name = "r-listener-backend"
+main = "src/index.ts"
+compatibility_date = "2026-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# TODO: run `wrangler d1 create r-listener` and paste the returned database_id
+[[d1_databases]]
+binding = "DB"
+database_name = "r-listener"
+database_id = "<fill-me>"
+
+# TODO: run `wrangler r2 bucket create r-listener-audio`
+[[r2_buckets]]
+binding = "R2"
+bucket_name = "r-listener-audio"
+
+# TODO: run `wrangler kv namespace create r-listener-cache` and paste `id`
+[[kv_namespaces]]
+binding = "KV"
+id = "<fill-me>"
+
+[vars]
+# Frontend origin allowed by CORS. Override per-env in the dashboard or .dev.vars.
+FRONTEND_ORIGIN = "http://localhost:5173"
+
+# Auth secrets live in `.dev.vars` locally and `wrangler secret put` in prod:
+#   SESSION_SECRET = "<random>"

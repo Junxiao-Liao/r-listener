@@ -1,0 +1,20 @@
+{
+	"name": "backend",
+	"private": true,
+	"version": "0.0.1",
+	"type": "module",
+	"scripts": {
+		"dev": "wrangler dev",
+		"deploy": "wrangler deploy",
+		"typecheck": "tsc --noEmit",
+		"cf-typegen": "wrangler types"
+	},
+	"dependencies": {
+		"hono": "^4.9.10"
+	},
+	"devDependencies": {
+		"@cloudflare/workers-types": "^4.20260401.0",
+		"typescript": "^5.7.0",
+		"wrangler": "^4.0.0"
+	}
+}
