@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { cors } from 'hono/cors';
+import { createDb, type Db } from './db';
 
 export type Env = {
 	Bindings: {
@@ -9,9 +10,17 @@ export type Env = {
 		FRONTEND_ORIGIN: string;
 		SESSION_SECRET: string;
 	};
+	Variables: {
+		db: Db;
+	};
 };
 
 const app = new Hono<Env>();
+
+app.use('*', async (c, next) => {
+	c.set('db', createDb(c.env.DB));
+	await next();
+});
 
 app.use(
 	'*',
