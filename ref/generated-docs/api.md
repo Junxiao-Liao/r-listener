@@ -94,22 +94,29 @@ Every request outside `/auth/signin` and `/health` requires a valid session.
 
 ### 1.7 Authorization
 
-Three scopes of role, checked in this order:
+Four scopes of role, checked in this order:
 
 1. **Platform admin** (`users.is_admin = true`). Can access all `/admin/*`
-   routes and can call `POST /auth/switch-tenant` for any tenant.
+   routes, can call `POST /auth/switch-tenant` for any tenant, and can
+   mutate tenant-scoped content regardless of membership role.
 2. **Tenant owner** (`memberships.role = 'owner'`) within the active
    tenant. Reserved for destructive tenant-scoped actions later; today
    membership management is admin-only so owner has no extra API powers
    vs. member.
-3. **Tenant member** (`memberships.role in ('owner', 'member')` for the
-   active tenant). Required for all `/tenants/*` and tenant-scoped
-   resource routes.
+3. **Tenant member** (`memberships.role = 'member'`) within the active
+   tenant. Can read and mutate normal tenant-scoped content.
+4. **Tenant viewer** (`memberships.role = 'viewer'`) within the active
+   tenant. Can read ready tenant-scoped content and use personal listener
+   state, but cannot mutate shared workspace content.
 
 Requests to tenant-scoped routes resolve the active tenant from
 `sessions.active_tenant_id`. 403 + `{code:'no_active_tenant'}` if the
 session has no active tenant; 403 + `{code:'tenant_forbidden'}` if the
 user is not a member of it (and not a platform admin).
+
+Tenant-scoped shared-content writes require an editor role (`owner` or
+`member`) unless the caller is a platform admin. A `viewer` calling a blocked
+write receives `403` + `{code:'insufficient_role'}`.
 
 ### 1.8 CSRF
 
@@ -165,7 +172,7 @@ type TenantDto = {
 type TenantMembershipDto = {
   tenantId: Id<"tenant">;
   tenantName: string;
-  role: "owner" | "member";
+  role: "owner" | "member" | "viewer";
   createdAt: Iso8601;
 };
 
@@ -208,7 +215,7 @@ type AdminUserDetailDto = UserDto & {
 };
 
 type AdminTenantListItemDto = TenantDto & {
-  memberCount: number;
+  memberCount: number; // all active owner/member/viewer memberships
   trackCount: number;
 };
 
@@ -373,6 +380,12 @@ All routes in this section are scoped to the session's active tenant. No
 tenant id in the URL. Omitting or lacking membership → `403 no_active_tenant`
 or `403 tenant_forbidden` as appropriate.
 
+Viewer memberships are listen-only for shared workspace content. Viewers can
+read ready tracks/playlists, search, request stream URLs, write personal
+playback history, manage their own queue, and update their own preferences.
+They cannot upload, edit, delete, or otherwise mutate shared tenant content;
+blocked edit calls return `403 insufficient_role`.
+
 ### 5.1 Tracks
 
 #### `GET /tracks`
@@ -382,12 +395,16 @@ Query: `limit`, `cursor`, `q` (optional, case-insensitive substring on
 
 Response `200`: `{ items: TrackDto[], nextCursor }`. Excludes
 `status='pending'` and soft-deleted rows by default. `?includePending=true`
-shows in-flight uploads (used by the uploads UI).
+shows in-flight uploads (used by the uploads UI) and requires an editor role
+or platform admin. Viewers requesting `includePending=true` receive
+`403 insufficient_role`.
 
 #### `GET /tracks/{id}`
-Response `200`: `TrackDto`. `404 not_found` if missing or soft-deleted —
-soft-deletion is invisible to clients (no 410, no owner-only signal),
-matching the UI's "deletions are non-reversible" principle.
+Response `200`: `TrackDto`. `404 not_found` if missing or soft-deleted.
+Pending tracks are visible only to editor roles and platform admins; viewers
+receive `404 track_not_found` for pending track ids. Soft-deletion is invisible
+to clients (no 410, no owner-only signal), matching the UI's "deletions are
+non-reversible" principle.
 
 #### `POST /tracks` — **upload init** (step 1 of 3)
 
@@ -810,7 +827,9 @@ Response: `AdminUserDetailDto`.
   }
 }
 ```
-Validation: email format; password ≥ 12 chars (or your configured policy). `initialMembership` is optional.
+Validation: email format; password ≥ 12 chars (or your configured policy).
+`initialMembership` is optional; when present its `role` is `"owner"`,
+`"member"`, or `"viewer"`.
 Response `201`: `UserDto`.
 Errors: `409 email_conflict`, `422 weak_password`.
 Audit: `user.create`.
@@ -872,13 +891,15 @@ Response: `{ items: (TenantMembershipDto & { user: UserDto })[], nextCursor }`.
 ```json
 { "userId": "usr_01H...", "role": "member" }
 ```
-Response `201`: `TenantMembershipDto`. Errors: `404 user_not_found`,
-`409 already_member`. Audit: `membership.create`.
+`role` may be `"owner"`, `"member"`, or `"viewer"`. Response `201`:
+`TenantMembershipDto`. Errors: `404 user_not_found`, `409 already_member`.
+Audit: `membership.create`.
 
 #### `PATCH /admin/tenants/{id}/members/{userId}`
 ```json
 { "role": "owner" }
 ```
+`role` may be `"owner"`, `"member"`, or `"viewer"`.
 Response: `TenantMembershipDto`. Demoting the last owner is rejected with
 `422 cannot_remove_last_owner`. Audit: `membership.update`.
 
@@ -958,6 +979,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 403  | `admin_required`             | Non-admin hit `/admin/*`                         |
 | 403  | `no_active_tenant`           | Session has `active_tenant_id = null`            |
 | 403  | `tenant_forbidden`           | User not a member of active tenant               |
+| 403  | `insufficient_role`          | Viewer attempted editor-only tenant mutation     |
 | 403  | `forbidden_origin`           | `Origin` header mismatch on mutation             |
 | 404  | `not_found`                  | Generic; also used for resource-specific forms   |
 | 404  | `user_not_found`             | Admin ops referencing a missing user             |

@@ -221,6 +221,7 @@ Implement:
 - Session validation with expiry and rolling refresh.
 - `requireSession`.
 - `requireTenant`.
+- `requireTenantEditor` for owner/member tenant-scoped shared-content writes.
 - `requireAdmin`.
 - Origin enforcement for state-changing methods.
 - KV-backed rate limiting for `/auth/*`.
@@ -232,6 +233,7 @@ Tests first:
 - Missing/invalid session returns `401 unauthenticated`.
 - No active tenant returns `403 no_active_tenant`.
 - Non-member active tenant returns `403 tenant_forbidden`.
+- Viewer hitting an editor-only tenant route returns `403 insufficient_role`.
 - Non-admin admin route returns `403 admin_required`.
 - Bad mutation origin returns `403 forbidden_origin`.
 - Rate-limited auth route returns `429 rate_limited`.
@@ -308,8 +310,9 @@ Acceptance:
 
 ### 5. Tracks, Uploads, Lyrics, Covers, And Streaming Slice
 
-Goal: users can upload private audio, see completed tracks in Library, manage
-metadata/lyrics/covers, and stream audio from R2.
+Goal: owner/member users can upload private audio, see completed tracks in
+Library, manage metadata/lyrics/covers, and stream audio from R2; viewer users
+can stream ready tracks without editing shared content.
 
 Backend:
 
@@ -330,6 +333,8 @@ Backend:
 - Generate R2 keys under `tenants/{tenantId}/tracks/`.
 - Validate MIME types, upload sizes, duration, lyrics, and tenant ownership.
 - Keep pending uploads hidden from normal Library reads.
+- Require owner/member/admin for upload, finalize, metadata, lyrics, cover,
+  delete, and `includePending=true`; viewers get `403 insufficient_role`.
 - Preserve soft-delete behavior.
 
 Frontend:
@@ -345,6 +350,8 @@ Frontend:
   - Library.
   - Music Detail.
   - Edit Music Metadata.
+- Disable upload/edit/delete/lyrics/cover controls for viewers with a short
+  role explanation.
 - Upload flow:
   - Review selected files.
   - Call backend upload init.
@@ -362,6 +369,8 @@ Tests first:
 - Lyrics status derives `none`, `synced`, `plain`, and `invalid`.
 - Soft-deleted tracks disappear from reads.
 - Stream URL rejects pending tracks.
+- Viewer can list/stream ready tracks but cannot upload, finalize, edit, delete,
+  edit lyrics/covers, or request `includePending=true`.
 - Upload review pairs matching audio and `.lrc` files.
 - Upload progress handles retry/remove failed item states.
 
@@ -392,6 +401,7 @@ Backend:
 - Enforce tenant scoping and ready-track-only queue items.
 - Keep queue positions dense in DTOs.
 - Keep a single current queue item per user and tenant.
+- Allow viewers to write personal playback history and queue state.
 
 Frontend:
 
@@ -423,6 +433,7 @@ Tests first:
 - Recent tracks keeps completed tracks.
 - Queue rejects wrong-tenant or pending tracks.
 - Queue add/remove/reorder/current behavior preserves dense order.
+- Viewer can write playback events and manage their own queue.
 - Player can load a track and request a stream URL.
 - Lyrics line click calls seek behavior.
 - Mini-player expands to full player.
@@ -442,7 +453,8 @@ Acceptance:
 
 ### 7. Playlists Slice
 
-Goal: users can create, edit, delete, play, and reorder custom playlists.
+Goal: owner/member users can create, edit, delete, play, and reorder custom
+playlists; viewer users can browse and play playlists without editing them.
 
 Backend:
 
@@ -450,6 +462,7 @@ Backend:
 - Implement playlist track add/remove/reorder.
 - Enforce unique playlist names per tenant among non-deleted playlists.
 - Enforce duplicate-track rejection inside one playlist.
+- Require owner/member/admin for playlist and playlist-track mutations.
 - Compute `trackCount` and `totalDurationMs` at read time.
 
 Frontend:
@@ -463,6 +476,8 @@ Frontend:
   - Reorder Playlist.
 - Generate playlist covers from playlist name.
 - Wire playlist play action into queue/player.
+- Disable playlist create/edit/delete/add/reorder controls for viewers with a
+  short role explanation.
 
 Tests first:
 
@@ -472,6 +487,8 @@ Tests first:
 - Add track appends by default.
 - Insert/reorder/remove yields dense positions.
 - Duplicate track add returns conflict.
+- Viewer can read/play playlists but cannot create, update, delete, add,
+  remove, or reorder playlist tracks.
 
 Acceptance:
 
@@ -534,7 +551,8 @@ Backend:
   - Admin required.
   - Cannot demote/deactivate self.
   - Cannot delete self.
-  - Cannot remove or demote the last tenant owner.
+  - Cannot remove or demote the last tenant owner to member/viewer.
+- Allow membership roles `owner`, `member`, and `viewer`.
 - Implement admin tenant enter by using switch-tenant behavior and audit action
   `tenant.admin_enter`.
 
@@ -551,6 +569,7 @@ Frontend:
   - Admin Audit Logs.
 - Add confirmation sheets for destructive actions.
 - Disable impossible self/last-owner actions with clear inline explanation.
+- Include Viewer in admin membership role selectors.
 
 Tests first:
 
@@ -560,6 +579,7 @@ Tests first:
 - Self-demotion/self-delete are rejected.
 - Tenant create requires initial owner.
 - Last owner cannot be removed or demoted.
+- Admin can create, update, and list viewer memberships.
 - Mutating admin actions create audit logs.
 - Audit log filters work.
 
@@ -642,6 +662,7 @@ Backend Vitest:
 - Repository behavior for tenant scoping and soft delete.
 - Auth/session lifecycle.
 - Middleware authorization.
+- Viewer/editor role authorization.
 - Upload and stream validation.
 - Playlist and queue ordering.
 - Playback history.
@@ -665,6 +686,7 @@ Playwright:
 - Lyrics seek.
 - Queue CRUD.
 - Playlist CRUD and reorder.
+- Viewer disabled edit affordances.
 - Settings and preferences.
 - Admin user/tenant/member/audit flows.
 - EN and 中文 smoke coverage.

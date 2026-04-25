@@ -176,7 +176,7 @@ export const memberships = sqliteTable('memberships', {
   id:          text('id').primaryKey(),
   userId:      text('user_id').notNull().references(() => users.id,   { onDelete: 'cascade' }),
   tenantId:    text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  role:        text('role', { enum: ['owner', 'member'] }).notNull(),
+  role:        text('role', { enum: ['owner', 'member', 'viewer'] }).notNull(),
   createdAt:   integer('created_at', { mode: 'timestamp' }).notNull(),
   updatedAt:   integer('updated_at', { mode: 'timestamp' }).notNull(),
   deletedAt:   integer('deleted_at', { mode: 'timestamp' }),
@@ -191,6 +191,10 @@ export const memberships = sqliteTable('memberships', {
 The "last owner cannot be removed/demoted" rule (UI page #24) is enforced
 in the service layer with a `SELECT count(*) … role='owner'` precheck
 inside the same transaction.
+
+`viewer` is a listen-only tenant role. It grants workspace entry and ready
+content reads, but tenant-scoped shared-content writes require `owner` or
+`member` unless the caller is a platform admin.
 
 ### 2.5 `tracks`
 
@@ -243,8 +247,8 @@ export const tracks = sqliteTable('tracks', {
 `lyricsStatus` whenever lyrics are created, replaced, removed, or finalized.
 
 Users are soft-deleted, not physically deleted, so `uploader_id` remains
-non-null and historical uploads remain visible to other tenant members after
-the uploader is gone.
+non-null and historical uploads remain visible to other tenant users after the
+uploader is gone.
 
 Supported audio formats are the common private-library set from `api.md`:
 MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, and WebM audio.
@@ -436,26 +440,32 @@ because SQLite cannot express them as constraints:
 
 1. **Last-owner protection.** A tenant must always have ≥1 non-deleted
    membership with `role='owner'`. `membership.delete` and
-   `membership.update(role='member')` reject with 422 otherwise. (UI #24)
+   `membership.update(role IN ('member', 'viewer'))` reject with 422
+   otherwise. (UI #24)
 2. **Self-modification guard.** An admin cannot demote, deactivate, or
    delete themselves. → 422 `cannot_self_downgrade` /
    `cannot_self_delete`. (UI #21)
 3. **Tenant scoping on writes.** Every write to a tenant-scoped table
    must include the resolved `active_tenant_id` from the session;
    `service.ts` wraps each write in a `WHERE tenant_id = ?` guard.
-4. **Track readiness on stream/queue.** `GET /tracks/{id}/stream-url`
+4. **Viewer write guard.** Tenant-scoped shared-content writes require
+   `role IN ('owner', 'member')`, unless the caller is a platform admin.
+   Viewers may still write personal listener state: playback history, queue,
+   preferences, and password changes.
+5. **Track readiness on stream/queue.** `GET /tracks/{id}/stream-url`
    rejects with 409 `track_not_ready` when `status != 'ready'`. Queue add
    rejects pending, soft-deleted, or wrong-tenant tracks. Pending uploads are
-   filtered from `GET /tracks` unless `?includePending=true`.
-5. **Pending-track GC.** A future Cron Trigger deletes tracks where
+   filtered from `GET /tracks` unless `?includePending=true`; that flag is
+   editor/admin-only.
+6. **Pending-track GC.** A future Cron Trigger deletes tracks where
    `status='pending' AND created_at < now - 1h` and removes the matching
    R2 key. (Not part of v1 schema — covered by `tracks_pending_cleanup_idx`.)
-6. **Playback `ended`.** On ingest, an event with `event='ended'` writes
+7. **Playback `ended`.** On ingest, an event with `event='ended'` writes
    `last_position_ms = 0` regardless of the reported `positionMs`.
-7. **Playlist position rebalance.** When inserting between two
+8. **Playlist position rebalance.** When inserting between two
    `position_frac` values whose gap is `< 1e-9`, the service rewrites
    the entire playlist's positions in one statement before inserting.
-8. **Queue current marker.** At most one non-deleted queue item may have
+9. **Queue current marker.** At most one non-deleted queue item may have
    `is_current = true` for a `(user_id, tenant_id)` pair. The service clears
    siblings before setting a new current item.
 

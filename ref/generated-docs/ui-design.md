@@ -10,8 +10,10 @@ Important constraints:
 - Private library only; no public browsing, no social feed, no sharing
 - No public signup. Accounts are created by platform admins
 - Multi-tenant: a user may belong to multiple workspaces (tenants). An "active workspace" is chosen post-login; platform admins may additionally enter any workspace
-- Users only listen to music they uploaded into their active workspace
+- Users only listen to music uploaded into their active workspace
 - Users can upload audio files and lyrics files
+- Tenant roles are Owner, Member, and Viewer; Viewers can listen but cannot
+  edit shared workspace content
 - Bulk upload is supported
 - Custom playlists are supported
 - Lyrics are mainly synced lyrics, such as .lrc files
@@ -20,6 +22,9 @@ Important constraints:
 - Do not include unrelated pages such as storage analytics, social profiles, public discovery, friends, comments, subscriptions, payments, charts, radio, podcasts, or recommendation feeds
 - Do not show trash / restore UI. Deletions are non-reversible from the user's perspective (soft-delete is a backend concern, invisible in the app)
 - Do not show "pending upload" tracks in the Library — in-flight uploads only appear on the Upload Progress page. A track joins the Library only after it finishes uploading
+- For users whose active workspace role is Viewer, keep upload, edit, delete,
+  lyrics/cover edit, and playlist-editing controls visible but disabled with
+  a short reason such as "Viewer role can listen only"
 
 Design a single large, high-resolution landscape Figma-style overview board containing many mobile page mockups. Each mobile screen should be clearly labeled. Arrange the pages in a logical flow with section headers and light connector arrows where useful.
 
@@ -56,7 +61,7 @@ UI elements:
 - Header "Choose a workspace"
 - List of workspace cards, each with:
   - Workspace name
-  - User's role in that workspace (Owner / Member)
+  - User's role in that workspace (Owner / Member / Viewer)
   - "Last used" chip on whichever workspace matches the user's most-recent active tenant (single workspace only)
 - Tap a card to enter that workspace and go to Home
 Single-workspace users skip this screen and land on Home directly after Sign In.
@@ -392,7 +397,7 @@ UI elements:
 - Password field
 - Confirm password field
 - "Mark as platform admin" toggle (off by default)
-- Optional "Add to workspace" selector with role (can be skipped; memberships can be added later)
+- Optional "Add to workspace" selector with role (Owner / Member / Viewer; can be skipped; memberships can be added later)
 - Create button
 After creation: brief success toast and return to Users list. The admin is responsible for sharing the email+password out-of-band; the app does NOT display a copyable credential dialog.
 
@@ -403,7 +408,7 @@ UI elements:
 - Search bar (name)
 - Tenant list rows:
   - Workspace name
-  - Member count
+  - Member count (all active Owner / Member / Viewer memberships)
   - Track count, optional
   - Created date
 - "Create Tenant" button with form (name, required initial owner)
@@ -419,11 +424,11 @@ UI elements:
 - Tenant name header
 - Member list rows:
   - Email
-  - Role (Owner / Member)
+  - Role (Owner / Member / Viewer)
   - Joined date
   - Remove button
 - "Add Member" action — search existing users by email, pick a role
-- Role change affordance per row (Owner ↔ Member) with confirmation
+- Role change affordance per row (Owner / Member / Viewer) with confirmation
 - Do not allow removing the last Owner; show the action disabled with an explanation
 
 25. Admin — Audit Logs Page
@@ -503,6 +508,7 @@ Add small callout labels for important interactions:
 - "All music is private to your workspace"
 - "Admins can enter any workspace"
 - "Admin-created users get credentials out-of-band"
+- "Viewers can listen but cannot edit workspace content"
 
 Visual quality:
 - High-fidelity mobile web app mockups
