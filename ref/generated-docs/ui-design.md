@@ -207,7 +207,7 @@ UI elements:
 - Search playlists (server-side)
 - Create Playlist button
 - Playlist cards/list rows showing:
-  - Cover collage or generated cover
+  - Generated cover (based on playlist name, e.g. monogram/color tile)
   - Playlist name
   - Number of tracks
   - Updated date
@@ -222,7 +222,7 @@ Do not include public playlists or social playlists.
 Purpose: create a custom playlist.
 UI elements:
 - Header with Cancel and Save
-- Generated playlist cover preview (auto-collage from track covers; not manually selectable)
+- Generated playlist cover preview (based on playlist name; not manually selectable)
 - Playlist Name field
 - Description field, optional
 - Create button
@@ -232,7 +232,7 @@ Keep it simple.
 Purpose: rename or modify playlist details.
 UI elements:
 - Header with Cancel and Save
-- Generated playlist cover preview (auto-collage from track covers; not manually selectable)
+- Generated playlist cover preview (based on playlist name; not manually selectable)
 - Playlist Name field
 - Description field
 - Delete Playlist action

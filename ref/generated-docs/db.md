@@ -270,9 +270,7 @@ export const playlists = sqliteTable('playlists', {
 `PlaylistDto.trackCount` is computed at read time from `playlist_tracks`
 where both rows are non-deleted; it is not denormalized.
 
-Playlist covers are not stored — UI renders an auto-collage from the
-first N member tracks' `cover_r2_key`s. (UI design board's "cover
-selector" on create/edit is decorative for v1.)
+Playlist covers are not stored — UI renders a generated cover from the playlist name. (UI design board's "cover selector" on create/edit is decorative for v1.)
 
 ### 2.7 `playlist_tracks`
 

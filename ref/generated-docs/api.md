@@ -709,9 +709,18 @@ Response: `AdminUserDetailDto`.
 
 #### `POST /admin/users`
 ```json
-{ "email": "x@y.com", "password": "...", "displayName": "X", "isAdmin": false }
+{ 
+  "email": "x@y.com", 
+  "password": "...", 
+  "displayName": "X", 
+  "isAdmin": false,
+  "initialMembership": {
+    "tenantId": "tnt_01H...",
+    "role": "member"
+  }
+}
 ```
-Validation: email format; password ≥ 12 chars (or your configured policy).
+Validation: email format; password ≥ 12 chars (or your configured policy). `initialMembership` is optional.
 Response `201`: `UserDto`.
 Errors: `409 email_conflict`, `422 weak_password`.
 Audit: `user.create`.
