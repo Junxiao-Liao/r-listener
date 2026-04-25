@@ -1,7 +1,7 @@
 # Architecture (current state)
 
-Snapshot of what is scaffolded in the repo today. No forward plans — see
-issues / prompts for that.
+Snapshot of what is scaffolded in the repo today. This is not an execution
+plan; see `impl-plan.md` for the full-app build sequence.
 
 ## Repo layout
 
@@ -53,9 +53,8 @@ SvelteKit server routes act as a narrow proxy:
   routes, so browser CORS mostly doesn't trigger; the middleware is
   there for direct dev calls and future client-side fetches.
 - Drizzle ORM wired to D1. `createDb(env.DB)` is installed on every
-  request as `c.var.db`. `src/db/schema.ts` is currently empty — domain
-  tables (users, sessions, tracks, playlists, playlist_tracks) land per
-  feature.
+  request as `c.var.db`. `src/db/schema.ts` is currently empty — planned
+  domain tables land per feature and are specified in `db.md`.
 - `drizzle.config.ts` uses dialect `sqlite`, driver `d1-http`.
   Migrations will land in `drizzle/` once the first table ships.
 - `wrangler.toml` declares bindings for D1 (`DB`), R2 (`R2`), and KV
@@ -122,5 +121,7 @@ from the backend Worker.
 - Any domain tables or migrations.
 - Auth routes / session persistence / hooks.
 - Real pages beyond the default `+page.svelte`.
+- Queue, playback history, upload, playlist, search, preferences, and admin
+  feature routes.
 - Cloudflare Queues / Cron Triggers.
 - GitHub Actions workflows for deploy.

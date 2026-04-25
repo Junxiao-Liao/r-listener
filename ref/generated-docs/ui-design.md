@@ -322,7 +322,7 @@ Include lyric states:
 - Invalid lyrics file
 
 18. Queue / Now Playing Page
-Purpose: show current and upcoming tracks.
+Purpose: show the user's persisted current and upcoming tracks for the active workspace.
 Design as a mobile bottom sheet or full mobile page.
 UI elements:
 - Current track section
@@ -331,7 +331,8 @@ UI elements:
 - Remove from queue action
 - Clear queue button
 - Play from selected track action
-Do not include social listening or public queue features.
+Do not include social listening, public queue features, or per-device-only queue
+language; the queue follows the signed-in user within the active workspace.
 
 19. Settings Page
 Purpose: account and playback preferences.

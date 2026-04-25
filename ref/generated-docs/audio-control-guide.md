@@ -14,6 +14,9 @@ Use a single long-lived `<audio>` element and treat it as the source of truth fo
 
 - Require one explicit user gesture to start the first track. See `@poc/auto-play-next/index.html:49` and `@poc/auto-play-next/app.js:94`.
 - After that gesture, it is acceptable to switch `src` and call `audio.play()` on `ended` for the next item in the queue. See `@poc/auto-play-next/app.js:48`, `@poc/auto-play-next/app.js:80`, and `@poc/auto-play-next/app.js:124`.
+- In production, the upcoming-track list should be loaded from the persisted
+  backend queue (`GET /queue`) and queue mutations should go through the CRUD
+  queue API from `api.md`.
 - Register Media Session metadata and action handlers whenever the active track changes. See `@poc/background-play/app.js:100`, `@poc/background-play/app.js:110`, and `@poc/background-play/app.js:147`.
 - Keep the page state synchronized with native media actions such as play, pause, previous, and next. See `@poc/background-play/app.js:125`, `@poc/background-play/app.js:130`, and `@poc/background-play/app.js:191`.
 
@@ -35,7 +38,7 @@ Proceed with a web implementation based on:
 
 - one persistent `<audio>` element
 - Media Session integration for metadata and transport controls
-- queue advancement driven by the `ended` event
+- persisted backend queue state, with advancement driven by the `ended` event
 - an initial manual play requirement to satisfy browser autoplay policy
 
 This area is no longer a high-risk blocker for the project, though final QA should still be done on real iOS and Android devices during app integration.

@@ -80,9 +80,10 @@ never interpret them.
 ### 1.6 Authentication
 
 Session cookie only. Named `session`; value is a 20-byte base32 token. The
-backend stores SHA-256 of the token in `sessions` (see
-`backend/src/auth/session.ts`). The frontend BFF sets and forwards the
-cookie; CORS credentials are allowed for direct dev calls only.
+backend creates, validates, and invalidates sessions, and stores SHA-256 of the
+token in `sessions` (see `backend/src/auth/session.ts`). The frontend BFF sets,
+clears, and forwards the browser cookie; CORS credentials are allowed for direct
+dev calls only.
 
 - `HttpOnly; Secure; SameSite=Lax; Path=/`
 - Expiry: 30 days rolling. Every authed request that is ≥1 day older than
@@ -248,6 +249,25 @@ type RecentTrackDto = {
   playlistId: Id<"playlist"> | null;
 };
 
+// Queue ---------------------------------------------------------------
+type QueueItemDto = {
+  id: Id<"queue_item">;
+  tenantId: Id<"tenant">;
+  userId: Id<"user">;
+  trackId: Id<"track">;
+  position: number;             // 1-based, dense within user + tenant queue
+  isCurrent: boolean;
+  addedAt: Iso8601;
+  updatedAt: Iso8601;
+  track: TrackDto;
+};
+
+type QueueStateDto = {
+  items: QueueItemDto[];
+  currentItemId: Id<"queue_item"> | null;
+  updatedAt: Iso8601 | null;
+};
+
 // Search --------------------------------------------------------------
 type SearchHitDto =
   | { kind: "track"; track: TrackDto }
@@ -290,21 +310,27 @@ Response `200`:
   "user": { /* UserDto */ },
   "tenants": [ /* TenantMembershipDto[] */ ],
   "preferences": { /* PreferencesDto */ },
-  "activeTenantId": "tnt_01H..." | null
+  "activeTenantId": "tnt_01H..." | null,
+  "sessionToken": "abcd..." // BFF-only; stripped before any browser response
 }
 ```
 
 - `activeTenantId` is the last-used tenant from a prior session if still
   valid and the user is still a member; otherwise the first membership;
   otherwise `null` (user has no memberships — admins only).
-- Sets `session` cookie.
+- Creates a session row and returns the raw session token to the server-only
+  BFF caller. The backend does not emit `Set-Cookie`.
+- The SvelteKit BFF sets the browser `session` cookie with
+  `HttpOnly; Secure; SameSite=Lax; Path=/` and never exposes `sessionToken`
+  to client code.
 - Errors: `401 invalid_credentials`, `403 account_disabled`,
   `429 rate_limited`.
 
 ### `POST /auth/signout`
 
 Auth: session required.
-Response: `204`. Deletes the current session row and clears the cookie.
+Response: `204`. Deletes the current session row. The SvelteKit BFF clears the
+browser cookie after the backend confirms signout.
 
 ### `POST /auth/switch-tenant`
 
@@ -640,7 +666,69 @@ Response `200`: `{ items: RecentTrackDto[] }`, sorted `lastPlayedAt:desc`,
 including only rows with `lastPositionMs > 0` and
 `lastPositionMs < track.durationMs - 15_000` (i.e. meaningfully resumable).
 
-### 5.5 Unified search
+### 5.5 Queue
+
+Queue is persisted per `(userId, tenantId)`, not per device. It is scoped to the
+session's active tenant and only contains ready, non-deleted tracks.
+
+#### `GET /queue`
+
+Response `200`: `QueueStateDto`.
+
+Items are returned in dense `position:asc` order. `currentItemId` is `null` when
+the queue is empty or no current item has been selected.
+
+#### `POST /queue/items`
+
+Adds one or more ready tracks to the end of the queue, or inserts them before a
+requested 1-based position.
+
+Request:
+```json
+{ "trackIds": ["trk_01H..."], "position": null }
+```
+
+- `trackIds.length` must be 1..100.
+- `position = null` appends after the current tail.
+- When `position` is provided, the inserted tracks occupy that position and
+  existing items at or after it shift down.
+- Wrong-tenant, pending, or soft-deleted tracks are rejected.
+
+Response `201`: `QueueStateDto`.
+
+Errors: `400 validation_failed`, `404 track_not_found`, `409 track_not_ready`.
+
+#### `PATCH /queue/items/{id}`
+
+Updates one queue item's position and/or current marker.
+
+Request:
+```json
+{ "position": 3, "isCurrent": true }
+```
+
+- Both fields are optional, but at least one must be present.
+- `position` is clamped to `[1, queue length]`.
+- Setting `isCurrent: true` clears the current marker from all sibling queue
+  items for the same `(userId, tenantId)`.
+- Setting `isCurrent: false` clears the marker from this item only.
+
+Response `200`: `QueueStateDto`.
+
+Errors: `400 validation_failed`, `404 queue_item_not_found`.
+
+#### `DELETE /queue/items/{id}`
+
+Removes one queue item and compacts following positions. If it was the current
+item, `currentItemId` becomes `null`.
+
+Response `200`: `QueueStateDto`. Missing item returns `404 queue_item_not_found`.
+
+#### `DELETE /queue`
+
+Clears the current user's queue for the active tenant. Response: `204`.
+
+### 5.6 Unified search
 
 The Home page search box queries tracks and playlists together. Library
 and Playlists pages can keep using the per-resource `q` on
@@ -668,7 +756,7 @@ no full-text); revisit if the library grows beyond a few thousand rows.
 
 Errors: `400 validation_failed` if `q` empty.
 
-### 5.6 Preferences
+### 5.7 Preferences
 
 Preferences are scoped to the signed-in user, not to a tenant. They drive
 Settings, localization, playback defaults, and initial SSR rendering.
@@ -875,11 +963,13 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 404  | `user_not_found`             | Admin ops referencing a missing user             |
 | 404  | `tenant_not_found`           | Switch/admin ops referencing a missing tenant    |
 | 404  | `track_not_found`            | Track missing or not visible                     |
+| 404  | `queue_item_not_found`       | Queue item missing or not visible                |
 | 409  | `email_conflict`             | Admin create user, email in use                  |
 | 409  | `already_member`             | Admin add membership, row exists                 |
 | 409  | `playlist_name_conflict`     | Create/rename into an existing name              |
 | 409  | `track_already_in_playlist`  | Duplicate playlist-track                         |
 | 409  | `track_already_finalized`    | Second `/finalize` call                          |
+| 409  | `track_not_ready`            | Stream or queue operation references pending track |
 | 413  | `payload_too_large`          | Upload exceeds `MAX_AUDIO_BYTES`                 |
 | 415  | `unsupported_media_type`     | Non-allowed audio MIME                           |
 | 422  | `weak_password`              | Password fails policy                            |
@@ -929,6 +1019,12 @@ backend/src/
     repository.ts
     service.ts     last-wins upsert, continue-listening filter
     route.ts       /playback-events, /me/recent-tracks, /me/continue-listening
+  queue/
+    orm.ts         queue_items
+    dto.ts         QueueItemDto, QueueStateDto
+    repository.ts  queue reads/writes scoped by user + tenant
+    service.ts     add/remove/reorder/current, dense position DTOs
+    route.ts       /queue/*
   search/
     dto.ts         SearchHitDto
     service.ts     ranking heuristic across tracks + playlists

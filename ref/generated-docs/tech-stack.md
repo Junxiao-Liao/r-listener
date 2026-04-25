@@ -1,6 +1,7 @@
 Repo layout:
   frontend/ and backend/ as independent npm projects (no workspace)
-  See generated-docs/architect.md for how they fit together.
+  See generated-docs/current-state.md for the scaffold snapshot and
+  generated-docs/impl-plan.md for the full-app execution plan.
 
 Frontend (frontend/):
   SvelteKit + TypeScript
@@ -29,16 +30,32 @@ Auth:
   Session tokens: random base32 on the wire, SHA-256 hashed at rest
   Sessions persisted in D1
 
+Queue:
+  Persisted in D1 per user and active tenant
+  Backend exposes CRUD-style /queue routes
+  Frontend player treats backend queue state as durable cross-device state
+
 Cache:
   Cloudflare KV (in backend)
 
 Jobs:
   Later: Cloudflare Queues + Cron Triggers
 
+Validation:
+  Zod for runtime request/DTO validation
+
 Deployment:
   Cloudflare Pages (frontend) + Cloudflare Workers (backend)
   Wrangler
   GitHub Actions
+
+Tests:
+  Vitest for backend and frontend unit/service coverage
+  Playwright for critical mobile-first browser flows
+
+Bootstrap:
+  First admin, first tenant, and initial owner membership are created by
+  manual SQL. Do not add an application seed command.
 
 Domain:
   Start with pages.dev / workers.dev

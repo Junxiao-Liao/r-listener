@@ -26,6 +26,7 @@ Opaque text primary keys, prefixed by entity for human grepability:
 | `playlists`         | `pls_`  | `pls_01HF8Z5Q3A...`           |
 | `playlist_tracks`   | `plt_`  | `plt_01HF8Z5Q3A...`           |
 | `playback_history`  | —       | composite `(user, tenant, track)` |
+| `queue_items`       | `que_`  | `que_01HF8Z5Q3A...`           |
 | `user_preferences`  | —       | `user_id` is the PK           |
 | `audit_logs`        | `aud_`  | `aud_01HF8Z5Q3A...`           |
 
@@ -76,6 +77,7 @@ backend/src/
   tracks/orm.ts       tracks
   playlists/orm.ts    playlists, playlist_tracks
   playback/orm.ts     playback_history
+  queue/orm.ts         queue_items
   prefs/orm.ts        user_preferences
   audit/orm.ts        audit_logs
   db/schema.ts        re-exports all of the above
@@ -335,7 +337,48 @@ Soft-deleted tracks are filtered out at the JOIN with `tracks`, not by
 deleting these rows — so undeleting a track later (admin-only path, not
 in scope today) would resurface its history naturally.
 
-### 2.9 `user_preferences`
+### 2.9 `queue_items`
+
+Persisted Now Playing queue. One ordered list per `(user_id, tenant_id)`, scoped
+to the active tenant. Queue rows may only reference ready, non-deleted tracks in
+the same tenant; that readiness rule is enforced in the queue service because it
+depends on track status and soft-delete state.
+
+Internal column `position_frac` mirrors playlist ordering: reorders usually touch
+one row, while DTOs expose dense 1-based `position` via
+`ROW_NUMBER() OVER (PARTITION BY user_id, tenant_id ORDER BY position_frac)`.
+
+```ts
+export const queueItems = sqliteTable('queue_items', {
+  id:           text('id').primaryKey(),
+  userId:       text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  tenantId:     text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  trackId:      text('track_id').notNull().references(() => tracks.id, { onDelete: 'cascade' }),
+  positionFrac: real('position_frac').notNull(),
+  isCurrent:    integer('is_current', { mode: 'boolean' }).notNull().default(false),
+  addedAt:      integer('added_at',   { mode: 'timestamp' }).notNull(),
+  updatedAt:    integer('updated_at', { mode: 'timestamp' }).notNull(),
+  deletedAt:    integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  byUserTenantPosition: index('queue_items_user_tenant_position_idx')
+    .on(t.userId, t.tenantId, t.deletedAt, t.positionFrac),
+  byTrack: index('queue_items_track_idx').on(t.trackId),
+  oneCurrent: uniqueIndex('queue_items_one_current_uq')
+    .on(t.userId, t.tenantId, t.isCurrent)
+    .where(sql`${t.deletedAt} IS NULL AND ${t.isCurrent} = 1`),
+}));
+```
+
+Operations:
+- Add appends after `max(position_frac)` or inserts at the midpoint around a
+  requested 1-based position.
+- Reorder computes a new midpoint against neighbouring queue rows and rebalances
+  the partition when gaps become too small.
+- Setting `is_current = true` first clears sibling current markers inside the
+  same transaction.
+- Remove/clear soft-delete queue rows and compact DTO positions on the next read.
+
+### 2.10 `user_preferences`
 
 UI Settings page (#19) toggles plus language. One row per user; created
 lazily on first `GET /me/preferences` or `PATCH /me/preferences`.
@@ -357,7 +400,7 @@ export const userPreferences = sqliteTable('user_preferences', {
 The signin response embeds a sibling `preferences` field so SSR can render
 with the right language and defaults on first paint.
 
-### 2.10 `audit_logs`
+### 2.11 `audit_logs`
 
 Append-only. Written by the admin service wrappers. `meta` is a JSON
 column with secrets pre-redacted by the wrapper.
@@ -401,8 +444,9 @@ because SQLite cannot express them as constraints:
    must include the resolved `active_tenant_id` from the session;
    `service.ts` wraps each write in a `WHERE tenant_id = ?` guard.
 4. **Track readiness on stream/queue.** `GET /tracks/{id}/stream-url`
-   rejects with 409 `track_not_ready` when `status != 'ready'`. Pending
-   uploads are filtered from `GET /tracks` unless `?includePending=true`.
+   rejects with 409 `track_not_ready` when `status != 'ready'`. Queue add
+   rejects pending, soft-deleted, or wrong-tenant tracks. Pending uploads are
+   filtered from `GET /tracks` unless `?includePending=true`.
 5. **Pending-track GC.** A future Cron Trigger deletes tracks where
    `status='pending' AND created_at < now - 1h` and removes the matching
    R2 key. (Not part of v1 schema — covered by `tracks_pending_cleanup_idx`.)
@@ -411,6 +455,9 @@ because SQLite cannot express them as constraints:
 7. **Playlist position rebalance.** When inserting between two
    `position_frac` values whose gap is `< 1e-9`, the service rewrites
    the entire playlist's positions in one statement before inserting.
+8. **Queue current marker.** At most one non-deleted queue item may have
+   `is_current = true` for a `(user_id, tenant_id)` pair. The service clears
+   siblings before setting a new current item.
 
 ---
 
@@ -424,6 +471,7 @@ Initial migration creates everything in §2 in dependency order:
 users → tenants → memberships
                 ↘ sessions (FK active_tenant_id, user_id)
 tenants → tracks → playlists → playlist_tracks
+               ↘ queue_items (FK user, tenant, track)
                               ↘ playback_history (FK user, tenant, track, last_playlist)
 users → user_preferences
 users + tenants → audit_logs
@@ -468,6 +516,11 @@ in a follow-up step within the same migration to break the cycle with
 │ playback_history│
 └─────────────────┘
    (FK to users + tenants + tracks + playlists)
+
+┌─────────────────┐
+│   queue_items   │
+└─────────────────┘
+   (FK to users + tenants + tracks)
 ```
 
 ---
@@ -482,6 +535,8 @@ The DB/UI-required contracts are reflected in `api.md`:
   `users.last_active_tenant_id`) so the Tenant Picker can mark the
   most-recent workspace.
 - `PlaylistDto` exposes `totalDurationMs`, computed at read time.
+- `QueueItemDto` and `QueueStateDto` expose persisted per-user/per-tenant queue
+  state with dense positions and a single current item.
 - Track upload supports optional cover upload; existing tracks support
   cover upload/finalize/remove and lyrics upload/replace/remove.
 - `GET/PATCH /me/preferences` exists and signin embeds `preferences`.
