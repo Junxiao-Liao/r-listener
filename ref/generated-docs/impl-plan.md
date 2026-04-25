@@ -263,6 +263,11 @@ Backend:
   - `GET /me/preferences`
   - `PATCH /me/preferences`
 - Return session token data to BFF-only signin callers.
+- On signin, bind `sessions.active_tenant_id` only for single-workspace
+  users; multi-workspace users start with `active_tenant_id = null` and
+  bind via `POST /auth/switch-tenant` from the Tenant Picker.
+- The signin response's `activeTenantId` is a suggested pre-selection
+  for the picker, not a commitment to bind the session.
 - Enforce disabled-account and weak-password behavior.
 - Revoke sibling sessions on password change.
 
@@ -292,9 +297,12 @@ Manual bootstrap:
 
 Tests first:
 
-- Signin success creates session and chooses active tenant.
-- Single-workspace users skip tenant picker in frontend flow.
-- Multi-workspace users see tenant picker.
+- Signin success creates session.
+- Single-workspace users get `sessions.active_tenant_id` bound on signin
+  and skip the tenant picker in the frontend flow.
+- Multi-workspace users get `sessions.active_tenant_id = null` on signin
+  and always see the tenant picker; tapping a card calls
+  `POST /auth/switch-tenant` to bind the active tenant.
 - Disabled account cannot sign in.
 - Wrong password returns `invalid_credentials`.
 - Change password requires current password.

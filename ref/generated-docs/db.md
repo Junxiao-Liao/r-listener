@@ -140,7 +140,10 @@ export const sessions = sqliteTable('sessions', {
 
 Lifecycle: insert on signin, update `last_refreshed_at` (and slide
 `expires_at` by 30 d) when the request is ≥1 d past the last refresh,
-`DELETE FROM sessions WHERE token_hash = ?` on signout. Password change
+`DELETE FROM sessions WHERE token_hash = ?` on signout. On signin, the
+session row's `active_tenant_id` is set only when the user has exactly
+one membership; multi-workspace users start with `active_tenant_id = null`
+and bind it via `POST /auth/switch-tenant` from the Tenant Picker. Password change
 deletes all sibling rows for the same `user_id` except the current one.
 A future Cron Trigger sweeps `expires_at < now`.
 
@@ -277,7 +280,7 @@ export const playlists = sqliteTable('playlists', {
 at read time from `playlist_tracks` joined with non-deleted, ready
 `tracks`; neither is denormalized.
 
-Playlist covers are not stored — UI renders a generated cover from the playlist name. (UI design board's "cover selector" on create/edit is decorative for v1.)
+Playlist covers are not stored — the UI renders a generated cover from the playlist name. There is no cover upload path for playlists.
 
 ### 2.7 `playlist_tracks`
 

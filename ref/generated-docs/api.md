@@ -322,9 +322,15 @@ Response `200`:
 }
 ```
 
-- `activeTenantId` is the last-used tenant from a prior session if still
-  valid and the user is still a member; otherwise the first membership;
-  otherwise `null` (user has no memberships — admins only).
+- `activeTenantId` is a **suggested pre-selection** for the Tenant Picker:
+  the last-used tenant from a prior session if still valid and the user is
+  still a member; otherwise the first membership; otherwise `null` (user
+  has no memberships — admins only).
+- The session's `active_tenant_id` is bound only for **single-workspace
+  users** (set to their sole membership). For multi-workspace users the
+  session row is created with `active_tenant_id = null`; the picker calls
+  `POST /auth/switch-tenant` on tap to bind it. The signin response
+  `activeTenantId` is purely a UI hint for which card to highlight.
 - Creates a session row and returns the raw session token to the server-only
   BFF caller. The backend does not emit `Set-Cookie`.
 - The SvelteKit BFF sets the browser `session` cookie with
