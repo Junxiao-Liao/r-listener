@@ -21,7 +21,7 @@ the first breaking change ships.
 ### 1.2 Transport & content type
 
 - `Content-Type: application/json; charset=utf-8` for request and response
-  bodies, except audio upload (binary PUT to R2) and streaming (see §7, §8).
+  bodies, except audio/cover uploads (binary PUT to R2) and streaming (see §7, §8).
 - Timestamps: **ISO-8601 UTC strings** on the wire (`2026-04-25T09:12:03.000Z`).
   Stored as unix seconds in D1 (`integer('created_at', { mode: 'timestamp' })`).
 - IDs: opaque strings. Convention: ULID-like 26-char base32 generated at
@@ -164,6 +164,16 @@ type TenantMembershipDto = {
   tenantId: Id<"tenant">;
   tenantName: string;
   role: "owner" | "member";
+  createdAt: Iso8601;
+};
+
+type PreferencesDto = {
+  language: "en" | "zh";
+  autoPlayNext: boolean;
+  showMiniPlayer: boolean;
+  preferSyncedLyrics: boolean;
+  defaultLibrarySort: "createdAt:desc" | "title:asc" | "artist:asc" | "album:asc";
+  updatedAt: Iso8601;
 };
 
 // Tracks --------------------------------------------------------------
@@ -173,13 +183,31 @@ type TrackDto = {
   title: string;
   artist: string | null;
   album: string | null;
+  trackNumber: number | null;
+  genre: string | null;
+  year: number | null;
   durationMs: number | null;
-  lyricsLrc: string | null;   // raw LRC text, may be empty string
-  contentType: string;        // "audio/mpeg", ...
+  coverUrl: string | null;    // presigned cover image GET URL, expires like stream-url
+  lyricsLrc: string | null;   // raw lyric text, may be LRC or plain text
+  lyricsStatus: "none" | "synced" | "plain" | "invalid";
+  contentType: string;        // common audio MIME: MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, WebM
   sizeBytes: number;
   status: "pending" | "ready"; // pending until /finalize succeeds
   createdAt: Iso8601;
   updatedAt: Iso8601;
+};
+
+type AdminUserListItemDto = UserDto & {
+  workspaceCount: number;
+};
+
+type AdminUserDetailDto = UserDto & {
+  memberships: TenantMembershipDto[];
+};
+
+type AdminTenantListItemDto = TenantDto & {
+  memberCount: number;
+  trackCount: number;
 };
 
 // Playlists -----------------------------------------------------------
@@ -259,6 +287,7 @@ Response `200`:
 {
   "user": { /* UserDto */ },
   "tenants": [ /* TenantMembershipDto[] */ ],
+  "preferences": { /* PreferencesDto */ },
   "activeTenantId": "tnt_01H..." | null
 }
 ```
@@ -304,9 +333,9 @@ session is kept.
 Errors: `400 validation_failed`, `401 invalid_credentials` (wrong current),
 `422 weak_password`.
 
-There is no `/auth/me`. Signin already returns everything the frontend
-needs; on SSR hydrate the frontend reads session-bound state from a
-server-only store keyed by the cookie.
+There is no `/auth/me`. Signin returns identity, memberships, preferences,
+and active tenant. On SSR hydrate the frontend reads session-bound state
+from a server-only store keyed by the cookie.
 
 ---
 
@@ -340,15 +369,22 @@ Request:
   "title": "Song",
   "artist": "A" | null,
   "album": "B" | null,
+  "trackNumber": 1 | null,
+  "genre": "Rock" | null,
+  "year": 2026 | null,
   "contentType": "audio/mpeg",
-  "sizeBytes": 8421376
+  "sizeBytes": 8421376,
+  "coverContentType": "image/jpeg" | null
 }
 ```
 
 Validation:
-- `contentType ∈ { audio/mpeg, audio/mp4, audio/wav, audio/flac, audio/ogg }`
+- `contentType ∈ { audio/mpeg, audio/mp4, audio/aac, audio/wav,
+  audio/x-wav, audio/flac, audio/ogg, audio/opus, audio/webm }`
 - `sizeBytes <= MAX_AUDIO_BYTES` (env, default 100 MiB)
-- `title` 1..200 chars; `artist`/`album` 0..200
+- `coverContentType ∈ { image/jpeg, image/png, image/webp }` when present
+- `title` 1..200 chars; `artist`/`album`/`genre` 0..200;
+  `trackNumber` positive integer; `year` 1000..9999
 
 Response `201`:
 ```json
@@ -359,7 +395,13 @@ Response `201`:
     "method": "PUT",
     "headers": { "Content-Type": "audio/mpeg" },
     "expiresAt": "2026-04-25T09:27:03.000Z"
-  }
+  },
+  "coverUpload": {
+    "url": "https://...r2.cloudflarestorage.com/...?X-Amz-...",
+    "method": "PUT",
+    "headers": { "Content-Type": "image/jpeg" },
+    "expiresAt": "2026-04-25T09:27:03.000Z"
+  } | null
 }
 ```
 
@@ -367,6 +409,8 @@ Response `201`:
   `tenants/{tenantId}/tracks/{trackId}.{ext}`.
 - `url` is a 15-minute presigned PUT bound to exact `Content-Type` and
   `Content-Length`. R2 rejects mismatched uploads.
+- `coverUpload` is returned only when `coverContentType` is present; the
+  client may upload cover art before finalizing the track.
 - Pending rows older than 1 hour with no `/finalize` are GC'd by a
   future Cron Trigger.
 
@@ -388,14 +432,22 @@ No backend involvement. Returns an R2 200 + ETag.
 
 Request:
 ```json
-{ "durationMs": 215432, "lyricsLrc": "[ti:...]\n[00:12.34]line\n..." | null }
+{
+  "durationMs": 215432,
+  "lyricsLrc": "[ti:...]\n[00:12.34]line\n..." | null,
+  "coverUploaded": true | false
+}
 ```
 
 Server actions:
 1. `HEAD` the R2 object; verify it exists, `Content-Type` matches, and
    `Content-Length <= MAX_AUDIO_BYTES`.
 2. Trust `durationMs` from client; validate `> 0` and `< 6h`.
-3. Flip `status` to `"ready"`, persist `durationMs`, `lyricsLrc`,
+3. If `coverUploaded=true`, `HEAD` the cover object and persist
+   `cover_r2_key` when it exists and matches the requested content type.
+4. Parse `lyricsLrc` to derive `lyricsStatus` (`synced`, `plain`,
+   `invalid`, or `none`).
+5. Flip `status` to `"ready"`, persist `durationMs`, lyrics fields,
    `sizeBytes` from R2, `updatedAt = now`.
 
 Response `200`: `TrackDto` with `status:"ready"`.
@@ -414,13 +466,51 @@ Errors:
 
 #### `PATCH /tracks/{id}`
 
-Editable fields: `title`, `artist`, `album`, `lyricsLrc`. All optional;
-omitted fields unchanged; `null` clears (except `title`).
+Editable fields: `title`, `artist`, `album`, `trackNumber`, `genre`, `year`.
+All optional; omitted fields unchanged; `null` clears nullable fields.
 
 ```json
-{ "title": "New name", "lyricsLrc": null }
+{ "title": "New name", "genre": "Ambient", "year": 2026 }
 ```
 Response `200`: `TrackDto`.
+
+#### `PUT /tracks/{id}/lyrics`
+
+Upload or replace the track's lyric text. The frontend reads `.lrc` files as
+text and sends their contents; there is no separate binary lyric upload.
+
+```json
+{ "lyricsLrc": "[00:12.34]line\n..." }
+```
+
+Response `200`: `TrackDto` with server-derived `lyricsStatus`:
+- `none` — no lyric text
+- `synced` — valid timestamped LRC lines are present
+- `plain` — non-empty text has no timestamps
+- `invalid` — timestamp-like LRC content could not be parsed safely
+
+#### `DELETE /tracks/{id}/lyrics`
+
+Clears lyric text. Response `200`: `TrackDto` with `lyricsStatus:"none"`.
+
+#### `POST /tracks/{id}/cover-upload`
+
+Request:
+```json
+{ "contentType": "image/jpeg", "sizeBytes": 245760 }
+```
+
+Response `200`: `{ "upload": { "url": "...", "method": "PUT", "headers": { "Content-Type": "image/jpeg" }, "expiresAt": "..." } }`.
+The client PUTs directly to R2, then calls `POST /tracks/{id}/cover-finalize`.
+
+#### `POST /tracks/{id}/cover-finalize`
+
+Verifies the uploaded cover object and makes it active. Response `200`:
+`TrackDto` with a refreshed `coverUrl`.
+
+#### `DELETE /tracks/{id}/cover`
+
+Removes cover art from the track metadata. Response `200`: `TrackDto`.
 
 #### `DELETE /tracks/{id}`
 
@@ -576,6 +666,28 @@ no full-text); revisit if the library grows beyond a few thousand rows.
 
 Errors: `400 validation_failed` if `q` empty.
 
+### 5.6 Preferences
+
+Preferences are scoped to the signed-in user, not to a tenant. They drive
+Settings, localization, playback defaults, and initial SSR rendering.
+
+#### `GET /me/preferences`
+
+Response `200`: `PreferencesDto`. Creates a default preference row lazily if
+one does not exist.
+
+#### `PATCH /me/preferences`
+
+Editable fields: `language`, `autoPlayNext`, `showMiniPlayer`,
+`preferSyncedLyrics`, `defaultLibrarySort`. All optional; omitted fields are
+unchanged.
+
+```json
+{ "language": "zh", "autoPlayNext": false }
+```
+
+Response `200`: `PreferencesDto`.
+
 ---
 
 ## 6. Admin
@@ -590,10 +702,10 @@ captures the request body (with secrets redacted: `password`, tokens).
 
 #### `GET /admin/users`
 Query: `limit`, `cursor`, `q` (email/displayName substring),
-`includeInactive`. Response: `{ items: UserDto[], nextCursor }`.
+`includeInactive`. Response: `{ items: AdminUserListItemDto[], nextCursor }`.
 
 #### `GET /admin/users/{id}`
-Response: `UserDto`.
+Response: `AdminUserDetailDto`.
 
 #### `POST /admin/users`
 ```json
@@ -625,18 +737,19 @@ Self-delete rejected `422 cannot_self_delete`.
 ### 6.2 Tenants
 
 #### `GET /admin/tenants`
-Query: `limit`, `cursor`, `q`. Response: `{ items: TenantDto[], nextCursor }`.
+Query: `limit`, `cursor`, `q`. Response:
+`{ items: AdminTenantListItemDto[], nextCursor }`.
 
 #### `GET /admin/tenants/{id}`
 Response: `TenantDto`.
 
 #### `POST /admin/tenants`
 ```json
-{ "name": "Acme Family", "ownerUserId": "usr_01H..." | null }
+{ "name": "Acme Family", "ownerUserId": "usr_01H..." }
 ```
-- If `ownerUserId` present, a membership with `role='owner'` is created
-  atomically.
-- Response `201`: `{ tenant: TenantDto, ownership: TenantMembershipDto | null }`.
+- A membership with `role='owner'` is created atomically. Tenants cannot be
+  created without an initial owner.
+- Response `201`: `{ tenant: TenantDto, ownership: TenantMembershipDto }`.
 - Errors: `404 user_not_found`.
 - Audit: `tenant.create`.
 
@@ -667,12 +780,13 @@ Response `201`: `TenantMembershipDto`. Errors: `404 user_not_found`,
 ```json
 { "role": "owner" }
 ```
-Response: `TenantMembershipDto`. Audit: `membership.update`.
+Response: `TenantMembershipDto`. Demoting the last owner is rejected with
+`422 cannot_remove_last_owner`. Audit: `membership.update`.
 
 #### `DELETE /admin/tenants/{id}/members/{userId}`
-Removes membership (hard delete — the row has no useful tombstone once
-the user is out). Sessions with this tenant active drop `active_tenant_id`.
-`204`. Audit: `membership.delete`.
+Soft-deletes the membership. Sessions with this tenant active drop
+`active_tenant_id`. Removing the last owner is rejected with
+`422 cannot_remove_last_owner`. `204`. Audit: `membership.delete`.
 
 ### 6.4 Audit logs
 
@@ -701,12 +815,13 @@ Append-only; no write endpoint.
 ```
 
 Client responsibility:
-1. Call `POST /tracks` with metadata.
+1. Call `POST /tracks` with metadata and optional `coverContentType`.
 2. `PUT` file bytes directly to `upload.url` with the exact
    `Content-Type` and `Content-Length`.
-3. On R2 success, call `POST /tracks/{id}/finalize` with
+3. If `coverUpload` is present, `PUT` cover bytes directly to that URL.
+4. On R2 success, call `POST /tracks/{id}/finalize` with
    `durationMs` (read from `HTMLAudioElement.duration` after loading
-   metadata client-side).
+   metadata client-side), optional `lyricsLrc`, and `coverUploaded`.
 
 Failure modes the client must handle:
 - R2 PUT times out / 4xx → surface error, allow retry. The track row stays
@@ -760,6 +875,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 422  | `weak_password`              | Password fails policy                            |
 | 422  | `cannot_self_downgrade`      | Admin tried to demote/deactivate themselves      |
 | 422  | `cannot_self_delete`         | Admin tried to delete themselves                 |
+| 422  | `cannot_remove_last_owner`   | Admin tried to remove/demote a tenant's last owner |
 | 424  | `upload_missing`             | `/finalize` but R2 object absent                 |
 | 429  | `rate_limited`               | Auth rate limit exceeded                         |
 | 500  | `internal_error`             | Fallback; logged with request id                 |
@@ -789,7 +905,7 @@ backend/src/
     orm.ts
     dto.ts
     repository.ts
-    service.ts     presign, finalize, soft-delete, stream-url
+    service.ts     presign, finalize, soft-delete, lyrics, covers, stream-url
     route.ts       /tracks/*
   playlists/
     orm.ts         playlists, playlist_tracks
@@ -807,6 +923,12 @@ backend/src/
     dto.ts         SearchHitDto
     service.ts     ranking heuristic across tracks + playlists
     route.ts       /search
+  prefs/
+    orm.ts         user_preferences
+    dto.ts         PreferencesDto
+    repository.ts
+    service.ts     user preference defaults and updates
+    route.ts       /me/preferences
   admin/
     dto.ts
     service.ts     audit wrappers over per-feature services

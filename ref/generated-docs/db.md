@@ -51,10 +51,9 @@ one is bad) and `playback_history` rows that lose their referenced track
 (handled via FK `ON DELETE CASCADE`).
 
 > **Memberships.** Both `user.delete` cascade and admin
-> `membership.delete` set `deleted_at`. The API spec describes the latter
-> as "hard delete"; we soft-delete uniformly so audit_log entries that
-> reference a removed membership stay readable. Reads filter
-> `deleted_at IS NULL` so the contract is preserved.
+> `membership.delete` set `deleted_at`. We soft-delete uniformly so
+> audit_log entries that reference a removed membership stay readable.
+> Reads filter `deleted_at IS NULL` so the API contract is preserved.
 
 ### 1.4 Tenant scoping
 
@@ -161,6 +160,8 @@ Tenant deletion cascades a soft delete to its tracks, playlists,
 playlist_tracks, memberships, and clears `sessions.active_tenant_id`.
 That cascade is service-level (not FK `ON DELETE`), so all writes go
 through the same "set deleted_at" path and we keep audit trails.
+Tenant creation must atomically create an initial owner membership; ownerless
+tenants are not valid in v1.
 
 ### 2.4 `memberships`
 
@@ -195,14 +196,14 @@ inside the same transaction.
 export const tracks = sqliteTable('tracks', {
   id:           text('id').primaryKey(),
   tenantId:     text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  uploaderId:   text('uploader_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+  uploaderId:   text('uploader_id').notNull().references(() => users.id),
 
   // Core metadata (matches TrackDto)
   title:        text('title').notNull(),
   artist:       text('artist'),
   album:        text('album'),
   durationMs:   integer('duration_ms'),
-  contentType:  text('content_type').notNull(),               // audio/mpeg, audio/flac, ...
+  contentType:  text('content_type').notNull(),               // audio/mpeg, audio/mp4, audio/aac, audio/webm, ...
   sizeBytes:    integer('size_bytes').notNull(),
 
   // Extended ID3-style metadata (UI Edit Metadata page)
@@ -211,7 +212,9 @@ export const tracks = sqliteTable('tracks', {
   year:         integer('year'),
 
   // Lyrics
-  lyricsLrc:    text('lyrics_lrc'),                           // raw LRC; nullable
+  lyricsLrc:    text('lyrics_lrc'),                           // raw lyric text; nullable
+  lyricsStatus: text('lyrics_status', { enum: ['none', 'synced', 'plain', 'invalid'] })
+                  .notNull().default('none'),
 
   // Asset keys
   audioR2Key:   text('audio_r2_key').notNull(),               // tenants/{tenantId}/tracks/{trackId}.{ext}
@@ -233,15 +236,16 @@ export const tracks = sqliteTable('tracks', {
 }));
 ```
 
-> **DTO note.** `TrackDto` in `api.md` does NOT yet expose
-> `trackNumber/genre/year/coverR2Key`. The schema persists them so the
-> Edit Metadata page (UI #6) and cover art (UI #4, #5, #16) work.
-> `tracks/dto.ts` must extend `TrackDto` with `trackNumber`, `genre`,
-> `year`, and a derived `coverUrl` (presigned, like `stream-url`), and
-> `api.md` should be updated in the same PR that adds those fields.
+`TrackDto` exposes `trackNumber`, `genre`, `year`, a derived presigned
+`coverUrl`, `lyricsLrc`, and `lyricsStatus`. The service derives
+`lyricsStatus` whenever lyrics are created, replaced, removed, or finalized.
 
-`uploader_id` is `SET NULL` on user delete so historical uploads remain
-visible to other tenant members after the uploader is gone.
+Users are soft-deleted, not physically deleted, so `uploader_id` remains
+non-null and historical uploads remain visible to other tenant members after
+the uploader is gone.
+
+Supported audio formats are the common private-library set from `api.md`:
+MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, and WebM audio.
 
 ### 2.6 `playlists`
 
@@ -249,7 +253,7 @@ visible to other tenant members after the uploader is gone.
 export const playlists = sqliteTable('playlists', {
   id:           text('id').primaryKey(),
   tenantId:     text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
-  ownerId:      text('owner_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+  ownerId:      text('owner_id').notNull().references(() => users.id),
   name:         text('name').notNull(),
   description:  text('description'),
   createdAt:    integer('created_at', { mode: 'timestamp' }).notNull(),
@@ -335,8 +339,7 @@ in scope today) would resurface its history naturally.
 ### 2.9 `user_preferences`
 
 UI Settings page (#19) toggles plus language. One row per user; created
-lazily on first `PATCH /me/preferences` (a future endpoint to add
-alongside this table).
+lazily on first `GET /me/preferences` or `PATCH /me/preferences`.
 
 ```ts
 export const userPreferences = sqliteTable('user_preferences', {
@@ -352,9 +355,8 @@ export const userPreferences = sqliteTable('user_preferences', {
 });
 ```
 
-The signin response should embed a `preferences` field (or the SSR layer
-fetches it directly); add it to `UserDto` or as a sibling key when
-implementing.
+The signin response embeds a sibling `preferences` field so SSR can render
+with the right language and defaults on first paint.
 
 ### 2.10 `audit_logs`
 
@@ -364,7 +366,7 @@ column with secrets pre-redacted by the wrapper.
 ```ts
 export const auditLogs = sqliteTable('audit_logs', {
   id:          text('id').primaryKey(),
-  actorId:     text('actor_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+  actorId:     text('actor_id').notNull().references(() => users.id),
   action:      text('action').notNull(),                              // e.g. user.create, tenant.admin_enter
   targetType:  text('target_type', { enum: ['user', 'tenant', 'membership', 'track', 'playlist'] }).notNull(),
   targetId:    text('target_id').notNull(),                           // not FK: target may be soft-deleted
@@ -471,19 +473,15 @@ in a follow-up step within the same migration to break the cycle with
 
 ---
 
-## 6. Open follow-ups for `api.md`
+## 6. API sync checklist
 
-The DB design captures things the UI needs that the current API doc
-omits. When implementing each feature, update `api.md` together:
+The DB/UI-required contracts are reflected in `api.md`:
 
-- Extend `TrackDto` with `trackNumber`, `genre`, `year`, `coverUrl`.
-  Extend `PATCH /tracks/{id}` body to accept those fields. Add
-  `GET /tracks/{id}/cover-url` (or merge into `stream-url`) as a
-  presigned GET, mirroring the streaming flow.
-- Add a cover-art branch to the upload flow: `POST /tracks` returns a
-  second `coverUpload` presign block when the client sets
-  `coverContentType`; `/finalize` stamps `cover_r2_key` if the cover
-  HEAD succeeds.
-- Add `GET/PATCH /me/preferences` for `user_preferences`. Embed the
-  payload in the signin response so SSR can render with the right
-  language/sort defaults on first paint.
+- `TrackDto` exposes `trackNumber`, `genre`, `year`, `coverUrl`,
+  `lyricsLrc`, and `lyricsStatus`.
+- Track upload supports optional cover upload; existing tracks support
+  cover upload/finalize/remove and lyrics upload/replace/remove.
+- `GET/PATCH /me/preferences` exists and signin embeds `preferences`.
+- Admin list DTOs expose the summary counts needed by the mobile admin UI.
+- Admin user detail embeds memberships, and tenant creation requires an
+  initial owner.

@@ -69,7 +69,7 @@ UI elements:
 - Continue Listening card (populated from server-side playback history)
 - Recently Played horizontal list (server-side history)
 - Recently Uploaded horizontal list
-- Pinned or Favorite Playlists section
+- Recently Updated Playlists section
 - Upload shortcut card
 - Bottom navigation
 - Mini-player if something is playing
@@ -109,7 +109,7 @@ UI elements:
 - Artist
 - Album
 - Duration
-- File format badge, such as MP3, FLAC, AAC, M4A, WAV, OGG
+- File format badge, such as MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, WebM audio
 - Lyrics status badge:
   - Synced Lyrics
   - Plain Lyrics
@@ -118,7 +118,6 @@ UI elements:
 - Primary Play button
 - Secondary actions:
   - Edit Metadata
-  - Replace Audio
   - Upload/Replace Lyrics
   - Add to Playlist
   - Delete
@@ -150,7 +149,7 @@ UI elements:
 - Large tap-to-select upload area
 - Secondary hint: "Upload audio files and .lrc lyrics files"
 - Supported audio format hint:
-  - MP3, FLAC, AAC, M4A, WAV, OGG
+  - MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, WebM audio
 - Bulk upload supported hint
 - Buttons:
   - Select Files
@@ -223,7 +222,7 @@ Do not include public playlists or social playlists.
 Purpose: create a custom playlist.
 UI elements:
 - Header with Cancel and Save
-- Playlist cover selector, optional
+- Generated playlist cover preview (auto-collage from track covers; not manually selectable)
 - Playlist Name field
 - Description field, optional
 - Create button
@@ -233,7 +232,7 @@ Keep it simple.
 Purpose: rename or modify playlist details.
 UI elements:
 - Header with Cancel and Save
-- Cover selector
+- Generated playlist cover preview (auto-collage from track covers; not manually selectable)
 - Playlist Name field
 - Description field
 - Delete Playlist action
@@ -407,7 +406,7 @@ UI elements:
   - Member count
   - Track count, optional
   - Created date
-- "Create Tenant" button with form (name, optional initial owner)
+- "Create Tenant" button with form (name, required initial owner)
 - Row tap opens Tenant Detail:
   - Edit name
   - Members list (tap opens page #24)
@@ -435,7 +434,7 @@ UI elements:
 - Log row:
   - Timestamp
   - Actor (email + admin badge if applicable)
-  - Action (e.g., user.create, user.reset_password, user.disable, tenant.create, tenant.delete, tenant.admin_enter, membership.add, membership.remove, membership.role_change)
+  - Action (e.g., user.create, user.update, user.reset_password, tenant.create, tenant.delete, tenant.admin_enter, membership.create, membership.update, membership.delete)
   - Target (user email, tenant name, membership pair)
   - Tap for detail sheet with raw metadata
 - Empty state if no logs match filters
