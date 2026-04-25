@@ -1,0 +1,489 @@
+# Database
+
+Storage = Cloudflare D1 (SQLite). ORM = Drizzle. Audio bytes and cover art
+live in R2 and are referenced by key only; D1 holds metadata, identity,
+authorization, playback state, preferences, and audit history.
+
+This doc is the contract between the schema and the rest of the app
+(`api.md`, `ui-design.md`). It supersedes the placeholder in
+`backend/src/db/schema.ts`.
+
+---
+
+## 1. Conventions
+
+### 1.1 IDs
+
+Opaque text primary keys, prefixed by entity for human grepability:
+
+| Entity              | Prefix  | Example                       |
+| ------------------- | ------- | ----------------------------- |
+| `users`             | `usr_`  | `usr_01HF8Z5Q3A...`           |
+| `sessions`          | —       | row keyed by token hash       |
+| `tenants`           | `tnt_`  | `tnt_01HF8Z5Q3A...`           |
+| `memberships`       | `mbr_`  | `mbr_01HF8Z5Q3A...`           |
+| `tracks`            | `trk_`  | `trk_01HF8Z5Q3A...`           |
+| `playlists`         | `pls_`  | `pls_01HF8Z5Q3A...`           |
+| `playlist_tracks`   | `plt_`  | `plt_01HF8Z5Q3A...`           |
+| `playback_history`  | —       | composite `(user, tenant, track)` |
+| `user_preferences`  | —       | `user_id` is the PK           |
+| `audit_logs`        | `aud_`  | `aud_01HF8Z5Q3A...`           |
+
+The body is a 26-char Crockford-base32 ULID generated at insert time, so
+IDs sort lexicographically by creation time. D1 rowid is never exposed.
+
+### 1.2 Time
+
+All timestamp columns are `INTEGER` storing **unix seconds** (Drizzle
+`integer({ mode: 'timestamp' })`). The wire DTOs convert to ISO-8601 in
+`dto.ts` per feature. There is no timezone column anywhere — UTC only.
+
+### 1.3 Soft delete
+
+Every domain row that the user can "delete" carries
+`deleted_at INTEGER NULL`. List/get queries always filter
+`WHERE deleted_at IS NULL` unless an admin/own-resource flow explicitly
+opts in (e.g. a 410 response). R2 objects are kept until a future Cron
+Trigger GC.
+
+Hard deletes only happen on `sessions` (row IS the credential — leaking
+one is bad) and `playback_history` rows that lose their referenced track
+(handled via FK `ON DELETE CASCADE`).
+
+> **Memberships.** Both `user.delete` cascade and admin
+> `membership.delete` set `deleted_at`. The API spec describes the latter
+> as "hard delete"; we soft-delete uniformly so audit_log entries that
+> reference a removed membership stay readable. Reads filter
+> `deleted_at IS NULL` so the contract is preserved.
+
+### 1.4 Tenant scoping
+
+Every tenant-scoped resource carries a non-null `tenant_id` FK. There is
+no global "library" — a track only exists inside one tenant. Cross-tenant
+visibility is never granted; admins see other tenants by switching their
+session's `active_tenant_id`.
+
+### 1.5 Drizzle module layout
+
+Each feature owns its `orm.ts`. Cross-feature FKs are declared via
+`references(() => otherTable.id)` and re-exported through a barrel
+`backend/src/db/schema.ts` so migrations see one consolidated graph.
+
+```
+backend/src/
+  users/orm.ts        users
+  auth/orm.ts         sessions
+  tenants/orm.ts      tenants, memberships
+  tracks/orm.ts       tracks
+  playlists/orm.ts    playlists, playlist_tracks
+  playback/orm.ts     playback_history
+  prefs/orm.ts        user_preferences
+  audit/orm.ts        audit_logs
+  db/schema.ts        re-exports all of the above
+```
+
+---
+
+## 2. Tables
+
+### 2.1 `users`
+
+Identity. Email is globally unique (signin happens before tenant
+selection). `last_active_tenant_id` lets the signin response default a
+returning user back into their previous workspace even after the cookie
+expired.
+
+```ts
+export const users = sqliteTable('users', {
+  id:                  text('id').primaryKey(),
+  email:               text('email').notNull(),
+  passwordHash:        text('password_hash').notNull(),       // argon2id encoded
+  displayName:         text('display_name'),
+  isAdmin:             integer('is_admin', { mode: 'boolean' }).notNull().default(false),
+  isActive:            integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  lastActiveTenantId:  text('last_active_tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+  createdAt:           integer('created_at',  { mode: 'timestamp' }).notNull(),
+  updatedAt:           integer('updated_at',  { mode: 'timestamp' }).notNull(),
+  deletedAt:           integer('deleted_at',  { mode: 'timestamp' }),
+}, (t) => ({
+  emailUq:             uniqueIndex('users_email_uq').on(t.email).where(sql`${t.deletedAt} IS NULL`),
+}));
+```
+
+Notes:
+- Email uniqueness is partial: a soft-deleted user does not block a new
+  signup with the same email.
+- `is_admin = true` plus `deleted_at IS NULL` is the gate for `/admin/*`.
+- `is_active = false` produces 403 `account_disabled` on signin.
+
+### 2.2 `sessions`
+
+Oslo-style: client holds a 20-byte base32 token; DB stores SHA-256 hex
+of it as the primary key. A leaked DB never leaks a usable cookie.
+
+```ts
+export const sessions = sqliteTable('sessions', {
+  tokenHash:        text('token_hash').primaryKey(),          // sha256 hex of cookie value
+  userId:           text('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
+  activeTenantId:   text('active_tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+  expiresAt:        integer('expires_at',     { mode: 'timestamp' }).notNull(),
+  lastRefreshedAt:  integer('last_refreshed_at', { mode: 'timestamp' }).notNull(),
+  createdAt:        integer('created_at',     { mode: 'timestamp' }).notNull(),
+  userAgent:        text('user_agent'),                       // for password-change "revoke other sessions" UX
+  ip:               text('ip'),
+}, (t) => ({
+  byUser:           index('sessions_user_idx').on(t.userId),
+  byExpiry:         index('sessions_expires_idx').on(t.expiresAt),
+}));
+```
+
+Lifecycle: insert on signin, update `last_refreshed_at` (and slide
+`expires_at` by 30 d) when the request is ≥1 d past the last refresh,
+`DELETE FROM sessions WHERE token_hash = ?` on signout. Password change
+deletes all sibling rows for the same `user_id` except the current one.
+A future Cron Trigger sweeps `expires_at < now`.
+
+### 2.3 `tenants`
+
+```ts
+export const tenants = sqliteTable('tenants', {
+  id:         text('id').primaryKey(),
+  name:       text('name').notNull(),
+  createdAt:  integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt:  integer('updated_at', { mode: 'timestamp' }).notNull(),
+  deletedAt:  integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  nameUq:     uniqueIndex('tenants_name_uq').on(t.name).where(sql`${t.deletedAt} IS NULL`),
+}));
+```
+
+Tenant deletion cascades a soft delete to its tracks, playlists,
+playlist_tracks, memberships, and clears `sessions.active_tenant_id`.
+That cascade is service-level (not FK `ON DELETE`), so all writes go
+through the same "set deleted_at" path and we keep audit trails.
+
+### 2.4 `memberships`
+
+Join row between users and tenants. Both `(user, tenant)` and the
+membership row itself carry an id so `audit_logs.target_id` can point
+at it stably.
+
+```ts
+export const memberships = sqliteTable('memberships', {
+  id:          text('id').primaryKey(),
+  userId:      text('user_id').notNull().references(() => users.id,   { onDelete: 'cascade' }),
+  tenantId:    text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  role:        text('role', { enum: ['owner', 'member'] }).notNull(),
+  createdAt:   integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt:   integer('updated_at', { mode: 'timestamp' }).notNull(),
+  deletedAt:   integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  uniq:        uniqueIndex('memberships_user_tenant_uq')
+                 .on(t.userId, t.tenantId)
+                 .where(sql`${t.deletedAt} IS NULL`),
+  byTenant:    index('memberships_tenant_idx').on(t.tenantId),
+}));
+```
+
+The "last owner cannot be removed/demoted" rule (UI page #24) is enforced
+in the service layer with a `SELECT count(*) … role='owner'` precheck
+inside the same transaction.
+
+### 2.5 `tracks`
+
+```ts
+export const tracks = sqliteTable('tracks', {
+  id:           text('id').primaryKey(),
+  tenantId:     text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  uploaderId:   text('uploader_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+
+  // Core metadata (matches TrackDto)
+  title:        text('title').notNull(),
+  artist:       text('artist'),
+  album:        text('album'),
+  durationMs:   integer('duration_ms'),
+  contentType:  text('content_type').notNull(),               // audio/mpeg, audio/flac, ...
+  sizeBytes:    integer('size_bytes').notNull(),
+
+  // Extended ID3-style metadata (UI Edit Metadata page)
+  trackNumber:  integer('track_number'),
+  genre:        text('genre'),
+  year:         integer('year'),
+
+  // Lyrics
+  lyricsLrc:    text('lyrics_lrc'),                           // raw LRC; nullable
+
+  // Asset keys
+  audioR2Key:   text('audio_r2_key').notNull(),               // tenants/{tenantId}/tracks/{trackId}.{ext}
+  coverR2Key:   text('cover_r2_key'),                         // optional separate cover image
+
+  // Lifecycle
+  status:       text('status', { enum: ['pending', 'ready'] }).notNull().default('pending'),
+  createdAt:    integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt:    integer('updated_at', { mode: 'timestamp' }).notNull(),
+  deletedAt:    integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  byTenant:     index('tracks_tenant_idx').on(t.tenantId, t.deletedAt, t.status),
+  byTenantCreatedAt: index('tracks_tenant_created_idx').on(t.tenantId, t.createdAt),
+  byTenantTitle:     index('tracks_tenant_title_idx').on(t.tenantId, t.title),
+  byTenantArtist:    index('tracks_tenant_artist_idx').on(t.tenantId, t.artist),
+  byTenantAlbum:     index('tracks_tenant_album_idx').on(t.tenantId, t.album),
+  byPendingCleanup:  index('tracks_pending_cleanup_idx')
+                       .on(t.status, t.createdAt),            // Cron Trigger GC
+}));
+```
+
+> **DTO note.** `TrackDto` in `api.md` does NOT yet expose
+> `trackNumber/genre/year/coverR2Key`. The schema persists them so the
+> Edit Metadata page (UI #6) and cover art (UI #4, #5, #16) work.
+> `tracks/dto.ts` must extend `TrackDto` with `trackNumber`, `genre`,
+> `year`, and a derived `coverUrl` (presigned, like `stream-url`), and
+> `api.md` should be updated in the same PR that adds those fields.
+
+`uploader_id` is `SET NULL` on user delete so historical uploads remain
+visible to other tenant members after the uploader is gone.
+
+### 2.6 `playlists`
+
+```ts
+export const playlists = sqliteTable('playlists', {
+  id:           text('id').primaryKey(),
+  tenantId:     text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  ownerId:      text('owner_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+  name:         text('name').notNull(),
+  description:  text('description'),
+  createdAt:    integer('created_at', { mode: 'timestamp' }).notNull(),
+  updatedAt:    integer('updated_at', { mode: 'timestamp' }).notNull(),
+  deletedAt:    integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  nameUq:       uniqueIndex('playlists_tenant_name_uq')
+                  .on(t.tenantId, t.name)
+                  .where(sql`${t.deletedAt} IS NULL`),         // 409 playlist_name_conflict
+  byTenant:     index('playlists_tenant_idx').on(t.tenantId, t.updatedAt),
+}));
+```
+
+`PlaylistDto.trackCount` is computed at read time from `playlist_tracks`
+where both rows are non-deleted; it is not denormalized.
+
+Playlist covers are not stored — UI renders an auto-collage from the
+first N member tracks' `cover_r2_key`s. (UI design board's "cover
+selector" on create/edit is decorative for v1.)
+
+### 2.7 `playlist_tracks`
+
+Internal column `position_frac` is a `REAL` so reorders touch one row.
+The DTO's 1-based `position` is computed at read time via SQL
+`ROW_NUMBER() OVER (PARTITION BY playlist_id ORDER BY position_frac)`.
+
+```ts
+export const playlistTracks = sqliteTable('playlist_tracks', {
+  id:           text('id').primaryKey(),
+  playlistId:   text('playlist_id').notNull().references(() => playlists.id, { onDelete: 'cascade' }),
+  trackId:      text('track_id').notNull().references(() => tracks.id,   { onDelete: 'cascade' }),
+  positionFrac: real('position_frac').notNull(),
+  addedAt:      integer('added_at',   { mode: 'timestamp' }).notNull(),
+  deletedAt:    integer('deleted_at', { mode: 'timestamp' }),
+}, (t) => ({
+  uniq:         uniqueIndex('playlist_tracks_uq')
+                  .on(t.playlistId, t.trackId)
+                  .where(sql`${t.deletedAt} IS NULL`),         // 409 track_already_in_playlist
+  byPosition:   index('playlist_tracks_position_idx')
+                  .on(t.playlistId, t.deletedAt, t.positionFrac),
+}));
+```
+
+Insert math:
+- Append: `positionFrac = (SELECT max(position_frac) ... ) + 1.0` (or
+  `1.0` if empty).
+- Insert at requested 1-based `k`: read the two neighbours' `position_frac`
+  values, set the new row to their midpoint.
+- Reorder of an existing row: same midpoint computation against the new
+  neighbours.
+- Periodic rebalance (or on degenerate gaps `< 1e-9`): rewrite the
+  whole partition with `positionFrac = ROW_NUMBER()`.
+
+This keeps writes O(1) for reorders while the API still hands clients
+dense 1..N positions.
+
+### 2.8 `playback_history`
+
+One row per `(userId, tenantId, trackId)`. Last-wins semantics. No raw
+event log — `progress` events upsert this row; `ended` clears
+`lastPositionMs` to 0 (so it leaves Continue Listening but stays in
+Recently Played, exactly per the API spec).
+
+```ts
+export const playbackHistory = sqliteTable('playback_history', {
+  userId:          text('user_id').notNull().references(() => users.id,   { onDelete: 'cascade' }),
+  tenantId:        text('tenant_id').notNull().references(() => tenants.id, { onDelete: 'cascade' }),
+  trackId:         text('track_id').notNull().references(() => tracks.id,  { onDelete: 'cascade' }),
+  lastPlaylistId:  text('last_playlist_id').references(() => playlists.id, { onDelete: 'set null' }),
+  lastPlayedAt:    integer('last_played_at',   { mode: 'timestamp' }).notNull(),
+  lastPositionMs:  integer('last_position_ms').notNull(),
+  updatedAt:       integer('updated_at',       { mode: 'timestamp' }).notNull(),
+}, (t) => ({
+  pk:              primaryKey({ columns: [t.userId, t.tenantId, t.trackId] }),
+  recent:          index('playback_recent_idx').on(t.userId, t.tenantId, t.lastPlayedAt),
+}));
+```
+
+Soft-deleted tracks are filtered out at the JOIN with `tracks`, not by
+deleting these rows — so undeleting a track later (admin-only path, not
+in scope today) would resurface its history naturally.
+
+### 2.9 `user_preferences`
+
+UI Settings page (#19) toggles plus language. One row per user; created
+lazily on first `PATCH /me/preferences` (a future endpoint to add
+alongside this table).
+
+```ts
+export const userPreferences = sqliteTable('user_preferences', {
+  userId:               text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
+  language:             text('language', { enum: ['en', 'zh'] }).notNull().default('en'),
+  autoPlayNext:         integer('auto_play_next',          { mode: 'boolean' }).notNull().default(true),
+  showMiniPlayer:       integer('show_mini_player',        { mode: 'boolean' }).notNull().default(true),
+  preferSyncedLyrics:   integer('prefer_synced_lyrics',    { mode: 'boolean' }).notNull().default(true),
+  defaultLibrarySort:   text('default_library_sort',
+                            { enum: ['createdAt:desc', 'title:asc', 'artist:asc', 'album:asc'] })
+                          .notNull().default('createdAt:desc'),
+  updatedAt:            integer('updated_at', { mode: 'timestamp' }).notNull(),
+});
+```
+
+The signin response should embed a `preferences` field (or the SSR layer
+fetches it directly); add it to `UserDto` or as a sibling key when
+implementing.
+
+### 2.10 `audit_logs`
+
+Append-only. Written by the admin service wrappers. `meta` is a JSON
+column with secrets pre-redacted by the wrapper.
+
+```ts
+export const auditLogs = sqliteTable('audit_logs', {
+  id:          text('id').primaryKey(),
+  actorId:     text('actor_id').notNull().references(() => users.id, { onDelete: 'set null' }),
+  action:      text('action').notNull(),                              // e.g. user.create, tenant.admin_enter
+  targetType:  text('target_type', { enum: ['user', 'tenant', 'membership', 'track', 'playlist'] }).notNull(),
+  targetId:    text('target_id').notNull(),                           // not FK: target may be soft-deleted
+  tenantId:    text('tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
+  meta:        text('meta', { mode: 'json' }).$type<Record<string, unknown>>().notNull().default({}),
+  createdAt:   integer('created_at', { mode: 'timestamp' }).notNull(),
+}, (t) => ({
+  byCreated:   index('audit_logs_created_idx').on(t.createdAt),
+  byActor:     index('audit_logs_actor_idx').on(t.actorId, t.createdAt),
+  byTenant:    index('audit_logs_tenant_idx').on(t.tenantId, t.createdAt),
+  byAction:    index('audit_logs_action_idx').on(t.action, t.createdAt),
+  byTarget:    index('audit_logs_target_idx').on(t.targetType, t.targetId),
+}));
+```
+
+`target_id` is intentionally not an FK because targets get soft-deleted;
+the audit row must remain pointing at them.
+
+---
+
+## 3. Cross-cutting integrity rules
+
+These are enforced in the service layer (FP `(deps) => (input) => Result`)
+because SQLite cannot express them as constraints:
+
+1. **Last-owner protection.** A tenant must always have ≥1 non-deleted
+   membership with `role='owner'`. `membership.delete` and
+   `membership.update(role='member')` reject with 422 otherwise. (UI #24)
+2. **Self-modification guard.** An admin cannot demote, deactivate, or
+   delete themselves. → 422 `cannot_self_downgrade` /
+   `cannot_self_delete`. (UI #21)
+3. **Tenant scoping on writes.** Every write to a tenant-scoped table
+   must include the resolved `active_tenant_id` from the session;
+   `service.ts` wraps each write in a `WHERE tenant_id = ?` guard.
+4. **Track readiness on stream/queue.** `GET /tracks/{id}/stream-url`
+   rejects with 409 `track_not_ready` when `status != 'ready'`. Pending
+   uploads are filtered from `GET /tracks` unless `?includePending=true`.
+5. **Pending-track GC.** A future Cron Trigger deletes tracks where
+   `status='pending' AND created_at < now - 1h` and removes the matching
+   R2 key. (Not part of v1 schema — covered by `tracks_pending_cleanup_idx`.)
+6. **Playback `ended`.** On ingest, an event with `event='ended'` writes
+   `last_position_ms = 0` regardless of the reported `positionMs`.
+7. **Playlist position rebalance.** When inserting between two
+   `position_frac` values whose gap is `< 1e-9`, the service rewrites
+   the entire playlist's positions in one statement before inserting.
+
+---
+
+## 4. Migrations
+
+Drizzle Kit (`drizzle.config.ts` already present) emits versioned SQL
+under `backend/migrations/`. Apply via `wrangler d1 migrations apply`.
+Initial migration creates everything in §2 in dependency order:
+
+```
+users → tenants → memberships
+                ↘ sessions (FK active_tenant_id, user_id)
+tenants → tracks → playlists → playlist_tracks
+                              ↘ playback_history (FK user, tenant, track, last_playlist)
+users → user_preferences
+users + tenants → audit_logs
+```
+
+`users.last_active_tenant_id` and `sessions.active_tenant_id` are added
+in a follow-up step within the same migration to break the cycle with
+`tenants`.
+
+---
+
+## 5. ER diagram
+
+```
+                ┌─────────┐
+                │ tenants │
+                └──┬──────┘
+                   │
+   ┌───────────────┼─────────────────────────────────┐
+   │               │                                 │
+┌──▼──────┐  ┌─────▼────────┐  ┌──────────┐  ┌──────▼─────┐
+│ tracks  │  │ memberships  │  │ playlists│  │ audit_logs │
+└──┬──────┘  └─────┬────────┘  └────┬─────┘  └────────────┘
+   │               │                │
+   │               │           ┌────▼────────────┐
+   │               │           │ playlist_tracks │
+   │               │           └────┬────────────┘
+   │               │                │
+   │      ┌────────▼─────┐          │
+   │      │    users     │──────────┘ (uploader_id, owner_id)
+   │      └────┬─────────┘
+   │           │
+   │      ┌────▼────────┐
+   │      │  sessions   │
+   │      └─────────────┘
+   │           │
+   │      ┌────▼────────────────┐
+   │      │ user_preferences    │
+   │      └─────────────────────┘
+   │
+┌──▼──────────────┐
+│ playback_history│
+└─────────────────┘
+   (FK to users + tenants + tracks + playlists)
+```
+
+---
+
+## 6. Open follow-ups for `api.md`
+
+The DB design captures things the UI needs that the current API doc
+omits. When implementing each feature, update `api.md` together:
+
+- Extend `TrackDto` with `trackNumber`, `genre`, `year`, `coverUrl`.
+  Extend `PATCH /tracks/{id}` body to accept those fields. Add
+  `GET /tracks/{id}/cover-url` (or merge into `stream-url`) as a
+  presigned GET, mirroring the streaming flow.
+- Add a cover-art branch to the upload flow: `POST /tracks` returns a
+  second `coverUpload` presign block when the client sets
+  `coverContentType`; `/finalize` stamps `cover_r2_key` if the cover
+  HEAD succeeds.
+- Add `GET/PATCH /me/preferences` for `user_preferences`. Embed the
+  payload in the signin response so SSR can render with the right
+  language/sort defaults on first paint.
