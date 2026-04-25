@@ -6,14 +6,20 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
+		"deploy": "WRANGLER_LOG_PATH=.wrangler/logs wrangler pages deploy .svelte-kit/cloudflare --project-name r-listener-frontend",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
+		"compile": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
-		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch"
+		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
+		"test": "npm run test:unit && npm run test:e2e",
+		"test:unit": "vitest run",
+		"test:e2e": "playwright test"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "^2.15.2",
 		"@internationalized/date": "^3.12.1",
+		"@playwright/test": "^1.59.1",
 		"@sveltejs/adapter-cloudflare": "^7.2.8",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
@@ -24,6 +30,7 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7",
+		"vitest": "^4.1.5",
 		"wrangler": "^4.85.0"
 	},
 	"dependencies": {

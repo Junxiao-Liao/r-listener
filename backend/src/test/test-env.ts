@@ -1,0 +1,36 @@
+import type { Env } from '../index';
+
+export function createTestEnv(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
+	return {
+		DB: createMockD1(),
+		R2: createMockR2(),
+		KV: createMockKV(),
+		FRONTEND_ORIGIN: 'http://localhost:5173',
+		SESSION_SECRET: 'test-session-secret',
+		...overrides
+	};
+}
+
+function createMockD1(): D1Database {
+	const statement = {
+		bind: () => statement,
+		first: async () => null,
+		run: async () => ({ success: true }),
+		all: async () => ({ results: [], success: true }),
+		raw: async () => []
+	};
+
+	return {
+		prepare: () => statement,
+		batch: async () => [],
+		exec: async () => ({ count: 0, duration: 0 })
+	} as unknown as D1Database;
+}
+
+function createMockR2(): R2Bucket {
+	return {} as R2Bucket;
+}
+
+function createMockKV(): KVNamespace {
+	return {} as KVNamespace;
+}

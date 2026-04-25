@@ -12,6 +12,7 @@
 - Elegant FP style
     - Type system, domained types
     - HOFs
+- Type def should be centralized managed within feature use `*.type.ts` naming, similarly `*.service.ts`, etc.
 - Test driven dev
     - Write tests first, as complete as possible
 
