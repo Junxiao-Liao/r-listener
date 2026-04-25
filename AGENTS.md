@@ -10,6 +10,10 @@
 ## Coding
 
 - Elegant FP style
+    - Type system, domained types
+    - HOFs
+- Test driven dev
+    - Write tests first, as complete as possible
 
 # Files
 
