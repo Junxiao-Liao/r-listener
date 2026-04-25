@@ -57,7 +57,7 @@ UI elements:
 - List of workspace cards, each with:
   - Workspace name
   - User's role in that workspace (Owner / Member)
-  - Last active indicator, if useful
+  - "Last used" chip on whichever workspace matches the user's most-recent active tenant (single workspace only)
 - Tap a card to enter that workspace and go to Home
 Single-workspace users skip this screen and land on Home directly after Sign In.
 
@@ -174,7 +174,6 @@ UI elements:
   - Ready
   - Lyrics Matched
   - Lyrics Missing
-  - Duplicate Detected
   - Unsupported Format
 - Per-track actions:
   - Choose Lyrics File

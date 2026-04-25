@@ -267,8 +267,9 @@ export const playlists = sqliteTable('playlists', {
 }));
 ```
 
-`PlaylistDto.trackCount` is computed at read time from `playlist_tracks`
-where both rows are non-deleted; it is not denormalized.
+`PlaylistDto.trackCount` and `PlaylistDto.totalDurationMs` are computed
+at read time from `playlist_tracks` joined with non-deleted, ready
+`tracks`; neither is denormalized.
 
 Playlist covers are not stored — UI renders a generated cover from the playlist name. (UI design board's "cover selector" on create/edit is decorative for v1.)
 
@@ -477,6 +478,10 @@ The DB/UI-required contracts are reflected in `api.md`:
 
 - `TrackDto` exposes `trackNumber`, `genre`, `year`, `coverUrl`,
   `lyricsLrc`, and `lyricsStatus`.
+- `UserDto` exposes `lastActiveTenantId` (sourced from
+  `users.last_active_tenant_id`) so the Tenant Picker can mark the
+  most-recent workspace.
+- `PlaylistDto` exposes `totalDurationMs`, computed at read time.
 - Track upload supports optional cover upload; existing tracks support
   cover upload/finalize/remove and lyrics upload/replace/remove.
 - `GET/PATCH /me/preferences` exists and signin embeds `preferences`.

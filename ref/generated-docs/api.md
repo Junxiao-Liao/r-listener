@@ -150,6 +150,7 @@ type UserDto = {
   displayName: string | null;
   isAdmin: boolean;
   isActive: boolean;
+  lastActiveTenantId: Id<"tenant"> | null;  // most-recent tenant across sessions; drives Tenant Picker "Last used" chip
   createdAt: Iso8601;
 };
 
@@ -217,6 +218,7 @@ type PlaylistDto = {
   name: string;
   description: string | null;
   trackCount: number;
+  totalDurationMs: number;    // SUM of non-deleted, ready tracks' durationMs; computed at read time
   createdAt: Iso8601;
   updatedAt: Iso8601;
 };
@@ -357,9 +359,9 @@ Response `200`: `{ items: TrackDto[], nextCursor }`. Excludes
 shows in-flight uploads (used by the uploads UI).
 
 #### `GET /tracks/{id}`
-Response `200`: `TrackDto`. `404 not_found` or `410 deleted` if
-soft-deleted (returned only to the tenant member who owned it; others see
-`404`).
+Response `200`: `TrackDto`. `404 not_found` if missing or soft-deleted —
+soft-deletion is invisible to clients (no 410, no owner-only signal),
+matching the UI's "deletions are non-reversible" principle.
 
 #### `POST /tracks` — **upload init** (step 1 of 3)
 
@@ -878,7 +880,6 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 409  | `playlist_name_conflict`     | Create/rename into an existing name              |
 | 409  | `track_already_in_playlist`  | Duplicate playlist-track                         |
 | 409  | `track_already_finalized`    | Second `/finalize` call                          |
-| 410  | `deleted`                    | Soft-deleted row visible to its owner            |
 | 413  | `payload_too_large`          | Upload exceeds `MAX_AUDIO_BYTES`                 |
 | 415  | `unsupported_media_type`     | Non-allowed audio MIME                           |
 | 422  | `weak_password`              | Password fails policy                            |
