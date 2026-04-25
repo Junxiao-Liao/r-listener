@@ -57,14 +57,18 @@ Do NOT include a "Create Account" link or a Sign Up page. Accounts are admin-pro
 2. Tenant Picker Page (post-login)
 Purpose: user chooses which workspace to enter for this session.
 Shown only when a user belongs to more than one workspace, or when a user re-enters the picker from Settings → Switch Workspace.
+For platform admins, also show this page when they have no direct workspace
+memberships; admins can browse all workspaces and enter any workspace.
 UI elements:
 - Header "Choose a workspace"
 - List of workspace cards, each with:
   - Workspace name
-  - User's role in that workspace (Owner / Member / Viewer)
+  - User's role in that workspace (Owner / Member / Viewer), or an Admin
+    access label when the platform admin is not a member
   - "Last used" chip on whichever workspace matches the user's most-recent active tenant (single workspace only)
 - Tap a card to enter that workspace and go to Home
-Single-workspace users skip this screen and land on Home directly after Sign In.
+Single-workspace non-admin users skip this screen and land on Home directly
+after Sign In.
 
 3. Home Page
 Purpose: main landing page after workspace selection.
@@ -497,6 +501,7 @@ Use clear section labels and page labels. Use connector arrows to show important
 - Settings → Admin → (Users | Tenants | Audit Logs)
 - Admin · Tenants → Tenant Detail → Tenant Members
 - Admin · Tenants → Enter Workspace → Home (as admin)
+- Platform admin with no memberships → Tenant Picker showing all workspaces
 
 Interaction annotations:
 Add small callout labels for important interactions:

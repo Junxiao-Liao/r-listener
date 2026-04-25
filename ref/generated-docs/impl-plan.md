@@ -25,17 +25,24 @@ Decisions already locked:
 - Tests: Vitest + Playwright.
 - Runtime validation: Zod.
 - Browser session cookies: set and clear in the SvelteKit BFF.
+- Rolling session refresh: backend returns refreshed expiry metadata;
+  SvelteKit resets the browser cookie.
 - Initial admin/bootstrap: manual SQL, not a seed command.
 - Infrastructure: automate Wrangler setup/deploy scripts.
 - Upload metadata: browser-side parser with filename fallback.
 - Queue: backend-persisted per user and tenant.
 - Queue API style: CRUD rows.
+- Current-session hydration: `GET /auth/session`.
+- Frontend page implementation: feature pages under `frontend/src/pages`,
+  with SvelteKit routes kept thin.
 
 ## Architecture Rules
 
 - Preserve feature grouping required by `AGENTS.md`.
 - Backend features use `repository`, `orm`, `dto`, `service`, and `route`.
-- Frontend pages stay self-contained under `frontend/src/routes`.
+- Frontend feature pages stay self-contained under `frontend/src/pages`.
+  SvelteKit `frontend/src/routes` files should be thin wrappers/loaders that
+  call into those page modules.
 - Prefer existing ecosystem and local patterns over custom frameworks.
 - Write tests first for each slice, then implement the minimum code needed to
   pass.
@@ -60,7 +67,16 @@ Signin flow:
 3. Backend validates credentials, creates the session row, and returns the raw
    session token plus signin payload to the server-only caller.
 4. SvelteKit sets the app-origin `session` cookie:
-   `HttpOnly; Secure; SameSite=Lax; Path=/`.
+   `HttpOnly; Secure; SameSite=Lax; Path=/`, with an expiry matching the
+   backend session expiry.
+
+Rolling refresh flow:
+
+1. Backend validates the forwarded `session` cookie on every authenticated
+   request.
+2. If the session is due for refresh, backend extends the D1 session row and
+   returns `X-Session-Expires-At`.
+3. SvelteKit resets the app-origin browser cookie with the updated expiry.
 
 Signout flow:
 
@@ -260,6 +276,7 @@ Backend:
   - `POST /auth/signout`
   - `POST /auth/switch-tenant`
   - `POST /auth/change-password`
+  - `GET /auth/session`
   - `GET /me/preferences`
   - `PATCH /me/preferences`
 - Return session token data to BFF-only signin callers.
@@ -268,6 +285,8 @@ Backend:
   bind via `POST /auth/switch-tenant` from the Tenant Picker.
 - The signin response's `activeTenantId` is a suggested pre-selection
   for the picker, not a commitment to bind the session.
+- `GET /auth/session` returns the current user, memberships, preferences,
+  active tenant, and session expiry for SSR reloads and app shell hydration.
 - Enforce disabled-account and weak-password behavior.
 - Revoke sibling sessions on password change.
 
@@ -303,6 +322,10 @@ Tests first:
 - Multi-workspace users get `sessions.active_tenant_id = null` on signin
   and always see the tenant picker; tapping a card calls
   `POST /auth/switch-tenant` to bind the active tenant.
+- Authenticated reload calls `GET /auth/session` and refreshes the browser
+  cookie when the backend returns refreshed session expiry metadata.
+- Platform admins with no tenant memberships can use Tenant Picker to browse
+  all tenants and enter one as admin.
 - Disabled account cannot sign in.
 - Wrong password returns `invalid_credentials`.
 - Change password requires current password.
@@ -567,6 +590,8 @@ Backend:
 Frontend:
 
 - Add Settings -> Admin entry for platform admins only.
+- Let platform admins enter the admin area even when they have no tenant
+  memberships or active tenant.
 - Implement:
   - Admin Users.
   - Admin User Detail.
@@ -595,6 +620,8 @@ Acceptance:
 
 - Admin can create user, create tenant, add membership, enter workspace, and see
   audit entries for the actions.
+- Admin user deletion removes access but keeps that user's uploaded tracks and
+  playlists visible to remaining authorized workspace users.
 
 ### 10. Localization, UI Polish, And Responsive Completion
 

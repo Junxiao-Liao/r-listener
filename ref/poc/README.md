@@ -1,6 +1,7 @@
 # Audio Playback PoCs
 
-This directory contains two standalone browser PoCs built from `generated-docs/poc-plan.md`.
+This directory contains two standalone browser PoCs summarized by
+`ref/generated-docs/audio-control-guide.md`.
 
 - `background-play/`: verifies basic audio playback plus Media Session metadata and lock-screen media actions.
 - `auto-play-next/`: verifies that track 2 can start automatically after track 1 ends.

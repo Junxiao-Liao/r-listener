@@ -88,6 +88,10 @@ dev calls only.
 - `HttpOnly; Secure; SameSite=Lax; Path=/`
 - Expiry: 30 days rolling. Every authed request that is ≥1 day older than
   the last refresh extends the session row by 30 days.
+- When a request rolls the session expiry, the backend includes
+  `X-Session-Expires-At: <ISO-8601>` in the response. The SvelteKit BFF is
+  responsible for resetting the browser cookie with the same expiry; the
+  backend still never emits `Set-Cookie`.
 
 Every request outside `/auth/signin` and `/health` requires a valid session.
 401 + `{code:'unauthenticated'}` otherwise.
@@ -183,6 +187,14 @@ type PreferencesDto = {
   preferSyncedLyrics: boolean;
   defaultLibrarySort: "createdAt:desc" | "title:asc" | "artist:asc" | "album:asc";
   updatedAt: Iso8601;
+};
+
+type CurrentSessionDto = {
+  user: UserDto;
+  tenants: TenantMembershipDto[];
+  preferences: PreferencesDto;
+  activeTenantId: Id<"tenant"> | null;
+  sessionExpiresAt: Iso8601;
 };
 
 // Tracks --------------------------------------------------------------
@@ -334,10 +346,34 @@ Response `200`:
 - Creates a session row and returns the raw session token to the server-only
   BFF caller. The backend does not emit `Set-Cookie`.
 - The SvelteKit BFF sets the browser `session` cookie with
-  `HttpOnly; Secure; SameSite=Lax; Path=/` and never exposes `sessionToken`
-  to client code.
+  `HttpOnly; Secure; SameSite=Lax; Path=/` and an expiry matching the
+  backend session expiry. It never exposes `sessionToken` to client code.
 - Errors: `401 invalid_credentials`, `403 account_disabled`,
   `429 rate_limited`.
+
+### `GET /auth/session`
+
+Auth: session required.
+
+Response `200`:
+```json
+{
+  "user": { /* UserDto */ },
+  "tenants": [ /* TenantMembershipDto[] */ ],
+  "preferences": { /* PreferencesDto */ },
+  "activeTenantId": "tnt_01H..." | null,
+  "sessionExpiresAt": "2026-05-25T09:12:03.000Z"
+}
+```
+
+- Validates the forwarded `session` cookie, applies the normal rolling refresh
+  rule, and returns the current app-shell state needed for SSR reloads.
+- Platform admins may have zero memberships. In that case `tenants` may be
+  empty and `activeTenantId` may be `null`; the frontend Tenant Picker should
+  let admins browse all tenants by calling the admin tenant list endpoint.
+- The BFF resets the browser cookie when this or any other authenticated
+  backend response includes `X-Session-Expires-At`.
+- Errors: `401 unauthenticated`, `403 account_disabled`.
 
 ### `POST /auth/signout`
 
@@ -374,9 +410,10 @@ session is kept.
 Errors: `400 validation_failed`, `401 invalid_credentials` (wrong current),
 `422 weak_password`.
 
-There is no `/auth/me`. Signin returns identity, memberships, preferences,
-and active tenant. On SSR hydrate the frontend reads session-bound state
-from a server-only store keyed by the cookie.
+Use `GET /auth/session` after reloads or direct navigation to hydrate the
+app shell with identity, memberships, active tenant, preferences, and the
+current session expiry. Do not rely on an in-memory frontend store for session
+state.
 
 ---
 
@@ -855,8 +892,10 @@ Response: `204`. Revokes all sessions for the target user. Audit:
 
 #### `DELETE /admin/users/{id}`
 Soft delete; revokes all sessions; removes the user from all tenant
-memberships (memberships soft-deleted too). `204`. Audit: `user.delete`.
-Self-delete rejected `422 cannot_self_delete`.
+memberships (memberships soft-deleted too). Uploaded tracks, playlist records,
+and other shared workspace content created by the user remain visible to other
+authorized workspace users. `204`. Audit: `user.delete`. Self-delete rejected
+`422 cannot_self_delete`.
 
 ### 6.2 Tenants
 

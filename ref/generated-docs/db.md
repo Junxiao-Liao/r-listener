@@ -51,10 +51,12 @@ Hard deletes only happen on `sessions` (row IS the credential — leaking
 one is bad) and `playback_history` rows that lose their referenced track
 (handled via FK `ON DELETE CASCADE`).
 
-> **Memberships.** Both `user.delete` cascade and admin
-> `membership.delete` set `deleted_at`. We soft-delete uniformly so
-> audit_log entries that reference a removed membership stay readable.
-> Reads filter `deleted_at IS NULL` so the API contract is preserved.
+> **Memberships.** Both admin `user.delete` and admin `membership.delete` set
+> membership `deleted_at`. We soft-delete uniformly so audit_log entries that
+> reference a removed membership stay readable. Reads filter
+> `deleted_at IS NULL` so the API contract is preserved. Deleting a user does
+> not delete shared workspace content they created, such as uploaded tracks or
+> playlists.
 
 ### 1.4 Tenant scoping
 
@@ -477,7 +479,7 @@ because SQLite cannot express them as constraints:
 ## 4. Migrations
 
 Drizzle Kit (`drizzle.config.ts` already present) emits versioned SQL
-under `backend/migrations/`. Apply via `wrangler d1 migrations apply`.
+under `backend/drizzle/`. Apply via `wrangler d1 migrations apply`.
 Initial migration creates everything in §2 in dependency order:
 
 ```
