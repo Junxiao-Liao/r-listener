@@ -380,16 +380,16 @@ UI elements:
 Purpose: platform admin CRUD on users (cross-tenant).
 UI elements:
 - Page title "Admin · Users"
-- Search bar (email)
+- Search bar (username)
 - Filter chips: All / Admins / Disabled
 - User list rows:
-  - Email
+  - Username
   - Admin badge, if applicable
   - Disabled badge, if applicable
   - Workspace count
   - Created date
 - "Create User" button (opens page #22)
-- Row tap opens User Detail (email, admin flag, disabled flag, workspace memberships with roles, Reset Password, Disable/Enable, Delete)
+- Row tap opens User Detail (username, admin flag, disabled flag, workspace memberships with roles, Reset Password, Disable/Enable, Delete)
 - Destructive actions use confirmation sheets
 Note: admins cannot demote or delete themselves; show these actions disabled with a tooltip/explanation.
 
@@ -397,13 +397,13 @@ Note: admins cannot demote or delete themselves; show these actions disabled wit
 Purpose: admin seeds a new account.
 UI elements:
 - Header with Cancel and Create
-- Email field
+- Username field
 - Password field
 - Confirm password field
 - "Mark as platform admin" toggle (off by default)
 - Optional "Add to workspace" selector with role (Owner / Member / Viewer; can be skipped; memberships can be added later)
 - Create button
-After creation: brief success toast and return to Users list. The admin is responsible for sharing the email+password out-of-band; the app does NOT display a copyable credential dialog.
+After creation: brief success toast and return to Users list. The admin is responsible for sharing the username+password out-of-band; the app does NOT display a copyable credential dialog.
 
 23. Admin — Tenants Page
 Purpose: platform admin CRUD on tenants (workspaces).
@@ -427,11 +427,11 @@ Purpose: manage memberships for a given tenant.
 UI elements:
 - Tenant name header
 - Member list rows:
-  - Email
+  - Username
   - Role (Owner / Member / Viewer)
   - Joined date
   - Remove button
-- "Add Member" action — search existing users by email, pick a role
+- "Add Member" action — search existing users by username, pick a role
 - Role change affordance per row (Owner / Member / Viewer) with confirmation
 - Do not allow removing the last Owner; show the action disabled with an explanation
 
@@ -439,12 +439,12 @@ UI elements:
 Purpose: read-only audit log viewer.
 UI elements:
 - Page title "Admin · Audit Logs"
-- Filter bar: actor email, target tenant, action type, date range
+- Filter bar: actor username, target tenant, action type, date range
 - Log row:
   - Timestamp
-  - Actor (email + admin badge if applicable)
+  - Actor (username + admin badge if applicable)
   - Action (e.g., user.create, user.update, user.reset_password, tenant.create, tenant.delete, tenant.admin_enter, membership.create, membership.update, membership.delete)
-  - Target (user email, tenant name, membership pair)
+  - Target (username, tenant name, membership pair)
   - Tap for detail sheet with raw metadata
 - Empty state if no logs match filters
 

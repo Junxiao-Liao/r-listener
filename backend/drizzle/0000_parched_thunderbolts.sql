@@ -160,9 +160,8 @@ CREATE TABLE `user_preferences` (
 --> statement-breakpoint
 CREATE TABLE `users` (
 	`id` text PRIMARY KEY NOT NULL,
-	`email` text NOT NULL,
+	`username` text NOT NULL,
 	`password_hash` text NOT NULL,
-	`display_name` text,
 	`is_admin` integer DEFAULT false NOT NULL,
 	`is_active` integer DEFAULT true NOT NULL,
 	`last_active_tenant_id` text,
@@ -172,4 +171,4 @@ CREATE TABLE `users` (
 	FOREIGN KEY (`last_active_tenant_id`) REFERENCES `tenants`(`id`) ON UPDATE no action ON DELETE set null
 );
 --> statement-breakpoint
-CREATE UNIQUE INDEX `users_email_uq` ON `users` (`email`) WHERE "users"."deleted_at" IS NULL;
+CREATE UNIQUE INDEX `users_username_uq` ON `users` (`username`) WHERE "users"."deleted_at" IS NULL;

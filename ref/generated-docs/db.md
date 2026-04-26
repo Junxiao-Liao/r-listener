@@ -91,7 +91,7 @@ backend/src/
 
 ### 2.1 `users`
 
-Identity. Email is globally unique (signin happens before tenant
+Identity. Username is globally unique (signin happens before tenant
 selection). `last_active_tenant_id` lets the signin response default a
 returning user back into their previous workspace even after the cookie
 expired.
@@ -99,9 +99,8 @@ expired.
 ```ts
 export const users = sqliteTable('users', {
   id:                  text('id').primaryKey(),
-  email:               text('email').notNull(),
+  username:            text('username').notNull(),
   passwordHash:        text('password_hash').notNull(),       // argon2id encoded
-  displayName:         text('display_name'),
   isAdmin:             integer('is_admin', { mode: 'boolean' }).notNull().default(false),
   isActive:            integer('is_active', { mode: 'boolean' }).notNull().default(true),
   lastActiveTenantId:  text('last_active_tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
@@ -109,13 +108,13 @@ export const users = sqliteTable('users', {
   updatedAt:           integer('updated_at',  { mode: 'timestamp' }).notNull(),
   deletedAt:           integer('deleted_at',  { mode: 'timestamp' }),
 }, (t) => ({
-  emailUq:             uniqueIndex('users_email_uq').on(t.email).where(sql`${t.deletedAt} IS NULL`),
+  usernameUq:          uniqueIndex('users_username_uq').on(t.username).where(sql`${t.deletedAt} IS NULL`),
 }));
 ```
 
 Notes:
-- Email uniqueness is partial: a soft-deleted user does not block a new
-  signup with the same email.
+- Username uniqueness is partial: a soft-deleted user does not block a new
+  signup with the same username.
 - `is_admin = true` plus `deleted_at IS NULL` is the gate for `/admin/*`.
 - `is_active = false` produces 403 `account_disabled` on signin.
 

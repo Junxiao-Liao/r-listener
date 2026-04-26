@@ -51,14 +51,14 @@ Mutations that have no meaningful body return `204 No Content`.
 Uniform shape on any non-2xx response:
 
 ```json
-{ "error": { "code": "invalid_credentials", "message": "Email or password is wrong." } }
+{ "error": { "code": "invalid_credentials", "message": "Username or password is wrong." } }
 ```
 
 For validation failures, a `fields` map may be added:
 
 ```json
 { "error": { "code": "validation_failed", "message": "Invalid input.",
-             "fields": { "email": "Must be a valid email." } } }
+             "fields": { "username": "Invalid username." } } }
 ```
 
 `code` is stable (client switches on it). `message` is human-readable and may
@@ -158,8 +158,7 @@ type Cursor = string;           // opaque
 // Users ---------------------------------------------------------------
 type UserDto = {
   id: Id<"user">;
-  email: string;
-  displayName: string | null;
+  username: string;
   isAdmin: boolean;
   isActive: boolean;
   lastActiveTenantId: Id<"tenant"> | null;  // most-recent tenant across sessions; drives Tenant Picker "Last used" chip
@@ -320,7 +319,7 @@ No auth. `200 { "ok": true }`. Already scaffolded.
 
 Request:
 ```json
-{ "email": "a@b.com", "password": "..." }
+{ "username": "alice", "password": "..." }
 ```
 
 Response `200`:
@@ -851,7 +850,7 @@ captures the request body (with secrets redacted: `password`, tokens).
 ### 6.1 Users
 
 #### `GET /admin/users`
-Query: `limit`, `cursor`, `q` (email/displayName substring),
+Query: `limit`, `cursor`, `q` (username substring),
 `includeInactive`. Response: `{ items: AdminUserListItemDto[], nextCursor }`.
 
 #### `GET /admin/users/{id}`
@@ -860,9 +859,8 @@ Response: `AdminUserDetailDto`.
 #### `POST /admin/users`
 ```json
 { 
-  "email": "x@y.com", 
+  "username": "alice", 
   "password": "...", 
-  "displayName": "X", 
   "isAdmin": false,
   "initialMembership": {
     "tenantId": "tnt_018f...",
@@ -870,15 +868,15 @@ Response: `AdminUserDetailDto`.
   }
 }
 ```
-Validation: email format; password ≥ 12 chars (or your configured policy).
+Validation: username is trimmed, lowercased, 3-32 characters, and may contain only `a-z`, `0-9`, `_`, and `-`; password ≥ 12 chars (or your configured policy).
 `initialMembership` is optional; when present its `role` is `"owner"`,
 `"member"`, or `"viewer"`.
 Response `201`: `UserDto`.
-Errors: `409 email_conflict`, `422 weak_password`.
+Errors: `409 username_conflict`, `422 weak_password`.
 Audit: `user.create`.
 
 #### `PATCH /admin/users/{id}`
-Editable: `email`, `displayName`, `isAdmin`, `isActive`.
+Editable: `username`, `isAdmin`, `isActive`.
 An admin cannot demote themselves (`isAdmin: false` on own id) or deactivate
 themselves (`422 cannot_self_downgrade`).
 Response: `UserDto`. Audit: `user.update`.
@@ -1019,7 +1017,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | ---- | ---------------------------- | ------------------------------------------------ |
 | 400  | `validation_failed`          | Body fails schema; `fields` populated            |
 | 401  | `unauthenticated`            | Missing / invalid session                        |
-| 401  | `invalid_credentials`        | Wrong email/password on signin or change-pw      |
+| 401  | `invalid_credentials`        | Wrong username/password on signin or change-pw   |
 | 403  | `account_disabled`           | User `isActive=false`                            |
 | 403  | `admin_required`             | Non-admin hit `/admin/*`                         |
 | 403  | `no_active_tenant`           | Session has `active_tenant_id = null`            |
@@ -1031,7 +1029,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 404  | `tenant_not_found`           | Switch/admin ops referencing a missing tenant    |
 | 404  | `track_not_found`            | Track missing or not visible                     |
 | 404  | `queue_item_not_found`       | Queue item missing or not visible                |
-| 409  | `email_conflict`             | Admin create user, email in use                  |
+| 409  | `username_conflict`          | Admin create user, username in use               |
 | 409  | `already_member`             | Admin add membership, row exists                 |
 | 409  | `playlist_name_conflict`     | Create/rename into an existing name              |
 | 409  | `track_already_in_playlist`  | Duplicate playlist-track                         |

@@ -608,7 +608,7 @@ Frontend:
 Tests first:
 
 - Non-admin cannot access admin routes.
-- Create user rejects duplicate email and weak password.
+- Create user rejects duplicate username and weak password.
 - Reset password revokes sessions.
 - Self-demotion/self-delete are rejected.
 - Tenant create requires initial owner.

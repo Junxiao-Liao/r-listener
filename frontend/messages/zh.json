@@ -6,7 +6,7 @@
 	"auth_sign_in": "登录",
 	"auth_sign_up": "注册",
 	"auth_sign_out": "退出登录",
-	"auth_email": "邮箱",
+	"auth_username": "用户名",
 	"auth_password": "密码",
 	"player_prev": "上一首",
 	"player_next": "下一首",

@@ -6,7 +6,7 @@
 	"auth_sign_in": "Sign in",
 	"auth_sign_up": "Sign up",
 	"auth_sign_out": "Sign out",
-	"auth_email": "Email",
+	"auth_username": "Username",
 	"auth_password": "Password",
 	"player_prev": "Previous",
 	"player_next": "Next",

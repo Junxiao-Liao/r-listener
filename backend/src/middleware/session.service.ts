@@ -54,8 +54,7 @@ export async function validateSession(
 	return {
 		user: {
 			id: row.user.id as SessionContext['user']['id'],
-			email: row.user.email,
-			displayName: row.user.displayName,
+			username: row.user.username,
 			isAdmin: row.user.isAdmin,
 			isActive: row.user.isActive,
 			lastActiveTenantId: row.user.lastActiveTenantId as SessionContext['user']['lastActiveTenantId'],

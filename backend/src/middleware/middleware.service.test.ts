@@ -179,8 +179,7 @@ describe('real middleware service', () => {
 					},
 					user: {
 						id: 'usr_018f0000-0000-7000-8000-000000000000',
-						email: 'user@example.com',
-						displayName: null,
+						username: 'user',
 						isAdmin: false,
 						isActive: true,
 						lastActiveTenantId: null,
@@ -216,8 +215,7 @@ describe('real middleware service', () => {
 					},
 					user: {
 						id: 'usr_018f0000-0000-7000-8000-000000000000',
-						email: 'user@example.com',
-						displayName: null,
+						username: 'user',
 						isAdmin: false,
 						isActive: true,
 						lastActiveTenantId: null,
@@ -317,8 +315,7 @@ function sessionFixture(
 	return {
 		user: {
 			id: 'usr_018f0000-0000-7000-8000-000000000000' as SessionContext['user']['id'],
-			email: 'user@example.com',
-			displayName: 'User',
+			username: 'user',
 			isAdmin: overrides.userIsAdmin ?? false,
 			isActive: true,
 			lastActiveTenantId: null,
