@@ -1,4 +1,4 @@
-import { redirect, type RequestEvent } from '@sveltejs/kit';
+import { redirect, error as svelteError, type RequestEvent } from '@sveltejs/kit';
 import { authApi } from '$shared/api/auth';
 import { applyLocaleCookie } from '$shared/i18n/locale';
 import { ApiError, createApiClient } from './api';
@@ -29,9 +29,12 @@ export async function loadAppSession(event: Event): Promise<AppSession> {
 	try {
 		session = await authApi.getSession(api, (res) => rollSessionCookie(event.cookies, res.headers, token));
 	} catch (err) {
-		if (err instanceof ApiError && err.status === 401) {
-			clearSessionCookie(event.cookies);
-			throw redirect(303, '/signin');
+		if (err instanceof ApiError) {
+			if (err.status === 401) {
+				clearSessionCookie(event.cookies);
+				throw redirect(303, '/signin');
+			}
+			throw svelteError(err.status, err.message);
 		}
 		throw err;
 	}

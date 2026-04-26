@@ -21,7 +21,7 @@ export const enforceMutationOrigin = () =>
 
 export const enforceAuthRateLimit = () =>
 	createMiddleware<BackendEnv>(async (c, next) => {
-		if (!c.req.path.startsWith('/auth/')) {
+		if (!c.req.path.startsWith('/auth/') || c.req.path === '/auth/session') {
 			await next();
 			return;
 		}
