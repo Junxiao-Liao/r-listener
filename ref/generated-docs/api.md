@@ -24,8 +24,8 @@ the first breaking change ships.
   bodies, except audio/cover uploads (binary PUT to R2) and streaming (see §7, §8).
 - Timestamps: **ISO-8601 UTC strings** on the wire (`2026-04-25T09:12:03.000Z`).
   Stored as unix seconds in D1 (`integer('created_at', { mode: 'timestamp' })`).
-- IDs: opaque strings. Convention: ULID-like 26-char base32 generated at
-  insert time; never expose D1 rowid.
+- IDs: opaque strings. Convention: prefixed UUIDv7 generated at insert time;
+  never expose D1 rowid.
 - All mutation endpoints are idempotent at the shape level: repeated
   create-with-same-input returns 409, repeated delete on missing row
   returns 404 (not 204), repeated toggle endpoints are PATCH.
@@ -35,7 +35,7 @@ the first breaking change ships.
 Single resource: the resource object directly.
 
 ```json
-{ "id": "trk_01H...", "title": "Song", ... }
+{ "id": "trk_018f...", "title": "Song", ... }
 ```
 
 List: `{ items, nextCursor }`. `nextCursor` is `null` when no more.
@@ -152,7 +152,7 @@ additional internal columns.
 ```ts
 // Shared primitives
 type Iso8601 = string;          // "2026-04-25T09:12:03.000Z"
-type Id<K extends string> = string; // e.g. Id<"user"> = "usr_01H..."
+type Id<K extends string> = string; // e.g. Id<"user"> = "usr_018f..."
 type Cursor = string;           // opaque
 
 // Users ---------------------------------------------------------------
@@ -329,7 +329,7 @@ Response `200`:
   "user": { /* UserDto */ },
   "tenants": [ /* TenantMembershipDto[] */ ],
   "preferences": { /* PreferencesDto */ },
-  "activeTenantId": "tnt_01H..." | null,
+  "activeTenantId": "tnt_018f..." | null,
   "sessionToken": "abcd..." // BFF-only; stripped before any browser response
 }
 ```
@@ -361,7 +361,7 @@ Response `200`:
   "user": { /* UserDto */ },
   "tenants": [ /* TenantMembershipDto[] */ ],
   "preferences": { /* PreferencesDto */ },
-  "activeTenantId": "tnt_01H..." | null,
+  "activeTenantId": "tnt_018f..." | null,
   "sessionExpiresAt": "2026-05-25T09:12:03.000Z"
 }
 ```
@@ -386,11 +386,11 @@ browser cookie after the backend confirms signout.
 Auth: session required.
 Request:
 ```json
-{ "tenantId": "tnt_01H..." }
+{ "tenantId": "tnt_018f..." }
 ```
 Response `200`:
 ```json
-{ "user": { ... }, "activeTenantId": "tnt_01H..." }
+{ "user": { ... }, "activeTenantId": "tnt_018f..." }
 ```
 
 - Non-admin: 403 `tenant_forbidden` if not a member.
@@ -660,7 +660,7 @@ Embeds `track: TrackDto` for efficient playback UI.
 
 #### `POST /playlists/{id}/tracks`
 ```json
-{ "trackId": "trk_01H...", "position": 3 | null }
+{ "trackId": "trk_018f...", "position": 3 | null }
 ```
 - `position = null` appends at end.
 - Otherwise inserts at 1-based `position`; items at and after shift down.
@@ -691,11 +691,11 @@ Batched ingest. Request:
 ```json
 {
   "events": [
-    { "trackId": "trk_01H...", "startedAt": "2026-04-25T09:10:00.000Z",
+    { "trackId": "trk_018f...", "startedAt": "2026-04-25T09:10:00.000Z",
       "positionMs": 0,       "event": "play",     "playlistId": null },
-    { "trackId": "trk_01H...", "startedAt": "2026-04-25T09:12:45.000Z",
+    { "trackId": "trk_018f...", "startedAt": "2026-04-25T09:12:45.000Z",
       "positionMs": 165000,  "event": "progress", "playlistId": null },
-    { "trackId": "trk_01H...", "startedAt": "2026-04-25T09:15:30.000Z",
+    { "trackId": "trk_018f...", "startedAt": "2026-04-25T09:15:30.000Z",
       "positionMs": 330000,  "event": "ended",    "playlistId": null }
   ]
 }
@@ -745,7 +745,7 @@ requested 1-based position.
 
 Request:
 ```json
-{ "trackIds": ["trk_01H..."], "position": null }
+{ "trackIds": ["trk_018f..."], "position": null }
 ```
 
 - `trackIds.length` must be 1..100.
@@ -865,7 +865,7 @@ Response: `AdminUserDetailDto`.
   "displayName": "X", 
   "isAdmin": false,
   "initialMembership": {
-    "tenantId": "tnt_01H...",
+    "tenantId": "tnt_018f...",
     "role": "member"
   }
 }
@@ -908,7 +908,7 @@ Response: `TenantDto`.
 
 #### `POST /admin/tenants`
 ```json
-{ "name": "Acme Family", "ownerUserId": "usr_01H..." }
+{ "name": "Acme Family", "ownerUserId": "usr_018f..." }
 ```
 - A membership with `role='owner'` is created atomically. Tenants cannot be
   created without an initial owner.
@@ -934,7 +934,7 @@ Response: `{ items: (TenantMembershipDto & { user: UserDto })[], nextCursor }`.
 
 #### `POST /admin/tenants/{id}/members`
 ```json
-{ "userId": "usr_01H...", "role": "member" }
+{ "userId": "usr_018f...", "role": "member" }
 ```
 `role` may be `"owner"`, `"member"`, or `"viewer"`. Response `201`:
 `TenantMembershipDto`. Errors: `404 user_not_found`, `409 already_member`.

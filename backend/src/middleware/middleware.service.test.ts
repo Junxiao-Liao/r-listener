@@ -1,0 +1,381 @@
+import { describe, expect, it, vi } from 'vitest';
+import { internalError } from '../http/api-error';
+import { createApp } from '../app';
+import type { MiddlewareService, SessionContext } from './middleware.type';
+import { createMiddlewareService } from './middleware.service';
+import { requireAdmin, requireSession, requireTenant, requireTenantEditor } from './middleware.guard';
+import { createTestEnv } from '../test/test-env';
+
+describe('backend middleware', () => {
+	it('allows health without authentication', async () => {
+		const app = createFixtureApp({ session: null });
+
+		const res = await app.request('/health', {}, createTestEnv());
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ ok: true });
+	});
+
+	it('returns 401 for missing sessions', async () => {
+		const app = createFixtureApp({ session: null });
+
+		const res = await app.request('/fixture/session', {}, createTestEnv());
+
+		expect(res.status).toBe(401);
+		expect(await res.json()).toEqual({
+			error: { code: 'unauthenticated', message: 'Authentication required.' }
+		});
+	});
+
+	it('returns 401 for invalid sessions', async () => {
+		const app = createFixtureApp({ session: null });
+
+		const res = await app.request(
+			'/fixture/session',
+			{ headers: { cookie: 'session=invalid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(401);
+		expect((await readError(res)).code).toBe('unauthenticated');
+	});
+
+	it('sets refreshed session expiry metadata', async () => {
+		const app = createFixtureApp({
+			session: sessionFixture(),
+			refreshedSessionExpiresAt: '2026-05-26T00:00:00.000Z'
+		});
+
+		const res = await app.request(
+			'/fixture/session',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(200);
+		expect(res.headers.get('X-Session-Expires-At')).toBe('2026-05-26T00:00:00.000Z');
+	});
+
+	it('returns 403 when there is no active tenant', async () => {
+		const app = createFixtureApp({ session: sessionFixture({ activeTenantId: null }) });
+
+		const res = await app.request(
+			'/fixture/tenant',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(403);
+		expect((await readError(res)).code).toBe('no_active_tenant');
+	});
+
+	it('returns 403 when the active tenant is not accessible', async () => {
+		const app = createFixtureApp({ session: sessionFixture(), tenantAllowed: false });
+
+		const res = await app.request(
+			'/fixture/tenant',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(403);
+		expect((await readError(res)).code).toBe('tenant_forbidden');
+	});
+
+	it('returns 403 when a viewer hits an editor-only route', async () => {
+		const app = createFixtureApp({ session: sessionFixture(), tenantRole: 'viewer' });
+
+		const res = await app.request(
+			'/fixture/editor',
+			{
+				method: 'POST',
+				headers: { cookie: 'session=valid', origin: 'http://localhost:5173' }
+			},
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(403);
+		expect((await readError(res)).code).toBe('insufficient_role');
+	});
+
+	it('returns 403 when a non-admin hits an admin route', async () => {
+		const app = createFixtureApp({ session: sessionFixture() });
+
+		const res = await app.request(
+			'/fixture/admin',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(403);
+		expect((await readError(res)).code).toBe('admin_required');
+	});
+
+	it('rejects mutation requests with missing or wrong origins', async () => {
+		const app = createFixtureApp({ session: sessionFixture() });
+
+		const missingOrigin = await app.request(
+			'/fixture/editor',
+			{ method: 'POST', headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+		const wrongOrigin = await app.request(
+			'/fixture/editor',
+			{
+				method: 'POST',
+				headers: { cookie: 'session=valid', origin: 'http://evil.test' }
+			},
+			createTestEnv()
+		);
+
+		expect(missingOrigin.status).toBe(403);
+		expect((await readError(missingOrigin)).code).toBe('forbidden_origin');
+		expect(wrongOrigin.status).toBe(403);
+		expect((await readError(wrongOrigin)).code).toBe('forbidden_origin');
+	});
+
+	it('returns 429 when an auth route is rate limited', async () => {
+		const app = createFixtureApp({ session: sessionFixture(), rateLimitAllowed: false });
+
+		const res = await app.request('/auth/session', {}, createTestEnv());
+
+		expect(res.status).toBe(429);
+		expect((await readError(res)).code).toBe('rate_limited');
+	});
+
+	it('returns 500 when auth rate-limit infrastructure fails closed', async () => {
+		const app = createFixtureApp({ session: sessionFixture(), rateLimitThrows: true });
+
+		const res = await app.request('/auth/session', {}, createTestEnv());
+
+		expect(res.status).toBe(500);
+		expect((await readError(res)).code).toBe('internal_error');
+	});
+
+	it('lets injected fixtures exercise successful protected routes', async () => {
+		const app = createFixtureApp({ session: sessionFixture({ userIsAdmin: true }) });
+
+		const res = await app.request(
+			'/fixture/admin',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(200);
+		expect(await res.json()).toEqual({ ok: true });
+	});
+});
+
+describe('real middleware service', () => {
+	it('deletes expired session rows during validation', async () => {
+		const deleteWhere = vi.fn();
+		const db = createSessionDb({
+			rows: [
+				{
+					session: {
+						activeTenantId: null,
+						expiresAt: new Date('2026-04-25T00:00:00.000Z'),
+						lastRefreshedAt: new Date('2026-04-24T00:00:00.000Z')
+					},
+					user: {
+						id: 'usr_018f0000-0000-7000-8000-000000000000',
+						email: 'user@example.com',
+						displayName: null,
+						isAdmin: false,
+						isActive: true,
+						lastActiveTenantId: null,
+						createdAt: new Date('2026-04-01T00:00:00.000Z'),
+						deletedAt: null
+					}
+				}
+			],
+			deleteWhere
+		});
+		const service = createMiddlewareService(db, createKv());
+
+		const result = await service.validateSession({
+			token: 'expired-token',
+			now: new Date('2026-04-26T00:00:00.000Z'),
+			ip: '127.0.0.1',
+			userAgent: null
+		});
+
+		expect(result).toBeNull();
+		expect(deleteWhere).toHaveBeenCalledOnce();
+	});
+
+	it('refreshes old valid sessions and returns refreshed expiry metadata', async () => {
+		const updateSet = vi.fn(() => ({ where: vi.fn() }));
+		const db = createSessionDb({
+			rows: [
+				{
+					session: {
+						activeTenantId: null,
+						expiresAt: new Date('2026-05-01T00:00:00.000Z'),
+						lastRefreshedAt: new Date('2026-04-24T00:00:00.000Z')
+					},
+					user: {
+						id: 'usr_018f0000-0000-7000-8000-000000000000',
+						email: 'user@example.com',
+						displayName: null,
+						isAdmin: false,
+						isActive: true,
+						lastActiveTenantId: null,
+						createdAt: new Date('2026-04-01T00:00:00.000Z'),
+						deletedAt: null
+					}
+				}
+			],
+			updateSet
+		});
+		const service = createMiddlewareService(db, createKv());
+
+		const result = await service.validateSession({
+			token: 'valid-token',
+			now: new Date('2026-04-26T00:00:00.000Z'),
+			ip: '127.0.0.1',
+			userAgent: null
+		});
+
+		expect(result?.refreshedSessionExpiresAt).toBe('2026-05-26T00:00:00.000Z');
+		expect(updateSet).toHaveBeenCalledWith({
+			expiresAt: new Date('2026-05-26T00:00:00.000Z'),
+			lastRefreshedAt: new Date('2026-04-26T00:00:00.000Z')
+		});
+	});
+
+	it('fails closed when KV rate-limit storage throws', async () => {
+		const service = createMiddlewareService(
+			createSessionDb({ rows: [] }),
+			createKv({ get: async () => { throw new Error('kv unavailable'); } })
+		);
+
+		await expect(
+			service.checkAuthRateLimit({ ip: '127.0.0.1', now: new Date('2026-04-26T00:00:00.000Z') })
+		).rejects.toMatchObject({ status: 500, code: 'internal_error' });
+	});
+});
+
+type FixtureOptions = {
+	session: SessionContext | null;
+	refreshedSessionExpiresAt?: string | null;
+	tenantAllowed?: boolean;
+	tenantRole?: 'owner' | 'member' | 'viewer' | null;
+	rateLimitAllowed?: boolean;
+	rateLimitThrows?: boolean;
+};
+
+function createFixtureApp(options: FixtureOptions) {
+	const service: MiddlewareService = {
+		validateSession: vi.fn(async ({ token }) =>
+			token === 'valid' && options.session
+				? {
+						...options.session,
+						refreshedSessionExpiresAt: options.refreshedSessionExpiresAt ?? null
+					}
+				: null
+		),
+		resolveTenantAccess: vi.fn(async ({ session }) =>
+			options.tenantAllowed === false || !session.activeTenantId
+				? null
+				: {
+						activeTenantId: session.activeTenantId,
+						role: session.user.isAdmin ? null : (options.tenantRole ?? 'member')
+					}
+		),
+		checkAuthRateLimit: vi.fn(async () => {
+			if (options.rateLimitThrows) throw internalError();
+			return { allowed: options.rateLimitAllowed ?? true };
+		})
+	};
+
+	return createApp({
+		createMiddlewareService: () => service,
+		configure: (app) => {
+			app.get('/fixture/session', requireSession(), (c) =>
+				c.json({ userId: c.var.session.user.id })
+			);
+			app.get('/fixture/tenant', requireSession(), requireTenant(), (c) =>
+				c.json({ tenantId: c.var.session.activeTenantId, role: c.var.session.role })
+			);
+			app.post(
+				'/fixture/editor',
+				requireSession(),
+				requireTenant(),
+				requireTenantEditor(),
+				(c) => c.json({ ok: true })
+			);
+			app.get('/fixture/admin', requireSession(), requireAdmin(), (c) => c.json({ ok: true }));
+			app.get('/auth/session', (c) => c.json({ ok: true }));
+		}
+	});
+}
+
+function sessionFixture(
+	overrides: { activeTenantId?: SessionContext['activeTenantId']; userIsAdmin?: boolean } = {}
+): SessionContext {
+	return {
+		user: {
+			id: 'usr_018f0000-0000-7000-8000-000000000000' as SessionContext['user']['id'],
+			email: 'user@example.com',
+			displayName: 'User',
+			isAdmin: overrides.userIsAdmin ?? false,
+			isActive: true,
+			lastActiveTenantId: null,
+			createdAt: '2026-04-26T00:00:00.000Z' as SessionContext['user']['createdAt']
+		},
+		sessionTokenHash: 'hash',
+		activeTenantId:
+			overrides.activeTenantId === undefined
+				? ('tnt_018f0000-0000-7000-8000-000000000000' as SessionContext['activeTenantId'])
+				: overrides.activeTenantId,
+		role: null,
+		sessionExpiresAt: '2026-05-26T00:00:00.000Z'
+	};
+}
+
+async function readError(res: Response): Promise<{ code: string; message: string }> {
+	const body = (await res.json()) as { error: { code: string; message: string } };
+	return body.error;
+}
+
+type SessionDbOptions = {
+	rows: unknown[];
+	deleteWhere?: ReturnType<typeof vi.fn>;
+	updateSet?: ReturnType<typeof vi.fn>;
+};
+
+function createSessionDb(options: SessionDbOptions) {
+	return {
+		select: () => ({
+			from: () => ({
+				innerJoin: () => ({
+					where: () => ({
+						limit: async () => options.rows
+					})
+				}),
+				where: () => ({
+					limit: async () => []
+				})
+			})
+		}),
+		delete: () => ({
+			where: options.deleteWhere ?? vi.fn()
+		}),
+		update: () => ({
+			set: options.updateSet ?? vi.fn(() => ({ where: vi.fn() }))
+		})
+	} as never;
+}
+
+function createKv(overrides: Partial<KVNamespace> = {}): KVNamespace {
+	const values = new Map<string, string>();
+
+	return {
+		get: async (key: string) => values.get(key) ?? null,
+		put: async (key: string, value: string) => {
+			values.set(key, value);
+		},
+		...overrides
+	} as unknown as KVNamespace;
+}

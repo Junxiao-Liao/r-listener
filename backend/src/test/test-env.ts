@@ -1,4 +1,4 @@
-import type { Env } from '../index';
+import type { BackendEnv as Env } from '../app.type';
 
 export function createTestEnv(overrides: Partial<Env['Bindings']> = {}): Env['Bindings'] {
 	return {

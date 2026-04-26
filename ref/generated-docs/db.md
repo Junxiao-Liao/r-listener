@@ -18,20 +18,20 @@ Opaque text primary keys, prefixed by entity for human grepability:
 
 | Entity              | Prefix  | Example                       |
 | ------------------- | ------- | ----------------------------- |
-| `users`             | `usr_`  | `usr_01HF8Z5Q3A...`           |
+| `users`             | `usr_`  | `usr_018f0000-0000-7000-8000-000000000000` |
 | `sessions`          | —       | row keyed by token hash       |
-| `tenants`           | `tnt_`  | `tnt_01HF8Z5Q3A...`           |
-| `memberships`       | `mbr_`  | `mbr_01HF8Z5Q3A...`           |
-| `tracks`            | `trk_`  | `trk_01HF8Z5Q3A...`           |
-| `playlists`         | `pls_`  | `pls_01HF8Z5Q3A...`           |
-| `playlist_tracks`   | `plt_`  | `plt_01HF8Z5Q3A...`           |
+| `tenants`           | `tnt_`  | `tnt_018f0000-0000-7000-8000-000000000000` |
+| `memberships`       | `mbr_`  | `mbr_018f0000-0000-7000-8000-000000000000` |
+| `tracks`            | `trk_`  | `trk_018f0000-0000-7000-8000-000000000000` |
+| `playlists`         | `pls_`  | `pls_018f0000-0000-7000-8000-000000000000` |
+| `playlist_tracks`   | `plt_`  | `plt_018f0000-0000-7000-8000-000000000000` |
 | `playback_history`  | —       | composite `(user, tenant, track)` |
-| `queue_items`       | `que_`  | `que_01HF8Z5Q3A...`           |
+| `queue_items`       | `que_`  | `que_018f0000-0000-7000-8000-000000000000` |
 | `user_preferences`  | —       | `user_id` is the PK           |
-| `audit_logs`        | `aud_`  | `aud_01HF8Z5Q3A...`           |
+| `audit_logs`        | `aud_`  | `aud_018f0000-0000-7000-8000-000000000000` |
 
-The body is a 26-char Crockford-base32 ULID generated at insert time, so
-IDs sort lexicographically by creation time. D1 rowid is never exposed.
+The body is a UUIDv7 generated at insert time, so IDs sort lexicographically
+by creation time. D1 rowid is never exposed.
 
 ### 1.2 Time
 

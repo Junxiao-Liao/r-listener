@@ -242,7 +242,7 @@ Implement:
 - `requireAdmin`.
 - Origin enforcement for state-changing methods.
 - KV-backed rate limiting for `/auth/*`.
-- ID generation helpers for prefixed ULID-like IDs.
+- ID generation helpers for prefixed UUIDv7 IDs.
 - Timestamp conversion helpers between D1 unix seconds and ISO strings.
 
 Tests first:
