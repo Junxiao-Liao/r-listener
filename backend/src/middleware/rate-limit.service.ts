@@ -17,7 +17,8 @@ export async function checkAuthRateLimit(
 		await kv.put(key, String(next), { expirationTtl: AUTH_RATE_LIMIT_WINDOW_SECONDS });
 
 		return { allowed: next <= AUTH_RATE_LIMIT_MAX };
-	} catch {
+	} catch (err) {
+		console.error('checkAuthRateLimit error:', err);
 		throw internalError();
 	}
 }

@@ -8,6 +8,7 @@ compatibility_flags = ["nodejs_compat"]
 binding = "DB"
 database_name = "r-listener"
 database_id = "<fill-me>"
+migrations_dir = "drizzle"
 
 # TODO: run `wrangler r2 bucket create r-listener-audio`
 [[r2_buckets]]
