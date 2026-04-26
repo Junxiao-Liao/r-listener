@@ -137,7 +137,7 @@ describe('backend middleware', () => {
 	it('returns 429 when an auth route is rate limited', async () => {
 		const app = createFixtureApp({ session: sessionFixture(), rateLimitAllowed: false });
 
-		const res = await app.request('/auth/session', {}, createTestEnv());
+		const res = await app.request('/auth/signin', {}, createTestEnv());
 
 		expect(res.status).toBe(429);
 		expect((await readError(res)).code).toBe('rate_limited');
@@ -146,7 +146,7 @@ describe('backend middleware', () => {
 	it('returns 500 when auth rate-limit infrastructure fails closed', async () => {
 		const app = createFixtureApp({ session: sessionFixture(), rateLimitThrows: true });
 
-		const res = await app.request('/auth/session', {}, createTestEnv());
+		const res = await app.request('/auth/signin', {}, createTestEnv());
 
 		expect(res.status).toBe(500);
 		expect((await readError(res)).code).toBe('internal_error');
@@ -304,7 +304,7 @@ function createFixtureApp(options: FixtureOptions) {
 				(c) => c.json({ ok: true })
 			);
 			app.get('/fixture/admin', requireSession(), requireAdmin(), (c) => c.json({ ok: true }));
-			app.get('/auth/session', (c) => c.json({ ok: true }));
+			app.post('/auth/signin', (c) => c.json({ ok: true }));
 		}
 	});
 }
