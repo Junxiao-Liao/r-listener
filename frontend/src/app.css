@@ -47,6 +47,12 @@
 }
 
 :root {
+	--bottom-nav-h: 4rem;
+	--mini-player-h: 3.5rem;
+	--content-max-w: 28rem;
+	--safe-bottom: env(safe-area-inset-bottom);
+	--safe-top: env(safe-area-inset-top);
+
 	--radius: 0.5rem;
 	--background: hsl(0 0% 100%);
 	--foreground: hsl(240 10% 3.9%);

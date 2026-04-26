@@ -1,10 +1,36 @@
-<!-- Temporary Step 1 placeholder page for frontend smoke coverage. -->
-<main class="min-h-screen bg-background text-foreground">
-	<section class="mx-auto flex min-h-screen w-full max-w-5xl flex-col justify-center px-6 py-12">
-		<p class="text-sm font-medium text-muted-foreground">Private music library</p>
-		<h1 class="mt-3 text-4xl font-semibold tracking-normal text-balance sm:text-5xl">R Listener</h1>
-		<p class="mt-4 max-w-2xl text-base leading-7 text-muted-foreground">
-			A focused listener for organizing tracks, queues, playlists, and playback across tenants.
+<script lang="ts">
+	import * as m from '$shared/paraglide/messages';
+	import { Button } from '$shared/components/ui/button';
+	import type { CurrentSessionDto } from '$shared/types/dto';
+
+	type Data = {
+		session: CurrentSessionDto;
+	};
+
+	let { data }: { data: Data } = $props();
+
+	const activeMembership = $derived(
+		data.session.tenants.find((t) => t.tenantId === data.session.activeTenantId) ?? null
+	);
+</script>
+
+<section class="flex flex-col gap-6 py-6">
+	<header class="flex flex-col gap-1">
+		<p class="text-sm text-muted-foreground">{m.home_workspace()}</p>
+		<h1 class="text-2xl font-semibold">
+			{activeMembership?.tenantName ?? '—'}
+		</h1>
+		<p class="text-sm text-muted-foreground">
+			{m.home_greeting()} {data.session.user.username}
 		</p>
-	</section>
-</main>
+	</header>
+
+	<div class="flex flex-col gap-2">
+		<Button variant="outline" href="/tenants">
+			{m.settings_switch_workspace()}
+		</Button>
+		<Button variant="outline" href="/settings">
+			{m.settings_title()}
+		</Button>
+	</div>
+</section>

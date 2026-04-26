@@ -1,15 +1,13 @@
 import { json } from '@sveltejs/kit';
-import { createApiClient } from '$lib/server/api';
-import { SESSION_COOKIE } from '$lib/server/session';
+import { createApiClient } from '$shared/server/api';
+import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
+import { SESSION_COOKIE } from '$shared/server/session';
 import type { RequestHandler } from './$types';
 
 export const GET: RequestHandler = async ({ cookies, fetch, platform }) => {
-	const backendUrl = platform?.env.BACKEND_URL;
-	if (!backendUrl) {
-		return json({ ok: false, error: 'BACKEND_URL not configured' }, { status: 500 });
-	}
 	const api = createApiClient({
-		backendUrl,
+		backendUrl: getBackendUrl(platform),
+		frontendOrigin: getFrontendOrigin(platform),
 		sessionToken: cookies.get(SESSION_COOKIE),
 		fetch
 	});

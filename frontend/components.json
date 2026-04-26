@@ -6,11 +6,11 @@
 		"baseColor": "zinc"
 	},
 	"aliases": {
-		"components": "$lib/components",
-		"utils": "$lib/utils",
-		"hooks": "$lib/hooks",
-		"ui": "$lib/components/ui",
-		"lib": "$lib"
+		"components": "$shared/components",
+		"utils": "$shared/utils",
+		"hooks": "$shared/hooks",
+		"ui": "$shared/components/ui",
+		"lib": "$shared"
 	},
 	"typescript": true,
 	"registry": "https://shadcn-svelte.com/registry"

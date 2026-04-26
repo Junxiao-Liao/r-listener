@@ -9,6 +9,7 @@ declare global {
 		interface Platform {
 			env: {
 				BACKEND_URL: string;
+				FRONTEND_ORIGIN: string;
 			};
 			cf: CfProperties;
 			ctx: ExecutionContext;
