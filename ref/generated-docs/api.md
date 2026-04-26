@@ -1057,64 +1057,73 @@ API is organized by feature per `AGENTS.md`:
 backend/src/
   auth/            password.ts, session.ts (present)
   users/
-    orm.ts         drizzle schema
-    dto.ts         UserDto, input schemas (zod/valibot)
-    repository.ts  SELECT/INSERT/UPDATE functions, no business logic
-    service.ts     password policy, hashing, domain rules
-    route.ts       Hono subapp mounting /auth/*
+    users.orm.ts         drizzle schema
+    users.type.ts        UserDto and feature domain types
+    users.dto.ts         input/output schemas and mappers
+    users.repository.ts  SELECT/INSERT/UPDATE functions, no business logic
+    users.service.ts     password policy, hashing, domain rules
+    users.route.ts       Hono subapp mounting /auth/*
   tenants/
-    orm.ts         tenants, memberships
-    dto.ts
-    repository.ts
-    service.ts
-    route.ts       mounts /auth/switch-tenant here (tenant domain)
+    tenants.orm.ts         tenants, memberships
+    tenants.type.ts
+    tenants.dto.ts
+    tenants.repository.ts
+    tenants.service.ts
+    tenants.route.ts       mounts /auth/switch-tenant here (tenant domain)
   tracks/
-    orm.ts
-    dto.ts
-    repository.ts
-    service.ts     presign, finalize, soft-delete, lyrics, covers, stream-url
-    route.ts       /tracks/*
+    tracks.orm.ts
+    tracks.type.ts
+    tracks.dto.ts
+    tracks.repository.ts
+    tracks.service.ts     presign, finalize, soft-delete, lyrics, covers, stream-url
+    tracks.route.ts       /tracks/*
   playlists/
-    orm.ts         playlists, playlist_tracks
-    dto.ts
-    repository.ts
-    service.ts     reorder arithmetic, dense positions
-    route.ts       /playlists/*
+    playlists.orm.ts         playlists, playlist_tracks
+    playlists.type.ts
+    playlists.dto.ts
+    playlists.repository.ts
+    playlists.service.ts     reorder arithmetic, dense positions
+    playlists.route.ts       /playlists/*
   playback/
-    orm.ts         playback_history (userId, tenantId, trackId, last*)
-    dto.ts         PlaybackEventInput, RecentTrackDto
-    repository.ts
-    service.ts     last-wins upsert, continue-listening filter
-    route.ts       /playback-events, /me/recent-tracks, /me/continue-listening
+    playback.orm.ts         playback_history (userId, tenantId, trackId, last*)
+    playback.type.ts        PlaybackEventInput, RecentTrackDto
+    playback.dto.ts
+    playback.repository.ts
+    playback.service.ts     last-wins upsert, continue-listening filter
+    playback.route.ts       /playback-events, /me/recent-tracks, /me/continue-listening
   queue/
-    orm.ts         queue_items
-    dto.ts         QueueItemDto, QueueStateDto
-    repository.ts  queue reads/writes scoped by user + tenant
-    service.ts     add/remove/reorder/current, dense position DTOs
-    route.ts       /queue/*
+    queue.orm.ts         queue_items
+    queue.type.ts        QueueItemDto, QueueStateDto
+    queue.dto.ts
+    queue.repository.ts  queue reads/writes scoped by user + tenant
+    queue.service.ts     add/remove/reorder/current, dense position DTOs
+    queue.route.ts       /queue/*
   search/
-    dto.ts         SearchHitDto
-    service.ts     ranking heuristic across tracks + playlists
-    route.ts       /search
+    search.type.ts    SearchHitDto
+    search.dto.ts
+    search.service.ts ranking heuristic across tracks + playlists
+    search.route.ts   /search
   prefs/
-    orm.ts         user_preferences
-    dto.ts         PreferencesDto
-    repository.ts
-    service.ts     user preference defaults and updates
-    route.ts       /me/preferences
+    prefs.orm.ts         user_preferences
+    prefs.type.ts        PreferencesDto
+    prefs.dto.ts
+    prefs.repository.ts
+    prefs.service.ts     user preference defaults and updates
+    prefs.route.ts       /me/preferences
   admin/
-    dto.ts
-    service.ts     audit wrappers over per-feature services
-    route.ts       /admin/*
+    admin.type.ts
+    admin.dto.ts
+    admin.service.ts     audit wrappers over per-feature services
+    admin.route.ts       /admin/*
   audit/
-    orm.ts
-    dto.ts
-    repository.ts
-    route.ts       /admin/audit-logs (read-only)
+    audit.orm.ts
+    audit.type.ts
+    audit.dto.ts
+    audit.repository.ts
+    audit.route.ts       /admin/audit-logs (read-only)
   middleware/
-    auth.ts        requireSession, requireAdmin, requireTenant
-    origin.ts      CSRF-origin check
-    rateLimit.ts   KV-backed limiter
+    middleware.type.ts
+    middleware.service.ts
   index.ts         compose subapps, wire middleware
 ```
 

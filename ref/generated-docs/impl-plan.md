@@ -196,11 +196,12 @@ backend/src/
 
 Each feature should contain only the layers it needs:
 
-- `orm.ts`: Drizzle tables and indexes.
-- `dto.ts`: DTO types, Zod schemas, and mapping helpers.
-- `repository.ts`: database queries only.
-- `service.ts`: domain rules and orchestration.
-- `route.ts`: Hono routes.
+- `*.orm.ts`: Drizzle tables and indexes.
+- `*.dto.ts`: DTO types, Zod schemas, and mapping helpers.
+- `*.repository.ts`: database queries only.
+- `*.service.ts`: domain rules and orchestration.
+- `*.route.ts`: Hono routes.
+- `*.type.ts`: centralized feature domain and DTO-facing types.
 
 Database modules:
 

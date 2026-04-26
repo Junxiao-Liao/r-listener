@@ -37,7 +37,7 @@ IDs sort lexicographically by creation time. D1 rowid is never exposed.
 
 All timestamp columns are `INTEGER` storing **unix seconds** (Drizzle
 `integer({ mode: 'timestamp' })`). The wire DTOs convert to ISO-8601 in
-`dto.ts` per feature. There is no timezone column anywhere — UTC only.
+`*.dto.ts` per feature. There is no timezone column anywhere — UTC only.
 
 ### 1.3 Soft delete
 
@@ -67,22 +67,22 @@ session's `active_tenant_id`.
 
 ### 1.5 Drizzle module layout
 
-Each feature owns its `orm.ts`. Cross-feature FKs are declared via
+Each feature owns its `*.orm.ts`. Cross-feature FKs are declared via
 `references(() => otherTable.id)` and re-exported through a barrel
 `backend/src/db/schema.ts` so migrations see one consolidated graph.
 
 ```
 backend/src/
-  users/orm.ts        users
-  auth/orm.ts         sessions
-  tenants/orm.ts      tenants, memberships
-  tracks/orm.ts       tracks
-  playlists/orm.ts    playlists, playlist_tracks
-  playback/orm.ts     playback_history
-  queue/orm.ts         queue_items
-  prefs/orm.ts        user_preferences
-  audit/orm.ts        audit_logs
-  db/schema.ts        re-exports all of the above
+  users/users.orm.ts          users
+  auth/auth.orm.ts            sessions
+  tenants/tenants.orm.ts      tenants, memberships
+  tracks/tracks.orm.ts        tracks
+  playlists/playlists.orm.ts  playlists, playlist_tracks
+  playback/playback.orm.ts    playback_history
+  queue/queue.orm.ts          queue_items
+  prefs/prefs.orm.ts          user_preferences
+  audit/audit.orm.ts          audit_logs
+  db/schema.ts                re-exports all of the above
 ```
 
 ---
@@ -452,7 +452,7 @@ because SQLite cannot express them as constraints:
    `cannot_self_delete`. (UI #21)
 3. **Tenant scoping on writes.** Every write to a tenant-scoped table
    must include the resolved `active_tenant_id` from the session;
-   `service.ts` wraps each write in a `WHERE tenant_id = ?` guard.
+   `*.service.ts` wraps each write in a `WHERE tenant_id = ?` guard.
 4. **Viewer write guard.** Tenant-scoped shared-content writes require
    `role IN ('owner', 'member')`, unless the caller is a platform admin.
    Viewers may still write personal listener state: playback history, queue,
