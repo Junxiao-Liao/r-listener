@@ -8,6 +8,8 @@ import { healthRoute } from './health/health.route';
 import { createMiddlewareService } from './middleware/middleware.service';
 import { enforceAuthRateLimit, enforceMutationOrigin } from './middleware/middleware.guard';
 import type { MiddlewareService } from './middleware/middleware.type';
+import { authRoute } from './auth/auth.route';
+import { prefsRoute } from './prefs/prefs.route';
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
@@ -35,6 +37,8 @@ export function createApp(options: AppOptions = {}) {
 	app.use('*', enforceAuthRateLimit());
 
 	app.route('/', healthRoute);
+	app.route('/', authRoute);
+	app.route('/', prefsRoute);
 
 	options.configure?.(app);
 

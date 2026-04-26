@@ -32,5 +32,11 @@ function createMockR2(): R2Bucket {
 }
 
 function createMockKV(): KVNamespace {
-	return {} as KVNamespace;
+	const values = new Map<string, string>();
+	return {
+		get: async (key: string) => values.get(key) ?? null,
+		put: async (key: string, value: string) => {
+			values.set(key, value);
+		}
+	} as unknown as KVNamespace;
 }

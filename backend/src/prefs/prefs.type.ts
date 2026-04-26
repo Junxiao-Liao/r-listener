@@ -11,3 +11,10 @@ export type PreferencesDto = {
 	defaultLibrarySort: LibrarySort;
 	updatedAt: Iso8601;
 };
+
+export type PreferencesPatch = Partial<
+	Pick<
+		PreferencesDto,
+		'language' | 'autoPlayNext' | 'showMiniPlayer' | 'preferSyncedLyrics' | 'defaultLibrarySort'
+	>
+>;

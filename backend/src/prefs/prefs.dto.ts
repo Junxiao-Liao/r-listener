@@ -12,6 +12,16 @@ export const preferencesDtoSchema = z.object({
 	updatedAt: z.string()
 });
 
+export const preferencesPatchSchema = preferencesDtoSchema
+	.pick({
+		language: true,
+		autoPlayNext: true,
+		showMiniPlayer: true,
+		preferSyncedLyrics: true,
+		defaultLibrarySort: true
+	})
+	.partial();
+
 export function toPreferencesDto(preferences: typeof userPreferences.$inferSelect): PreferencesDto {
 	return {
 		language: preferences.language,

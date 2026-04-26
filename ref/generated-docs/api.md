@@ -329,7 +329,8 @@ Response `200`:
   "tenants": [ /* TenantMembershipDto[] */ ],
   "preferences": { /* PreferencesDto */ },
   "activeTenantId": "tnt_018f..." | null,
-  "sessionToken": "abcd..." // BFF-only; stripped before any browser response
+  "sessionToken": "abcd...", // BFF-only; stripped before any browser response
+  "sessionExpiresAt": "2026-05-25T09:12:03.000Z"
 }
 ```
 
@@ -408,6 +409,9 @@ Response: `204`. All other sessions for the user are revoked; the current
 session is kept.
 Errors: `400 validation_failed`, `401 invalid_credentials` (wrong current),
 `422 weak_password`.
+
+Password policy for new passwords: at least 12 characters and at least 3 of
+lowercase, uppercase, digit, symbol.
 
 Use `GET /auth/session` after reloads or direct navigation to hydrate the
 app shell with identity, memberships, active tenant, preferences, and the

@@ -35,6 +35,8 @@ Decisions already locked:
 - Current-session hydration: `GET /auth/session`.
 - Frontend page implementation: feature pages under `frontend/src/pages`,
   with SvelteKit routes kept thin.
+- Local dev launcher: root `./dev.sh` starts backend and frontend together.
+- Step 4 and later acceptance includes a browser check.
 
 ## Architecture Rules
 
@@ -65,7 +67,8 @@ Signin flow:
 1. Browser posts credentials to a SvelteKit server route/action.
 2. SvelteKit calls backend `POST /auth/signin`.
 3. Backend validates credentials, creates the session row, and returns the raw
-   session token plus signin payload to the server-only caller.
+   session token, `sessionExpiresAt`, and signin payload to the server-only
+   caller.
 4. SvelteKit sets the app-origin `session` cookie:
    `HttpOnly; Secure; SameSite=Lax; Path=/`, with an expiry matching the
    backend session expiry.
@@ -272,6 +275,9 @@ Backend:
 - Implement session repositories.
 - Implement tenant and membership reads.
 - Implement preferences lazy creation and updates.
+- Add root `dev.sh` that starts backend `npm run dev` on
+  `127.0.0.1:8787` and frontend `npm run dev` on `localhost:5173`, with
+  signal cleanup for both child processes.
 - Implement:
   - `POST /auth/signin`
   - `POST /auth/signout`
@@ -281,6 +287,8 @@ Backend:
   - `GET /me/preferences`
   - `PATCH /me/preferences`
 - Return session token data to BFF-only signin callers.
+- Return `sessionExpiresAt` in the signin JSON alongside the BFF-only
+  `sessionToken`.
 - On signin, bind `sessions.active_tenant_id` only for single-workspace
   users; multi-workspace users start with `active_tenant_id = null` and
   bind via `POST /auth/switch-tenant` from the Tenant Picker.
@@ -289,6 +297,8 @@ Backend:
 - `GET /auth/session` returns the current user, memberships, preferences,
   active tenant, and session expiry for SSR reloads and app shell hydration.
 - Enforce disabled-account and weak-password behavior.
+- Weak password means failing: at least 12 characters and at least 3 of
+  lowercase, uppercase, digit, symbol.
 - Revoke sibling sessions on password change.
 
 Frontend:
@@ -306,6 +316,8 @@ Frontend:
   - Language.
   - Playback preferences.
 - Add change password page.
+- The change-password UI must visibly show: “at least 12 characters and at
+  least 3 of lowercase, uppercase, digit, symbol.”
 - Add EN and 中文 messages for these screens.
 
 Manual bootstrap:
@@ -339,6 +351,10 @@ Acceptance:
 - A manually bootstrapped user can sign in locally.
 - SvelteKit owns browser cookie writes.
 - Authenticated BFF calls forward the cookie to backend.
+- Browser check: start `./dev.sh`, open the frontend, verify the app loads, and
+  verify `/api/health` reports a healthy backend. Full signin, tenant picker,
+  and settings browser acceptance waits for the Step 4 frontend slice when only
+  the backend slice is implemented.
 
 ### 5. Tracks, Uploads, Lyrics, Covers, And Streaming Slice
 
