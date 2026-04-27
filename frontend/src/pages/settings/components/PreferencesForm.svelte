@@ -2,6 +2,7 @@
 	import { Button } from '$shared/components/ui/button';
 	import { Label } from '$shared/components/ui/label';
 	import * as m from '$shared/paraglide/messages';
+	import { applyTheme } from '$shared/theme/theme';
 	import type { FormMessage } from '$shared/forms/superforms';
 	import { superForm } from 'sveltekit-superforms';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
@@ -23,6 +24,16 @@
 		{ value: 'artist:asc', label: m.settings_sort_artist },
 		{ value: 'album:asc', label: m.settings_sort_album }
 	] as const;
+
+	const themeOptions = [
+		{ value: 'system', label: m.settings_theme_system },
+		{ value: 'light', label: m.settings_theme_light },
+		{ value: 'dark', label: m.settings_theme_dark }
+	] as const;
+
+	$effect(() => {
+		if ($form.theme) applyTheme($form.theme);
+	});
 </script>
 
 <form
@@ -85,6 +96,22 @@
 				<option value={opt.value}>{opt.label()}</option>
 			{/each}
 		</select>
+	</section>
+
+	<section class="flex flex-col gap-2">
+		<h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+			{m.settings_appearance()}
+		</h2>
+		<div class="grid grid-cols-3 gap-2 rounded-md bg-muted p-1">
+			{#each themeOptions as opt (opt.value)}
+				<label
+					class="flex h-9 cursor-pointer items-center justify-center rounded-sm px-2 text-sm text-muted-foreground transition-colors has-[:checked]:bg-background has-[:checked]:text-foreground has-[:checked]:shadow-xs"
+				>
+					<input type="radio" class="sr-only" name="theme" value={opt.value} bind:group={$form.theme} />
+					{opt.label()}
+				</label>
+			{/each}
+		</div>
 	</section>
 
 	<section class="flex flex-col gap-2">

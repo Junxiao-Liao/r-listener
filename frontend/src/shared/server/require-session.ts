@@ -1,6 +1,7 @@
 import { redirect, error as svelteError, type RequestEvent } from '@sveltejs/kit';
 import { authApi } from '$shared/api/auth';
 import { applyLocaleCookie } from '$shared/i18n/locale';
+import { applyThemeCookie } from '$shared/theme/theme';
 import { ApiError, createApiClient } from './api';
 import { getBackendUrl, getFrontendOrigin } from './origin';
 import { clearSessionCookie, rollSessionCookie, SESSION_COOKIE } from './session';
@@ -14,6 +15,7 @@ export type AppSession = CurrentSessionDto;
 // - 401 → redirect to /signin (with the local cookie cleared).
 // - rolling session cookie refresh based on X-Session-Expires-At.
 // - paraglide locale cookie sync to user preferences.
+// - theme cookie sync to user preferences for first paint.
 export async function loadAppSession(event: Event): Promise<AppSession> {
 	const token = event.cookies.get(SESSION_COOKIE);
 	if (!token) {
@@ -39,5 +41,6 @@ export async function loadAppSession(event: Event): Promise<AppSession> {
 		throw err;
 	}
 	applyLocaleCookie(event.cookies, session.preferences.language);
+	applyThemeCookie(event.cookies, session.preferences.theme);
 	return session;
 }

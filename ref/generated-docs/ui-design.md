@@ -358,6 +358,8 @@ UI elements:
 - Library management section:
   - Default sort order
   - Default playlist behavior, optional
+- Appearance section:
+  - Theme segmented control: System / Light / Dark
 - Language section:
   - English / 中文 (selectable)
 - Admin section (visible only when the signed-in user is a platform admin):

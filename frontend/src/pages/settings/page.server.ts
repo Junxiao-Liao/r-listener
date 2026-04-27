@@ -7,6 +7,7 @@ import {
 import { authApi } from '$shared/api/auth';
 import { prefsApi } from '$shared/api/prefs';
 import { applyLocaleCookie } from '$shared/i18n/locale';
+import { applyThemeCookie } from '$shared/theme/theme';
 import { ApiError, createApiClient } from '$shared/server/api';
 import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
 import { clearSessionCookie, SESSION_COOKIE } from '$shared/server/session';
@@ -24,6 +25,7 @@ export async function load({ parent }: ServerLoadEvent<never, ParentData>) {
 	const { session } = await parent();
 	const initial: PreferencesForm = {
 		language: session.preferences.language,
+		theme: session.preferences.theme,
 		autoPlayNext: session.preferences.autoPlayNext,
 		showMiniPlayer: session.preferences.showMiniPlayer,
 		preferSyncedLyrics: session.preferences.preferSyncedLyrics,
@@ -49,6 +51,7 @@ const savePreferences: Action = async (event) => {
 	try {
 		await prefsApi.patch(api, form.data);
 		if (form.data.language) applyLocaleCookie(event.cookies, form.data.language);
+		if (form.data.theme) applyThemeCookie(event.cookies, form.data.theme);
 		return message<FormMessage>(form, { type: 'success' });
 	} catch (err) {
 		if (err instanceof ApiError) {

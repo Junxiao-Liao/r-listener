@@ -3,6 +3,7 @@ import { authApi } from '$shared/api/auth';
 import { ApiError, createApiClient } from '$shared/server/api';
 import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
 import { setSessionCookie } from '$shared/server/session';
+import { applyThemeCookie } from '$shared/theme/theme';
 import { asErrorStatus, message, superValidate, zod } from '$shared/forms/superforms';
 import type { FormMessage } from '$shared/forms/superforms';
 import { postSigninRedirect, signinSchema } from './signin.form';
@@ -26,6 +27,7 @@ const signin: Action = async ({ request, cookies, fetch, platform }) => {
 	try {
 		const result = await authApi.signin(api, form.data);
 		setSessionCookie(cookies, result.sessionToken, result.sessionExpiresAt);
+		applyThemeCookie(cookies, result.preferences.theme);
 		throw redirect(303, postSigninRedirect(result));
 	} catch (err) {
 		if (err instanceof ApiError) {

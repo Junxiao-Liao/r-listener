@@ -5,6 +5,7 @@ import type { userPreferences } from './prefs.orm';
 
 export const preferencesDtoSchema = z.object({
 	language: z.enum(['en', 'zh']),
+	theme: z.enum(['system', 'light', 'dark']),
 	autoPlayNext: z.boolean(),
 	showMiniPlayer: z.boolean(),
 	preferSyncedLyrics: z.boolean(),
@@ -15,6 +16,7 @@ export const preferencesDtoSchema = z.object({
 export const preferencesPatchSchema = preferencesDtoSchema
 	.pick({
 		language: true,
+		theme: true,
 		autoPlayNext: true,
 		showMiniPlayer: true,
 		preferSyncedLyrics: true,
@@ -25,6 +27,7 @@ export const preferencesPatchSchema = preferencesDtoSchema
 export function toPreferencesDto(preferences: typeof userPreferences.$inferSelect): PreferencesDto {
 	return {
 		language: preferences.language,
+		theme: preferences.theme,
 		autoPlayNext: preferences.autoPlayNext,
 		showMiniPlayer: preferences.showMiniPlayer,
 		preferSyncedLyrics: preferences.preferSyncedLyrics,

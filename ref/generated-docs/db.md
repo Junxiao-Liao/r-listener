@@ -388,13 +388,14 @@ Operations:
 
 ### 2.10 `user_preferences`
 
-UI Settings page (#19) toggles plus language. One row per user; created
-lazily on first `GET /me/preferences` or `PATCH /me/preferences`.
+UI Settings page (#19) toggles plus language and theme. One row per user;
+created lazily on first `GET /me/preferences` or `PATCH /me/preferences`.
 
 ```ts
 export const userPreferences = sqliteTable('user_preferences', {
   userId:               text('user_id').primaryKey().references(() => users.id, { onDelete: 'cascade' }),
   language:             text('language', { enum: ['en', 'zh'] }).notNull().default('en'),
+  theme:                text('theme', { enum: ['system', 'light', 'dark'] }).notNull().default('system'),
   autoPlayNext:         integer('auto_play_next',          { mode: 'boolean' }).notNull().default(true),
   showMiniPlayer:       integer('show_mini_player',        { mode: 'boolean' }).notNull().default(true),
   preferSyncedLyrics:   integer('prefer_synced_lyrics',    { mode: 'boolean' }).notNull().default(true),
@@ -406,7 +407,7 @@ export const userPreferences = sqliteTable('user_preferences', {
 ```
 
 The signin response embeds a sibling `preferences` field so SSR can render
-with the right language and defaults on first paint.
+with the right language, theme, and defaults on first paint.
 
 ### 2.11 `audit_logs`
 

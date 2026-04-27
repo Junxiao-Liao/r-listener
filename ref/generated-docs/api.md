@@ -181,6 +181,7 @@ type TenantMembershipDto = {
 
 type PreferencesDto = {
   language: "en" | "zh";
+  theme: "system" | "light" | "dark";
   autoPlayNext: boolean;
   showMiniPlayer: boolean;
   preferSyncedLyrics: boolean;
@@ -822,7 +823,8 @@ Errors: `400 validation_failed` if `q` empty.
 ### 5.7 Preferences
 
 Preferences are scoped to the signed-in user, not to a tenant. They drive
-Settings, localization, playback defaults, and initial SSR rendering.
+Settings, localization, theme selection, playback defaults, and initial SSR
+rendering.
 
 #### `GET /me/preferences`
 
@@ -831,12 +833,12 @@ one does not exist.
 
 #### `PATCH /me/preferences`
 
-Editable fields: `language`, `autoPlayNext`, `showMiniPlayer`,
+Editable fields: `language`, `theme`, `autoPlayNext`, `showMiniPlayer`,
 `preferSyncedLyrics`, `defaultLibrarySort`. All optional; omitted fields are
 unchanged.
 
 ```json
-{ "language": "zh", "autoPlayNext": false }
+{ "language": "zh", "theme": "dark", "autoPlayNext": false }
 ```
 
 Response `200`: `PreferencesDto`.

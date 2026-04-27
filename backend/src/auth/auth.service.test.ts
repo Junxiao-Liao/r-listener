@@ -320,6 +320,7 @@ function toPublicUser(user: UserPasswordRecord): UserDto {
 function prefsFixture(overrides: Partial<PreferencesDto> = {}): PreferencesDto {
 	return {
 		language: 'en',
+		theme: 'system',
 		autoPlayNext: true,
 		showMiniPlayer: true,
 		preferSyncedLyrics: true,

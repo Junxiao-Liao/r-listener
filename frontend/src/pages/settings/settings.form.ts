@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 export const languageSchema = z.enum(['en', 'zh']);
+export const themeSchema = z.enum(['system', 'light', 'dark']);
 export const librarySortSchema = z.enum([
 	'createdAt:desc',
 	'title:asc',
@@ -18,6 +19,7 @@ const checkboxBooleanSchema = z.preprocess((value) => {
 
 export const preferencesSchema = z.object({
 	language: languageSchema.optional(),
+	theme: themeSchema.optional(),
 	autoPlayNext: checkboxBooleanSchema,
 	showMiniPlayer: checkboxBooleanSchema,
 	preferSyncedLyrics: checkboxBooleanSchema,

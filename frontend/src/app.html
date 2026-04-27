@@ -3,6 +3,23 @@
 <html lang="%paraglide.lang%" dir="%paraglide.dir%">
 	<head>
 		<meta charset="utf-8" />
+		<script>
+			(() => {
+				const cookie = document.cookie
+					.split(';')
+					.map((part) => part.trim())
+					.find((part) => part.startsWith('theme='));
+				let value = 'system';
+				try {
+					value = cookie ? decodeURIComponent(cookie.slice(6)) : 'system';
+				} catch {}
+				const theme = ['system', 'light', 'dark'].includes(value) ? value : 'system';
+				const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
+				const dark = theme === 'dark' || (theme === 'system' && prefersDark);
+				document.documentElement.classList.toggle('dark', dark);
+				document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+			})();
+		</script>
 
 		<meta
 			name="viewport"

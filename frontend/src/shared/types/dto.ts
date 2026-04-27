@@ -33,6 +33,7 @@ export type ApiErrorBody = {
 
 export type Language = 'en' | 'zh';
 export type LibrarySort = 'createdAt:desc' | 'title:asc' | 'artist:asc' | 'album:asc';
+export type Theme = 'system' | 'light' | 'dark';
 export type TenantRole = 'owner' | 'member' | 'viewer';
 
 export type UserDto = {
@@ -53,6 +54,7 @@ export type TenantMembershipDto = {
 
 export type PreferencesDto = {
 	language: Language;
+	theme: Theme;
 	autoPlayNext: boolean;
 	showMiniPlayer: boolean;
 	preferSyncedLyrics: boolean;
@@ -63,7 +65,12 @@ export type PreferencesDto = {
 export type PreferencesPatch = Partial<
 	Pick<
 		PreferencesDto,
-		'language' | 'autoPlayNext' | 'showMiniPlayer' | 'preferSyncedLyrics' | 'defaultLibrarySort'
+		| 'language'
+		| 'theme'
+		| 'autoPlayNext'
+		| 'showMiniPlayer'
+		| 'preferSyncedLyrics'
+		| 'defaultLibrarySort'
 	>
 >;
 

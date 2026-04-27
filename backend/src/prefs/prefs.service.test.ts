@@ -35,15 +35,37 @@ describe('prefs service', () => {
 
 		const result = await service.updatePreferences('usr_a' as UserDto['id'], {
 			language: 'zh',
+			theme: 'dark',
 			autoPlayNext: false
 		});
 
 		expect(result.language).toBe('zh');
+		expect(result.theme).toBe('dark');
 		expect(result.autoPlayNext).toBe(false);
 		expect(result.showMiniPlayer).toBe(true);
 		expect(repository.update).toHaveBeenCalledWith({
 			userId: 'usr_a',
-			patch: { language: 'zh', autoPlayNext: false },
+			patch: { language: 'zh', theme: 'dark', autoPlayNext: false },
+			now: new Date('2026-04-26T00:00:00.000Z')
+		});
+	});
+
+	it('passes through empty patches', async () => {
+		const repository = {
+			findByUserId: vi.fn(async () => prefsFixture()),
+			createDefault: vi.fn(),
+			update: vi.fn(async ({ patch }) => prefsFixture(patch))
+		};
+		const service = createPrefsService(repository, {
+			now: () => new Date('2026-04-26T00:00:00.000Z')
+		});
+
+		const result = await service.updatePreferences('usr_a' as UserDto['id'], {});
+
+		expect(result).toEqual(prefsFixture());
+		expect(repository.update).toHaveBeenCalledWith({
+			userId: 'usr_a',
+			patch: {},
 			now: new Date('2026-04-26T00:00:00.000Z')
 		});
 	});
@@ -52,6 +74,7 @@ describe('prefs service', () => {
 function prefsFixture(overrides: Partial<PreferencesDto> = {}): PreferencesDto {
 	return {
 		language: 'en',
+		theme: 'system',
 		autoPlayNext: true,
 		showMiniPlayer: true,
 		preferSyncedLyrics: true,

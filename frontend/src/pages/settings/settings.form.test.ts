@@ -8,7 +8,7 @@ describe('preferencesSchema', () => {
 	});
 
 	it('accepts a partial patch', () => {
-		const r = preferencesSchema.safeParse({ language: 'zh', autoPlayNext: true });
+		const r = preferencesSchema.safeParse({ language: 'zh', theme: 'dark', autoPlayNext: true });
 		expect(r.success).toBe(true);
 	});
 
@@ -31,6 +31,7 @@ describe('preferencesSchema', () => {
 	it('parses a native FormData preferences submit', async () => {
 		const formData = new FormData();
 		formData.append('language', 'zh');
+		formData.append('theme', 'dark');
 		formData.append('autoPlayNext', 'false');
 		formData.append('showMiniPlayer', 'false');
 		formData.append('showMiniPlayer', 'true');
@@ -42,6 +43,7 @@ describe('preferencesSchema', () => {
 		expect(form.valid).toBe(true);
 		expect(form.data).toEqual({
 			language: 'zh',
+			theme: 'dark',
 			autoPlayNext: false,
 			showMiniPlayer: true,
 			preferSyncedLyrics: false,
@@ -51,6 +53,7 @@ describe('preferencesSchema', () => {
 
 	it('rejects invalid language and sort', () => {
 		expect(preferencesSchema.safeParse({ language: 'fr' }).success).toBe(false);
+		expect(preferencesSchema.safeParse({ theme: 'sepia' }).success).toBe(false);
 		expect(preferencesSchema.safeParse({ defaultLibrarySort: 'bogus' }).success).toBe(false);
 	});
 });
