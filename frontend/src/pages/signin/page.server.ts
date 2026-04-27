@@ -5,10 +5,10 @@ import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
 import { setSessionCookie } from '$shared/server/session';
 import { asErrorStatus, message, superValidate, zod } from '$shared/forms/superforms';
 import type { FormMessage } from '$shared/forms/superforms';
-import { defaultSigninForm, postSigninRedirect, signinSchema } from './signin.form';
+import { postSigninRedirect, signinSchema } from './signin.form';
 
 export async function load({ cookies }: ServerLoadEvent) {
-	const form = await superValidate(defaultSigninForm, zod(signinSchema));
+	const form = await superValidate(zod(signinSchema));
 	const justChanged = cookies.get('signin_flash') === 'changed';
 	if (justChanged) cookies.delete('signin_flash', { path: '/' });
 	return { form, justChanged };

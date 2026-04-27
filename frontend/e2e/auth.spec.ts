@@ -11,6 +11,22 @@ test('signin renders the form in English by default', async ({ page }) => {
 	await expect(page.getByText('Your private music library')).toBeVisible();
 	await expect(page.getByLabel('Username')).toBeVisible();
 	await expect(page.getByLabel('Password')).toBeVisible();
+	await expect(page.getByText('Username is required.')).toBeHidden();
+	await expect(page.getByText('Password is required.')).toBeHidden();
+});
+
+test('signin required errors clear when fields are filled', async ({ page }) => {
+	await page.goto('/signin');
+
+	await page.getByRole('button', { name: 'Sign in' }).click();
+	await expect(page.getByText('Username is required.')).toBeVisible();
+	await expect(page.getByText('Password is required.')).toBeVisible();
+
+	await page.getByLabel('Username').fill('alice');
+	await page.getByLabel('Password').fill('password');
+
+	await expect(page.getByText('Username is required.')).toBeHidden();
+	await expect(page.getByText('Password is required.')).toBeHidden();
 });
 
 test('the page renders in 中文 when the paraglide cookie is zh', async ({ page, context }) => {

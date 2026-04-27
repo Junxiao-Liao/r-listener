@@ -4,6 +4,7 @@
 	import { Label } from '$shared/components/ui/label';
 	import { superForm } from 'sveltekit-superforms';
 	import type { Infer, SuperValidated } from 'sveltekit-superforms';
+	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import * as m from '$shared/paraglide/messages';
 	import type { FormMessage } from '$shared/forms/superforms';
 	import { signinSchema } from '../signin.form';
@@ -16,7 +17,9 @@
 
 	// superForm reads the initial validated form once and returns its own reactive stores.
 	// svelte-ignore state_referenced_locally
-	const { form, errors, message, enhance, submitting } = superForm(data);
+	const { form, errors, message, enhance, submitting } = superForm(data, {
+		validators: zod4Client(signinSchema)
+	});
 
 	function errorText(code: string | undefined): string | null {
 		if (!code) return null;
