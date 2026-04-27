@@ -360,8 +360,10 @@ UI elements:
   - Default playlist behavior, optional
 - Appearance section:
   - Theme segmented control: System / Light / Dark
+  - Changes autosave immediately and update the browser theme without a submit
 - Language section:
   - English / 中文 (selectable)
+  - Changes autosave immediately and update the app locale without a submit
 - Admin section (visible only when the signed-in user is a platform admin):
   - "Admin" row opening the Admin area (pages #21–#24)
 Do not include storage usage charts, billing, subscriptions, public profile, friends, or admin analytics.

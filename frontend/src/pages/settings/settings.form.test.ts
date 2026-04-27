@@ -8,8 +8,13 @@ describe('preferencesSchema', () => {
 	});
 
 	it('accepts a partial patch', () => {
-		const r = preferencesSchema.safeParse({ language: 'zh', theme: 'dark', autoPlayNext: true });
+		const r = preferencesSchema.safeParse({ autoPlayNext: true });
 		expect(r.success).toBe(true);
+	});
+
+	it('accepts single-field visual preference patches', () => {
+		expect(preferencesSchema.safeParse({ theme: 'dark' }).success).toBe(true);
+		expect(preferencesSchema.safeParse({ language: 'zh' }).success).toBe(true);
 	});
 
 	it('parses native checkbox values without treating "false" as true', () => {

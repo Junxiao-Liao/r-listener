@@ -6,7 +6,6 @@ import {
 } from '@sveltejs/kit';
 import { authApi } from '$shared/api/auth';
 import { prefsApi } from '$shared/api/prefs';
-import { applyLocaleCookie } from '$shared/i18n/locale';
 import { applyThemeCookie } from '$shared/theme/theme';
 import { ApiError, createApiClient } from '$shared/server/api';
 import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
@@ -50,7 +49,6 @@ const savePreferences: Action = async (event) => {
 	const api = makeApi(event);
 	try {
 		await prefsApi.patch(api, form.data);
-		if (form.data.language) applyLocaleCookie(event.cookies, form.data.language);
 		if (form.data.theme) applyThemeCookie(event.cookies, form.data.theme);
 		return message<FormMessage>(form, { type: 'success' });
 	} catch (err) {

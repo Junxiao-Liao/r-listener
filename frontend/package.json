@@ -9,7 +9,7 @@
 		"deploy": "WRANGLER_LOG_PATH=.wrangler/logs wrangler pages deploy .svelte-kit/cloudflare --project-name r-listener-frontend",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/shared/paraglide --silent",
+		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/shared/paraglide --strategy custom-request-locale globalVariable preferredLanguage baseLocale --silent",
 		"compile": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",

@@ -54,7 +54,8 @@ export class ApiError extends Error {
 		public readonly status: number,
 		public readonly code: ApiErrorCode,
 		message: string,
-		public readonly fields?: Record<string, string>
+		public readonly fields?: Record<string, string>,
+		public readonly details?: ApiErrorBody['error']['details']
 	) {
 		super(message);
 		this.name = 'ApiError';
@@ -65,7 +66,13 @@ export class ApiError extends Error {
 		try {
 			const body = JSON.parse(text) as ApiErrorBody;
 			if (body?.error?.code) {
-				return new ApiError(res.status, body.error.code, body.error.message, body.error.fields);
+				return new ApiError(
+					res.status,
+					body.error.code,
+					body.error.message,
+					body.error.fields,
+					body.error.details
+				);
 			}
 		} catch {
 			// fallthrough

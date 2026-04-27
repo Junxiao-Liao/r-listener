@@ -12,7 +12,17 @@ describe('preferencesPatchSchema', () => {
 		}
 	});
 
+	it('accepts supported language values', () => {
+		for (const language of ['en', 'zh']) {
+			expect(preferencesPatchSchema.safeParse({ language }).success).toBe(true);
+		}
+	});
+
 	it('rejects unsupported theme values', () => {
 		expect(preferencesPatchSchema.safeParse({ theme: 'sepia' }).success).toBe(false);
+	});
+
+	it('rejects unsupported language values', () => {
+		expect(preferencesPatchSchema.safeParse({ language: 'fr' }).success).toBe(false);
 	});
 });

@@ -1,4 +1,3 @@
-import { cookieName } from '$shared/paraglide/runtime';
 import type { Language } from '$shared/types/dto';
 
 const SUPPORTED: readonly Language[] = ['en', 'zh'] as const;
@@ -33,18 +32,4 @@ export function pickLocale(
 ): Language {
 	if (prefs?.language && isLocale(prefs.language)) return prefs.language;
 	return parseAcceptLanguage(acceptLanguage) ?? 'en';
-}
-
-import type { Cookies } from '@sveltejs/kit';
-
-export function applyLocaleCookie(
-	cookies: Pick<Cookies, 'set' | 'get'>,
-	locale: Language
-): void {
-	if (cookies.get(cookieName) === locale) return;
-	cookies.set(cookieName, locale, {
-		path: '/',
-		maxAge: 34_560_000,
-		sameSite: 'lax'
-	});
 }

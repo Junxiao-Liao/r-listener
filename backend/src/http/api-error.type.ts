@@ -36,5 +36,11 @@ export type ApiErrorBody = {
 		code: ApiErrorCode;
 		message: string;
 		fields?: ApiErrorFieldMap;
+		details?: {
+			name: string;
+			message: string;
+			stack?: string;
+			cause?: string;
+		};
 	};
 };

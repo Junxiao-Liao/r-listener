@@ -8,7 +8,8 @@ Frontend (frontend/):
   Tailwind CSS + shadcn-svelte
   Paraglide JS for i18n (en, zh)
   Deploys to Cloudflare Pages via adapter-cloudflare
-  Thin BFF layer in server routes — proxies to backend, forwards session cookie
+  Thin BFF layer in server routes — proxies to backend, forwards session cookie,
+  and resolves the request locale from signed-in preferences
 
 Backend (backend/):
   Hono on Cloudflare Workers

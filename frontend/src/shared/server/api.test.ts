@@ -57,12 +57,18 @@ describe('createApiClient', () => {
 		);
 	});
 
-	it('parses backend ApiErrorBody into ApiError with code/message', async () => {
-		const body = { error: { code: 'invalid_credentials', message: 'Bad creds.' } };
+	it('parses backend ApiErrorBody into ApiError with code/message/details', async () => {
+		const body = {
+			error: {
+				code: 'internal_error',
+				message: 'Internal server error.',
+				details: { name: 'Error', message: 'no such column: user_preferences.theme' }
+			}
+		};
 		const fetch = vi.fn<typeof globalThis.fetch>(
 			async () =>
 				new Response(JSON.stringify(body), {
-					status: 401,
+					status: 500,
 					headers: { 'content-type': 'application/json' }
 				})
 		);
@@ -72,9 +78,10 @@ describe('createApiClient', () => {
 		});
 
 		await expect(api.request('/auth/signin', { method: 'POST' })).rejects.toMatchObject({
-			status: 401,
-			code: 'invalid_credentials',
-			message: 'Bad creds.'
+			status: 500,
+			code: 'internal_error',
+			message: 'Internal server error.',
+			details: { name: 'Error', message: 'no such column: user_preferences.theme' }
 		});
 	});
 

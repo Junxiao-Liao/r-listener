@@ -9,9 +9,9 @@
 
 	let current = $state(getLocale());
 
-	function pick(locale: 'en' | 'zh') {
+	async function pick(locale: 'en' | 'zh') {
 		current = locale;
-		setLocale(locale);
+		await setLocale(locale);
 	}
 </script>
 

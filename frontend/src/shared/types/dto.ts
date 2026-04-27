@@ -28,6 +28,12 @@ export type ApiErrorBody = {
 		code: ApiErrorCode;
 		message: string;
 		fields?: Record<string, string>;
+		details?: {
+			name: string;
+			message: string;
+			stack?: string;
+			cause?: string;
+		};
 	};
 };
 

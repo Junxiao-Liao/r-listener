@@ -7,6 +7,7 @@ export type BackendBindings = {
 	KV: KVNamespace;
 	FRONTEND_ORIGIN: string;
 	SESSION_SECRET: string;
+	ENVIRONMENT?: string;
 };
 
 export type BackendVariables = {

@@ -369,6 +369,9 @@ Response `200`:
 
 - Validates the forwarded `session` cookie, applies the normal rolling refresh
   rule, and returns the current app-shell state needed for SSR reloads.
+- The SvelteKit BFF uses `preferences.language` to resolve the request locale
+  before the first client render, so locale changes take effect on the next
+  navigation and on full reload.
 - Platform admins may have zero memberships. In that case `tenants` may be
   empty and `activeTenantId` may be `null`; the frontend Tenant Picker should
   let admins browse all tenants by calling the admin tenant list endpoint.
@@ -825,6 +828,11 @@ Errors: `400 validation_failed` if `q` empty.
 Preferences are scoped to the signed-in user, not to a tenant. They drive
 Settings, localization, theme selection, playback defaults, and initial SSR
 rendering.
+
+The backend contract remains `GET /me/preferences` and `PATCH /me/preferences`.
+The frontend settings page now autosaves `theme` and `language` through a
+SvelteKit server route at `/settings/preferences`, which forwards the patch to
+the backend and keeps the browser theme/locale in sync immediately.
 
 #### `GET /me/preferences`
 

@@ -313,8 +313,12 @@ Frontend:
   - Switch workspace.
   - Change password.
   - Sign out.
-  - Language.
+  - Language, autosaved immediately through the BFF.
   - Playback preferences.
+  - Theme, autosaved immediately through the BFF.
+- Add a frontend-only `/settings/preferences` route that forwards visual
+  preference patches to the backend and keeps the current locale/theme
+  state aligned without a full reload.
 - Add change password page.
 - The change-password UI must visibly show: “at least 12 characters and at
   least 3 of lowercase, uppercase, digit, symbol.”
