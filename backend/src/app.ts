@@ -10,9 +10,12 @@ import { enforceAuthRateLimit, enforceMutationOrigin } from './middleware/middle
 import type { MiddlewareService } from './middleware/middleware.type';
 import { authRoute } from './auth/auth.route';
 import { prefsRoute } from './prefs/prefs.route';
+import { createAdminRoute } from './admin/admin.route';
+import type { AdminService } from './admin/admin.service';
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
+	createAdminService?: (db: Db) => AdminService;
 	configure?: (app: Hono<BackendEnv>) => void;
 };
 
@@ -39,6 +42,7 @@ export function createApp(options: AppOptions = {}) {
 	app.route('/', healthRoute);
 	app.route('/', authRoute);
 	app.route('/', prefsRoute);
+	app.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
 
 	options.configure?.(app);
 

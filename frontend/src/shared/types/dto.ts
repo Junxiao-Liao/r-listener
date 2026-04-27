@@ -81,3 +81,11 @@ export type SwitchTenantResult = {
 	user: UserDto;
 	activeTenantId: Id<'tenant'>;
 };
+
+export type AdminTenantListItemDto = {
+	id: Id<'tenant'>;
+	name: string;
+	createdAt: Iso8601;
+	memberCount: number;
+	trackCount: number;
+};

@@ -3,6 +3,7 @@ import {
 	type Action,
 	type ServerLoadEvent
 } from '@sveltejs/kit';
+import { adminApi } from '$shared/api/admin';
 import { authApi } from '$shared/api/auth';
 import { ApiError, createApiClient } from '$shared/server/api';
 import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
@@ -14,16 +15,25 @@ import { defaultSwitchTenantForm, switchTenantSchema } from './tenants.form';
 
 type ParentData = { session: CurrentSessionDto };
 
-export async function load({ parent }: ServerLoadEvent<never, ParentData>) {
+export async function load({ parent, cookies, fetch, platform }: ServerLoadEvent<never, ParentData>) {
 	const { session } = await parent();
 	const form = await superValidate(defaultSwitchTenantForm, zod(switchTenantSchema));
+	const api = createApiClient({
+		backendUrl: getBackendUrl(platform),
+		frontendOrigin: getFrontendOrigin(platform),
+		sessionToken: cookies.get(SESSION_COOKIE),
+		fetch
+	});
+	const adminTenants =
+		session.user.isAdmin && session.tenants.length === 0
+			? (await adminApi.listTenants(api)).tenants
+			: [];
 	return {
 		form,
 		memberships: session.tenants,
+		adminTenants,
 		lastActiveTenantId: session.user.lastActiveTenantId,
 		isAdminWithNoMemberships: session.user.isAdmin && session.tenants.length === 0
-		// TODO(step-9): when /admin/tenants ships, fetch and expose all tenants
-		// here so platform admins with no memberships can pick any workspace.
 	};
 }
 

@@ -1,15 +1,21 @@
 <script lang="ts">
 	import * as m from '$shared/paraglide/messages';
-	import type { TenantMembershipDto } from '$shared/types/dto';
+	import type { TenantRole } from '$shared/types/dto';
 	import { cn } from '$shared/utils';
 
+	export type TenantCardModel = {
+		tenantId: string;
+		tenantName: string;
+		role?: TenantRole;
+	};
+
 	type Props = {
-		membership: TenantMembershipDto;
+		tenant: TenantCardModel;
 		lastUsed?: boolean;
 	};
-	let { membership, lastUsed = false }: Props = $props();
+	let { tenant, lastUsed = false }: Props = $props();
 
-	function roleLabel(role: TenantMembershipDto['role']): string {
+	function roleLabel(role: TenantRole | undefined): string {
 		switch (role) {
 			case 'owner':
 				return m.tenants_role_owner();
@@ -17,12 +23,14 @@
 				return m.tenants_role_member();
 			case 'viewer':
 				return m.tenants_role_viewer();
+			default:
+				return m.tenants_role_admin_access();
 		}
 	}
 </script>
 
 <form method="POST" class="contents">
-	<input type="hidden" name="tenantId" value={membership.tenantId} />
+	<input type="hidden" name="tenantId" value={tenant.tenantId} />
 	<button
 		type="submit"
 		class={cn(
@@ -31,8 +39,8 @@
 		)}
 	>
 		<div class="flex flex-col gap-0.5">
-			<span class="font-medium leading-tight">{membership.tenantName}</span>
-			<span class="text-xs text-muted-foreground">{roleLabel(membership.role)}</span>
+			<span class="font-medium leading-tight">{tenant.tenantName}</span>
+			<span class="text-xs text-muted-foreground">{roleLabel(tenant.role)}</span>
 		</div>
 		{#if lastUsed}
 			<span

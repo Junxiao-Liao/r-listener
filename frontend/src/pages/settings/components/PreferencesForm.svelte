@@ -18,10 +18,10 @@
 	});
 
 	const sortOptions = [
-		{ value: 'createdAt:desc', label: 'Recently Added' },
-		{ value: 'title:asc', label: 'Title' },
-		{ value: 'artist:asc', label: 'Artist' },
-		{ value: 'album:asc', label: 'Album' }
+		{ value: 'createdAt:desc', label: m.settings_sort_recent },
+		{ value: 'title:asc', label: m.settings_sort_title },
+		{ value: 'artist:asc', label: m.settings_sort_artist },
+		{ value: 'album:asc', label: m.settings_sort_album }
 	] as const;
 </script>
 
@@ -37,24 +37,33 @@
 		</h2>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_auto_play_next()}</span>
+			<input type="hidden" name="autoPlayNext" value="false" />
 			<input
 				type="checkbox"
+				name="autoPlayNext"
+				value="true"
 				class="size-4"
 				bind:checked={$form.autoPlayNext}
 			/>
 		</label>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_show_mini_player()}</span>
+			<input type="hidden" name="showMiniPlayer" value="false" />
 			<input
 				type="checkbox"
+				name="showMiniPlayer"
+				value="true"
 				class="size-4"
 				bind:checked={$form.showMiniPlayer}
 			/>
 		</label>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_prefer_synced_lyrics()}</span>
+			<input type="hidden" name="preferSyncedLyrics" value="false" />
 			<input
 				type="checkbox"
+				name="preferSyncedLyrics"
+				value="true"
 				class="size-4"
 				bind:checked={$form.preferSyncedLyrics}
 			/>
@@ -68,11 +77,12 @@
 		<Label for="defaultLibrarySort">{m.settings_default_sort()}</Label>
 		<select
 			id="defaultLibrarySort"
+			name="defaultLibrarySort"
 			class="h-9 rounded-md border border-input bg-background px-2 text-sm"
 			bind:value={$form.defaultLibrarySort}
 		>
 			{#each sortOptions as opt (opt.value)}
-				<option value={opt.value}>{opt.label}</option>
+				<option value={opt.value}>{opt.label()}</option>
 			{/each}
 		</select>
 	</section>
@@ -85,13 +95,13 @@
 			<label
 				class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-foreground"
 			>
-				<input type="radio" class="sr-only" value="en" bind:group={$form.language} />
+				<input type="radio" class="sr-only" name="language" value="en" bind:group={$form.language} />
 				{m.settings_language_en()}
 			</label>
 			<label
 				class="flex cursor-pointer items-center justify-center gap-2 rounded-md border border-border px-3 py-2 text-sm has-[:checked]:border-foreground"
 			>
-				<input type="radio" class="sr-only" value="zh" bind:group={$form.language} />
+				<input type="radio" class="sr-only" name="language" value="zh" bind:group={$form.language} />
 				{m.settings_language_zh()}
 			</label>
 		</div>

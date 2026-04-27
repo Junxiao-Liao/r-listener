@@ -1,10 +1,11 @@
 <script lang="ts">
 	import * as m from '$shared/paraglide/messages';
-	import type { TenantMembershipDto } from '$shared/types/dto';
+	import type { AdminTenantListItemDto, TenantMembershipDto } from '$shared/types/dto';
 	import TenantCard from './components/TenantCard.svelte';
 
 	type Data = {
 		memberships: TenantMembershipDto[];
+		adminTenants: AdminTenantListItemDto[];
 		lastActiveTenantId: string | null;
 		isAdminWithNoMemberships: boolean;
 	};
@@ -27,9 +28,20 @@
 		{#each data.memberships as membership (membership.tenantId)}
 			<li>
 				<TenantCard
-					{membership}
+					tenant={membership}
 					lastUsed={membership.tenantId === data.lastActiveTenantId &&
 						data.memberships.length === 1}
+				/>
+			</li>
+		{/each}
+		{#each data.adminTenants as tenant (tenant.id)}
+			<li>
+				<TenantCard
+					tenant={{
+						tenantId: tenant.id,
+						tenantName: tenant.name
+					}}
+					lastUsed={tenant.id === data.lastActiveTenantId}
 				/>
 			</li>
 		{/each}

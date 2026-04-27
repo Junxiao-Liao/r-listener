@@ -5,7 +5,7 @@ import { getBackendUrl, getFrontendOrigin } from '$shared/server/origin';
 import { setSessionCookie } from '$shared/server/session';
 import { asErrorStatus, message, superValidate, zod } from '$shared/forms/superforms';
 import type { FormMessage } from '$shared/forms/superforms';
-import { defaultSigninForm, signinSchema } from './signin.form';
+import { defaultSigninForm, postSigninRedirect, signinSchema } from './signin.form';
 
 export async function load({ cookies }: ServerLoadEvent) {
 	const form = await superValidate(defaultSigninForm, zod(signinSchema));
@@ -26,7 +26,7 @@ const signin: Action = async ({ request, cookies, fetch, platform }) => {
 	try {
 		const result = await authApi.signin(api, form.data);
 		setSessionCookie(cookies, result.sessionToken, result.sessionExpiresAt);
-		throw redirect(303, result.activeTenantId ? '/' : '/tenants');
+		throw redirect(303, postSigninRedirect(result));
 	} catch (err) {
 		if (err instanceof ApiError) {
 			return message<FormMessage>(
