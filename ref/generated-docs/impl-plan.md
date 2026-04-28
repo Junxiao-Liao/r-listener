@@ -374,22 +374,67 @@ Goal: owner/member users can upload private audio, see completed tracks in
 Library, manage metadata/lyrics/covers, and stream audio from R2; viewer users
 can stream ready tracks without editing shared content.
 
+**Implementation decisions (Step 5):**
+
+- **R2 upload**: Worker proxy (multipart/form-data). Client sends audio bytes
+  to the Worker; Worker writes to R2 binding. No S3 presigned URLs needed.
+- **R2 streaming**: Worker proxy stream. `GET /tracks/{id}/stream` pipes the
+  R2 object as a `ReadableStream` through the Worker with Range header support.
+- **Upload flow**: Two-step.
+  1. `POST /tracks` (multipart: audio file + optional `title`/`artist`/`album`).
+     Creates a pending track row, stores audio in R2. Returns `TrackDto`.
+  2. `POST /tracks/{id}/finalize` (JSON: `durationMs` + optional `lyricsLrc`,
+     `trackNumber`, `genre`, `year`). Parses lyrics status, validates R2 object
+     exists, sets status to `ready`.
+- **Cover support**: Skipped for now. `coverR2Key` column stays null. No
+  `cover-upload`/`cover-finalize`/`cover-delete` endpoints in this slice.
+- **Pagination**: Cursor-based. Cursor is the track ID (UUIDv7, time-sortable).
+  Query params: `cursor` (optional, exclusive), `limit` (default 50).
+- **Sort options**: `title`, `artist`, `album`, `year`, `durationMs`, `createdAt`,
+  `updatedAt`. Default: `createdAt` descending. Query param: `sort`.
+- **Max audio file size**: 100 MB (Worker body limit).
+- **Audio MIME types**: `audio/mpeg`, `audio/mp4`, `audio/mp3`, `audio/ogg`,
+  `audio/flac`, `audio/wav`, `audio/x-wav`, `audio/aac`,
+  `audio/x-m4a`, `audio/webm`.
+- **Lyrics status detection**: Per-line parser. Each line is classified:
+  - Has `[mm:ss.xx]` format → line is LRC-tagged
+  - Empty/null overall → `none`
+  - ≥80% lines match LRC pattern → `synced`
+  - Non-empty but <80% LRC lines → `plain`
+  - Some `[brackets]` but malformed patterns → `invalid`
+- **Browser metadata parsing**: Use `music-metadata-browser` library to extract
+  title, artist, album, track number, genre, year, duration, embedded cover
+  bytes, and embedded lyrics (ID3 USLT/SYLT) from all common audio formats
+  before upload. Server-side extraction is deferred.
+- **R2 key format**: `tenants/{tenantId}/tracks/{trackId}.{ext}` where `ext`
+  is derived from the MIME type (e.g., `mp3`, `flac`, `ogg`).
+- **PATCH /tracks/{id} fields**: `title`, `artist`, `album`, `trackNumber`,
+  `genre`, `year`, `durationMs`. All optional (partial patch).
+- **GET /tracks query params**: `cursor` (exclusive track ID), `limit` (default
+  50, max 100), `sort` (default `createdAt` desc), `q` (text search on
+  title/artist/album), `includePending` (boolean, editors only).
+- **PUT /tracks/{id}/lyrics body**: JSON `{ "lyricsLrc": "<raw lrc text>" }`.
+  Backend parses and stores `lyricsStatus` derivation automatically.
+- **DELETE /tracks/{id}**: soft-delete (sets `deleted_at`).
+- **Stream endpoint**: `GET /tracks/{id}/stream` returns the raw audio stream
+  (proxied from R2). Range requests supported. Rejects pending tracks with 404.
+- **includePending**: Editors (owner/member/admin) can use `includePending=true`
+  to see their pending uploads. Viewers get `403 insufficient_role` when using
+  this flag. Default is `false` — pending tracks are hidden.
+
 Backend:
 
 - Implement track ORM, repository, DTO, service, and routes.
 - Implement:
-  - `GET /tracks`
+  - `GET /tracks` (with cursor pagination, sort, q, includePending)
   - `GET /tracks/{id}`
-  - `POST /tracks`
-  - `POST /tracks/{id}/finalize`
+  - `POST /tracks` (multipart: audio + optional metadata)
+  - `POST /tracks/{id}/finalize` (durationMs + optional lyricsLrc, etc.)
   - `PATCH /tracks/{id}`
   - `PUT /tracks/{id}/lyrics`
   - `DELETE /tracks/{id}/lyrics`
-  - `POST /tracks/{id}/cover-upload`
-  - `POST /tracks/{id}/cover-finalize`
-  - `DELETE /tracks/{id}/cover`
-  - `DELETE /tracks/{id}`
-  - `GET /tracks/{id}/stream-url`
+  - `DELETE /tracks/{id}` (soft-delete)
+  - `GET /tracks/{id}/stream` (R2 proxy stream with Range support)
 - Generate R2 keys under `tenants/{tenantId}/tracks/`.
 - Validate MIME types, upload sizes, duration, lyrics, and tenant ownership.
 - Keep pending uploads hidden from normal Library reads.

@@ -11,6 +11,7 @@ import { authRoute } from './auth/auth.route';
 import { prefsRoute } from './prefs/prefs.route';
 import { createAdminRoute } from './admin/admin.route';
 import type { AdminService } from './admin/admin.service';
+import { tracksRoute } from './tracks/tracks.route';
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
@@ -33,6 +34,7 @@ export function createApp(options: AppOptions = {}) {
 	api.route('/', authRoute);
 	api.route('/', prefsRoute);
 	api.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
+	api.route('/', tracksRoute);
 
 	options.configure?.(api);
 
