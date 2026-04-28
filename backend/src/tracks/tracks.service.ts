@@ -15,8 +15,11 @@ const SUPPORTED_MIME_TYPES = new Set([
 	'audio/mp3',
 	'audio/ogg',
 	'audio/flac',
+	'audio/x-flac',
 	'audio/wav',
+	'audio/wave',
 	'audio/x-wav',
+	'audio/x-pn-wav',
 	'audio/aac',
 	'audio/x-m4a',
 	'audio/webm'
@@ -28,11 +31,29 @@ const MIME_TO_EXT: Record<string, string> = {
 	'audio/mp3': 'mp3',
 	'audio/ogg': 'ogg',
 	'audio/flac': 'flac',
+	'audio/x-flac': 'flac',
 	'audio/wav': 'wav',
+	'audio/wave': 'wav',
 	'audio/x-wav': 'wav',
+	'audio/x-pn-wav': 'wav',
 	'audio/aac': 'aac',
 	'audio/x-m4a': 'm4a',
 	'audio/webm': 'webm'
+};
+
+const EXT_TO_MIME: Record<string, string> = {
+	mp3: 'audio/mpeg',
+	mp4: 'audio/mp4',
+	m4a: 'audio/mp4',
+	m4b: 'audio/mp4',
+	ogg: 'audio/ogg',
+	oga: 'audio/ogg',
+	opus: 'audio/ogg',
+	flac: 'audio/flac',
+	wav: 'audio/wav',
+	aac: 'audio/aac',
+	webm: 'audio/webm',
+	weba: 'audio/webm'
 };
 
 export type TracksService = {
@@ -124,13 +145,7 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 		},
 
 		createTrack: async (input) => {
-			if (!SUPPORTED_MIME_TYPES.has(input.file.type)) {
-				throw apiError(
-					415,
-					'unsupported_media_type',
-					`Audio format ${input.file.type || 'unknown'} is not supported.`
-				);
-			}
+			const contentType = resolveContentType(input.file);
 
 			if (input.file.size > MAX_AUDIO_BYTES) {
 				throw apiError(413, 'payload_too_large', 'Audio file exceeds maximum size of 100 MB.');
@@ -141,7 +156,7 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 			}
 
 			const trackId = createId('trk_') as Id<'track'>;
-			const ext = MIME_TO_EXT[input.file.type] ?? 'bin';
+			const ext = MIME_TO_EXT[contentType] ?? (getExt(input.file.name) || 'bin');
 			const r2Key = `tenants/${input.tenantId}/tracks/${trackId}.${ext}`;
 
 			const title = input.metadata.title || deriveTitleFromFilename(input.file.name);
@@ -154,14 +169,14 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 				title,
 				artist: input.metadata.artist ?? null,
 				album: input.metadata.album ?? null,
-				contentType: input.file.type,
+				contentType,
 				sizeBytes: input.file.size,
 				audioR2Key: r2Key,
 				now: now_
 			});
 
 			await deps.r2.put(r2Key, input.file.stream(), {
-				httpMetadata: { contentType: input.file.type }
+				httpMetadata: { contentType }
 			});
 
 			return track;
@@ -281,6 +296,29 @@ export function createTracksServiceForDb(db: Db, r2: R2Bucket): TracksService {
 		tracksRepository: createTracksRepository(db),
 		r2
 	});
+}
+
+function getExt(name: string): string {
+	const i = name.lastIndexOf('.');
+	return i >= 0 ? name.slice(i + 1).toLowerCase() : '';
+}
+
+function resolveContentType(file: UploadFile): string {
+	if (SUPPORTED_MIME_TYPES.has(file.type)) return file.type;
+	if (file.type && file.type !== 'application/octet-stream') {
+		throw apiError(
+			415,
+			'unsupported_media_type',
+			`Audio format ${file.type} is not supported.`
+		);
+	}
+	const ext = getExt(file.name);
+	if (ext in EXT_TO_MIME) return EXT_TO_MIME[ext]!;
+	throw apiError(
+		415,
+		'unsupported_media_type',
+		`Audio format ${file.type || 'unknown'} is not supported.`
+	);
 }
 
 function deriveTitleFromFilename(filename: string): string {

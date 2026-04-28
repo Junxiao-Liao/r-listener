@@ -4,15 +4,23 @@
 
 const AUDIO_EXTENSIONS = new Set([
 	'mp3',
+	'mp2',
+	'mp1',
 	'm4a',
+	'm4b',
 	'mp4',
 	'ogg',
 	'oga',
+	'opus',
 	'flac',
 	'wav',
+	'wave',
 	'aac',
 	'webm',
-	'opus'
+	'weba',
+	'aiff',
+	'aif',
+	'wma'
 ]);
 
 export type PairedFile = { audio: File; lrc: File | null };
