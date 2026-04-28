@@ -25,12 +25,20 @@
 				document.documentElement.classList.toggle('dark', dark);
 				document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
 
-				let lang = 'en';
+			let lang = 'en';
+			try {
+				lang = cookies.PARAGLIDE_LOCALE ? decodeURIComponent(cookies.PARAGLIDE_LOCALE) : '';
+			} catch {}
+			if (!['en', 'zh'].includes(lang)) {
+				lang = 'en';
 				try {
-					lang = cookies.PARAGLIDE_LOCALE ? decodeURIComponent(cookies.PARAGLIDE_LOCALE) : 'en';
+					for (const nl of navigator.languages ?? []) {
+						const base = nl.split('-')[0];
+						if (['en', 'zh'].includes(base)) { lang = base; break; }
+					}
 				} catch {}
-				if (!['en', 'zh'].includes(lang)) lang = 'en';
-				document.documentElement.lang = lang;
+			}
+			document.documentElement.lang = lang;
 			})();
 		</script>
 

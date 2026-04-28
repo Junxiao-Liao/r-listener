@@ -19,8 +19,20 @@
 
 	let username = $state('');
 	let password = $state('');
-	let fieldErrors = $state<Partial<Record<keyof SigninForm, string>>>({});
+	let submitted = $state(false);
 	const justChanged = readJustChanged();
+
+	let fieldErrors = $derived.by((): Partial<Record<keyof SigninForm, string>> => {
+		if (!submitted) return {};
+		const parsed = signinSchema.safeParse({ username, password });
+		if (parsed.success) return {};
+		const issues: Partial<Record<keyof SigninForm, string>> = {};
+		for (const issue of parsed.error.issues) {
+			const key = issue.path[0] as keyof SigninForm | undefined;
+			if (key && !issues[key]) issues[key] = issue.message;
+		}
+		return issues;
+	});
 
 	const flashError = $derived(errorText($signin.error));
 	const submitting = $derived($signin.isPending);
@@ -41,17 +53,10 @@
 
 	async function handleSubmit(event: SubmitEvent) {
 		event.preventDefault();
+		submitted = true;
 		const parsed = signinSchema.safeParse({ username, password });
-		if (!parsed.success) {
-			const issues: Partial<Record<keyof SigninForm, string>> = {};
-			for (const issue of parsed.error.issues) {
-				const key = issue.path[0] as keyof SigninForm | undefined;
-				if (key && !issues[key]) issues[key] = issue.message;
-			}
-			fieldErrors = issues;
-			return;
-		}
-		fieldErrors = {};
+		if (!parsed.success) return;
+		submitted = false;
 		try {
 			const session = await $signin.mutateAsync(parsed.data);
 			void goto(postSigninRedirect(session), { replaceState: true });
