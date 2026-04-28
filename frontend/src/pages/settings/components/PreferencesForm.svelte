@@ -1,24 +1,30 @@
 <script lang="ts">
-	import { Button } from '$shared/components/ui/button';
 	import { Label } from '$shared/components/ui/label';
 	import * as m from '$shared/paraglide/messages';
-	import { getLocale, setLocale } from '$shared/paraglide/runtime';
 	import { applyTheme } from '$shared/theme/theme';
-	import type { Language, Theme } from '$shared/types/dto';
+	import type {
+		Language,
+		LibrarySort,
+		PreferencesDto,
+		Theme
+	} from '$shared/types/dto';
 	import { cn } from '$shared/utils';
-	import type { FormMessage } from '$shared/forms/superforms';
-	import { superForm } from 'sveltekit-superforms';
-	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { autosavePreference, createPreferenceActionSaver } from '../settings.autosave';
-	import type { preferencesSchema } from '../settings.form';
+	import { useUpdatePreferencesMutation } from '$shared/query/prefs.query';
 
-	type Props = {
-		data: SuperValidated<Infer<typeof preferencesSchema>, FormMessage>;
-	};
-	let { data }: Props = $props();
+	type Props = { preferences: PreferencesDto };
+	let { preferences }: Props = $props();
 
-	// svelte-ignore state_referenced_locally
-	const { form, message, enhance, submitting } = superForm(data);
+	const update = useUpdatePreferencesMutation();
+
+	let pendingVisualPreference = $state<'theme' | 'language' | null>(null);
+	let visualPreferenceError = $state<'theme' | 'language' | null>(null);
+
+	const theme = $derived<Theme>(preferences.theme);
+	const language = $derived<Language>(preferences.language);
+	const autoPlayNext = $derived(preferences.autoPlayNext);
+	const showMiniPlayer = $derived(preferences.showMiniPlayer);
+	const preferSyncedLyrics = $derived(preferences.preferSyncedLyrics);
+	const defaultLibrarySort = $derived<LibrarySort>(preferences.defaultLibrarySort);
 
 	const sortOptions = [
 		{ value: 'createdAt:desc', label: m.settings_sort_recent },
@@ -38,131 +44,70 @@
 		{ value: 'zh', label: m.settings_language_zh }
 	] as const;
 
-	const saveVisualPreference = createPreferenceActionSaver();
-
-	function getInitialTheme(): Theme {
-		return data.data.theme ?? 'system';
-	}
-
-	function getInitialLanguage(): Language {
-		return data.data.language ?? (getLocale() as Language);
-	}
-
-	let selectedTheme = $state<Theme>(getInitialTheme());
-	let savedTheme = $state<Theme>(getInitialTheme());
-	let selectedLanguage = $state<Language>(getInitialLanguage());
-	let savedLanguage = $state<Language>(getInitialLanguage());
-	let pendingVisualPreference = $state<'theme' | 'language' | null>(null);
-	let visualPreferenceError = $state<'theme' | 'language' | null>(null);
-
-	$effect(() => {
-		applyTheme(selectedTheme);
-	});
-
-	async function pickTheme(theme: Theme) {
-		if (theme === selectedTheme || pendingVisualPreference) return;
-		const lastSaved = savedTheme;
-		selectedTheme = theme;
-		$form.theme = theme;
-		visualPreferenceError = null;
+	async function pickTheme(next: Theme) {
+		if (next === theme || pendingVisualPreference) return;
 		pendingVisualPreference = 'theme';
-
+		visualPreferenceError = null;
+		applyTheme(next);
 		try {
-			await autosavePreference({
-				lastSaved,
-				persist: async () => (await saveVisualPreference({ theme })).theme,
-				onSaved: (value) => {
-					savedTheme = value;
-					selectedTheme = value;
-					$form.theme = value;
-				},
-				onRevert: (value) => {
-					selectedTheme = value;
-					$form.theme = value;
-				},
-				onError: () => {
-					visualPreferenceError = 'theme';
-				}
-			});
+			await $update.mutateAsync({ theme: next });
+		} catch {
+			visualPreferenceError = 'theme';
+			applyTheme(theme);
 		} finally {
 			pendingVisualPreference = null;
 		}
 	}
 
-	async function pickLanguage(language: Language) {
-		if (language === selectedLanguage || pendingVisualPreference) return;
-		const lastSaved = savedLanguage;
-		selectedLanguage = language;
-		$form.language = language;
-		visualPreferenceError = null;
+	async function pickLanguage(next: Language) {
+		if (next === language || pendingVisualPreference) return;
 		pendingVisualPreference = 'language';
-
+		visualPreferenceError = null;
 		try {
-			await setLocale(language, { reload: false });
-			await autosavePreference({
-				lastSaved,
-				persist: async () => (await saveVisualPreference({ language })).language,
-				onSaved: (value) => {
-					savedLanguage = value;
-					selectedLanguage = value;
-					$form.language = value;
-				},
-				onRevert: (value) => {
-					selectedLanguage = value;
-					$form.language = value;
-					void setLocale(value, { reload: false });
-				},
-				onError: () => {
-					visualPreferenceError = 'language';
-				}
-			});
+			await $update.mutateAsync({ language: next });
+		} catch {
+			visualPreferenceError = 'language';
 		} finally {
 			pendingVisualPreference = null;
 		}
+	}
+
+	function pickSort(next: LibrarySort) {
+		if (next === defaultLibrarySort) return;
+		void $update.mutateAsync({ defaultLibrarySort: next });
 	}
 </script>
 
-<form
-	method="POST"
-	action="?/savePreferences"
-	use:enhance
-	class="flex flex-col gap-5"
->
+<div class="flex flex-col gap-5">
 	<section class="flex flex-col gap-3">
 		<h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
 			{m.settings_playback()}
 		</h2>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_auto_play_next()}</span>
-			<input type="hidden" name="autoPlayNext" value="false" />
 			<input
 				type="checkbox"
-				name="autoPlayNext"
-				value="true"
+				checked={autoPlayNext}
+				onchange={() => $update.mutate({ autoPlayNext: !autoPlayNext })}
 				class="size-4"
-				bind:checked={$form.autoPlayNext}
 			/>
 		</label>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_show_mini_player()}</span>
-			<input type="hidden" name="showMiniPlayer" value="false" />
 			<input
 				type="checkbox"
-				name="showMiniPlayer"
-				value="true"
+				checked={showMiniPlayer}
+				onchange={() => $update.mutate({ showMiniPlayer: !showMiniPlayer })}
 				class="size-4"
-				bind:checked={$form.showMiniPlayer}
 			/>
 		</label>
 		<label class="flex items-center justify-between gap-3 text-sm">
 			<span>{m.settings_prefer_synced_lyrics()}</span>
-			<input type="hidden" name="preferSyncedLyrics" value="false" />
 			<input
 				type="checkbox"
-				name="preferSyncedLyrics"
-				value="true"
+				checked={preferSyncedLyrics}
+				onchange={() => $update.mutate({ preferSyncedLyrics: !preferSyncedLyrics })}
 				class="size-4"
-				bind:checked={$form.preferSyncedLyrics}
 			/>
 		</label>
 	</section>
@@ -174,9 +119,9 @@
 		<Label for="defaultLibrarySort">{m.settings_default_sort()}</Label>
 		<select
 			id="defaultLibrarySort"
-			name="defaultLibrarySort"
 			class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-			bind:value={$form.defaultLibrarySort}
+			value={defaultLibrarySort}
+			onchange={(event) => pickSort(event.currentTarget.value as LibrarySort)}
 		>
 			{#each sortOptions as opt (opt.value)}
 				<option value={opt.value}>{opt.label()}</option>
@@ -188,17 +133,21 @@
 		<h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
 			{m.settings_appearance()}
 		</h2>
-		<div class="grid grid-cols-3 gap-2 rounded-md bg-muted p-1" role="radiogroup" aria-label={m.settings_appearance()}>
+		<div
+			class="grid grid-cols-3 gap-2 rounded-md bg-muted p-1"
+			role="radiogroup"
+			aria-label={m.settings_appearance()}
+		>
 			{#each themeOptions as opt (opt.value)}
 				<button
 					type="button"
 					role="radio"
-					aria-checked={selectedTheme === opt.value}
+					aria-checked={theme === opt.value}
 					disabled={pendingVisualPreference !== null}
 					onclick={() => pickTheme(opt.value)}
 					class={cn(
 						'flex h-9 cursor-pointer items-center justify-center rounded-sm px-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-70',
-						selectedTheme === opt.value
+						theme === opt.value
 							? 'bg-background font-medium text-foreground shadow-sm ring-1 ring-foreground/20'
 							: 'text-muted-foreground hover:text-foreground'
 					)}
@@ -221,12 +170,12 @@
 				<button
 					type="button"
 					role="radio"
-					aria-checked={selectedLanguage === opt.value}
+					aria-checked={language === opt.value}
 					disabled={pendingVisualPreference !== null}
 					onclick={() => pickLanguage(opt.value)}
 					class={cn(
 						'flex cursor-pointer items-center justify-center gap-2 rounded-md border px-3 py-2 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-70',
-						selectedLanguage === opt.value
+						language === opt.value
 							? 'border-foreground bg-muted text-foreground'
 							: 'border-border text-muted-foreground hover:text-foreground'
 					)}
@@ -239,10 +188,4 @@
 			<p class="text-xs text-destructive">{m.settings_autosave_language_error()}</p>
 		{/if}
 	</section>
-
-	<Button type="submit" disabled={$submitting} class="w-full">{m.settings_save()}</Button>
-
-	{#if $message?.type === 'success'}
-		<p class="text-xs text-muted-foreground">{m.settings_saved()}</p>
-	{/if}
-</form>
+</div>

@@ -11,7 +11,7 @@ describe('admin route', () => {
 		const app = createFixtureApp({ session: sessionFixture({ userIsAdmin: true }), tenants });
 
 		const res = await app.request(
-			'/admin/tenants',
+			'/api/admin/tenants',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
@@ -25,7 +25,7 @@ describe('admin route', () => {
 		const app = createFixtureApp({ session: sessionFixture(), service });
 
 		const res = await app.request(
-			'/admin/tenants',
+			'/api/admin/tenants',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);

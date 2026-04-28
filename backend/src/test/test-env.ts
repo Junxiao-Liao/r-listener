@@ -5,7 +5,7 @@ export function createTestEnv(overrides: Partial<Env['Bindings']> = {}): Env['Bi
 		DB: createMockD1(),
 		R2: createMockR2(),
 		KV: createMockKV(),
-		FRONTEND_ORIGIN: 'http://localhost:5173',
+		ASSETS: createMockAssets(),
 		SESSION_SECRET: 'test-session-secret',
 		...overrides
 	};
@@ -39,4 +39,10 @@ function createMockKV(): KVNamespace {
 			values.set(key, value);
 		}
 	} as unknown as KVNamespace;
+}
+
+function createMockAssets(): Fetcher {
+	return {
+		fetch: async () => new Response(null, { status: 404 })
+	} as unknown as Fetcher;
 }

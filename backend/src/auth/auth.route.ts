@@ -6,6 +6,7 @@ import { requireSession } from '../middleware/middleware.guard';
 import { getClientIp } from '../middleware/request-context';
 import { changePasswordInputSchema, signinInputSchema, switchTenantInputSchema } from './auth.dto';
 import { createAuthServiceForDb, type AuthService } from './auth.service';
+import { clearSessionCookie, setSessionCookie } from './session.cookie';
 import type { Id } from '../shared/shared.type';
 
 export type AuthRouteDeps = {
@@ -19,13 +20,14 @@ export function createAuthRoute(deps: AuthRouteDeps = {}) {
 	route.post('/auth/signin', async (c) => {
 		const body = await parseJsonBody(c, signinInputSchema);
 		const service = serviceFactory(c.var.db);
-		return c.json(
-			await service.signIn({
-				...body,
-				ip: getClientIp(c.req.raw.headers),
-				userAgent: c.req.header('User-Agent') ?? null
-			})
-		);
+		const result = await service.signIn({
+			...body,
+			ip: getClientIp(c.req.raw.headers),
+			userAgent: c.req.header('User-Agent') ?? null
+		});
+		setSessionCookie(c, result.sessionToken, result.sessionExpiresAt);
+		const { sessionToken: _omit, ...response } = result;
+		return c.json(response);
 	});
 
 	route.get('/auth/session', requireSession(), async (c) => {
@@ -36,6 +38,7 @@ export function createAuthRoute(deps: AuthRouteDeps = {}) {
 	route.post('/auth/signout', requireSession(), async (c) => {
 		const service = serviceFactory(c.var.db);
 		await service.signOut({ sessionTokenHash: c.var.session.sessionTokenHash });
+		clearSessionCookie(c);
 		return c.body(null, 204);
 	});
 

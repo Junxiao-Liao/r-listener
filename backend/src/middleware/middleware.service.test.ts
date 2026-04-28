@@ -10,7 +10,7 @@ describe('backend middleware', () => {
 	it('allows health without authentication', async () => {
 		const app = createFixtureApp({ session: null });
 
-		const res = await app.request('/health', {}, createTestEnv());
+		const res = await app.request('/api/health', {}, createTestEnv());
 
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({ ok: true });
@@ -19,7 +19,7 @@ describe('backend middleware', () => {
 	it('returns 401 for missing sessions', async () => {
 		const app = createFixtureApp({ session: null });
 
-		const res = await app.request('/fixture/session', {}, createTestEnv());
+		const res = await app.request('/api/fixture/session', {}, createTestEnv());
 
 		expect(res.status).toBe(401);
 		expect(await res.json()).toEqual({
@@ -31,7 +31,7 @@ describe('backend middleware', () => {
 		const app = createFixtureApp({ session: null });
 
 		const res = await app.request(
-			'/fixture/session',
+			'/api/fixture/session',
 			{ headers: { cookie: 'session=invalid' } },
 			createTestEnv()
 		);
@@ -40,27 +40,30 @@ describe('backend middleware', () => {
 		expect((await readError(res)).code).toBe('unauthenticated');
 	});
 
-	it('sets refreshed session expiry metadata', async () => {
+	it('rolls the session cookie when expiry is refreshed', async () => {
 		const app = createFixtureApp({
 			session: sessionFixture(),
 			refreshedSessionExpiresAt: '2026-05-26T00:00:00.000Z'
 		});
 
 		const res = await app.request(
-			'/fixture/session',
+			'/api/fixture/session',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
 
 		expect(res.status).toBe(200);
-		expect(res.headers.get('X-Session-Expires-At')).toBe('2026-05-26T00:00:00.000Z');
+		const setCookie = res.headers.get('Set-Cookie') ?? '';
+		expect(setCookie).toMatch(/^session=valid/);
+		expect(setCookie).toMatch(/HttpOnly/i);
+		expect(setCookie).toMatch(/SameSite=Lax/i);
 	});
 
 	it('returns 403 when there is no active tenant', async () => {
 		const app = createFixtureApp({ session: sessionFixture({ activeTenantId: null }) });
 
 		const res = await app.request(
-			'/fixture/tenant',
+			'/api/fixture/tenant',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
@@ -73,7 +76,7 @@ describe('backend middleware', () => {
 		const app = createFixtureApp({ session: sessionFixture(), tenantAllowed: false });
 
 		const res = await app.request(
-			'/fixture/tenant',
+			'/api/fixture/tenant',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
@@ -86,11 +89,8 @@ describe('backend middleware', () => {
 		const app = createFixtureApp({ session: sessionFixture(), tenantRole: 'viewer' });
 
 		const res = await app.request(
-			'/fixture/editor',
-			{
-				method: 'POST',
-				headers: { cookie: 'session=valid', origin: 'http://localhost:5173' }
-			},
+			'/api/fixture/editor',
+			{ method: 'POST', headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
 
@@ -102,7 +102,7 @@ describe('backend middleware', () => {
 		const app = createFixtureApp({ session: sessionFixture() });
 
 		const res = await app.request(
-			'/fixture/admin',
+			'/api/fixture/admin',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);
@@ -111,33 +111,10 @@ describe('backend middleware', () => {
 		expect((await readError(res)).code).toBe('admin_required');
 	});
 
-	it('rejects mutation requests with missing or wrong origins', async () => {
-		const app = createFixtureApp({ session: sessionFixture() });
-
-		const missingOrigin = await app.request(
-			'/fixture/editor',
-			{ method: 'POST', headers: { cookie: 'session=valid' } },
-			createTestEnv()
-		);
-		const wrongOrigin = await app.request(
-			'/fixture/editor',
-			{
-				method: 'POST',
-				headers: { cookie: 'session=valid', origin: 'http://evil.test' }
-			},
-			createTestEnv()
-		);
-
-		expect(missingOrigin.status).toBe(403);
-		expect((await readError(missingOrigin)).code).toBe('forbidden_origin');
-		expect(wrongOrigin.status).toBe(403);
-		expect((await readError(wrongOrigin)).code).toBe('forbidden_origin');
-	});
-
 	it('returns 429 when an auth route is rate limited', async () => {
 		const app = createFixtureApp({ session: sessionFixture(), rateLimitAllowed: false });
 
-		const res = await app.request('/auth/signin', {}, createTestEnv());
+		const res = await app.request('/api/auth/signin', {}, createTestEnv());
 
 		expect(res.status).toBe(429);
 		expect((await readError(res)).code).toBe('rate_limited');
@@ -146,7 +123,7 @@ describe('backend middleware', () => {
 	it('returns 500 when auth rate-limit infrastructure fails closed', async () => {
 		const app = createFixtureApp({ session: sessionFixture(), rateLimitThrows: true });
 
-		const res = await app.request('/auth/signin', {}, createTestEnv());
+		const res = await app.request('/api/auth/signin', {}, createTestEnv());
 
 		expect(res.status).toBe(500);
 		expect((await readError(res)).code).toBe('internal_error');
@@ -156,7 +133,7 @@ describe('backend middleware', () => {
 		const app = createFixtureApp({ session: sessionFixture({ userIsAdmin: true }) });
 
 		const res = await app.request(
-			'/fixture/admin',
+			'/api/fixture/admin',
 			{ headers: { cookie: 'session=valid' } },
 			createTestEnv()
 		);

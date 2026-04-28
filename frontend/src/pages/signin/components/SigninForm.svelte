@@ -1,29 +1,33 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
 	import { Label } from '$shared/components/ui/label';
-	import { superForm } from 'sveltekit-superforms';
-	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import { zod4Client } from 'sveltekit-superforms/adapters';
 	import * as m from '$shared/paraglide/messages';
-	import type { FormMessage } from '$shared/forms/superforms';
-	import { signinSchema } from '../signin.form';
+	import { useSigninMutation } from '$shared/query/session.query';
+	import { ApiError } from '$shared/api/client';
+	import { signinSchema, postSigninRedirect, type SigninForm } from '../signin.form';
 
-	type Props = {
-		data: SuperValidated<Infer<typeof signinSchema>, FormMessage>;
-		justChanged: boolean;
-	};
-	let { data, justChanged }: Props = $props();
+	const signin = useSigninMutation();
 
-	// superForm reads the initial validated form once and returns its own reactive stores.
-	// svelte-ignore state_referenced_locally
-	const { form, errors, message, enhance, submitting } = superForm(data, {
-		validators: zod4Client(signinSchema)
-	});
+	function readJustChanged(): boolean {
+		if (typeof window === 'undefined') return false;
+		const flag = sessionStorage.getItem('signin_flash') === 'changed';
+		if (flag) sessionStorage.removeItem('signin_flash');
+		return flag;
+	}
 
-	function errorText(code: string | undefined): string | null {
-		if (!code) return null;
-		switch (code) {
+	let username = $state('');
+	let password = $state('');
+	let fieldErrors = $state<Partial<Record<keyof SigninForm, string>>>({});
+	const justChanged = readJustChanged();
+
+	const flashError = $derived(errorText($signin.error));
+	const submitting = $derived($signin.isPending);
+
+	function errorText(error: unknown): string | null {
+		if (!(error instanceof ApiError)) return null;
+		switch (error.code) {
 			case 'invalid_credentials':
 				return m.signin_error_invalid();
 			case 'account_disabled':
@@ -35,7 +39,26 @@
 		}
 	}
 
-	const flashError = $derived($message?.type === 'error' ? errorText($message.code) : null);
+	async function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		const parsed = signinSchema.safeParse({ username, password });
+		if (!parsed.success) {
+			const issues: Partial<Record<keyof SigninForm, string>> = {};
+			for (const issue of parsed.error.issues) {
+				const key = issue.path[0] as keyof SigninForm | undefined;
+				if (key && !issues[key]) issues[key] = issue.message;
+			}
+			fieldErrors = issues;
+			return;
+		}
+		fieldErrors = {};
+		try {
+			const session = await $signin.mutateAsync(parsed.data);
+			void goto(postSigninRedirect(session), { replaceState: true });
+		} catch {
+			// Error surfaced via $signin.error / flashError.
+		}
+	}
 </script>
 
 <div class="flex flex-col gap-6">
@@ -50,12 +73,12 @@
 		</p>
 	{/if}
 
-	<form method="POST" use:enhance class="flex flex-col gap-4">
+	<form class="flex flex-col gap-4" onsubmit={handleSubmit}>
 		<div class="grid gap-1.5">
 			<Label for="username">{m.auth_username()}</Label>
-			<Input id="username" name="username" autocomplete="username" bind:value={$form.username} />
-			{#if $errors.username}
-				<p class="text-xs text-destructive">{$errors.username}</p>
+			<Input id="username" name="username" autocomplete="username" bind:value={username} />
+			{#if fieldErrors.username}
+				<p class="text-xs text-destructive">{fieldErrors.username}</p>
 			{/if}
 		</div>
 
@@ -66,10 +89,10 @@
 				name="password"
 				type="password"
 				autocomplete="current-password"
-				bind:value={$form.password}
+				bind:value={password}
 			/>
-			{#if $errors.password}
-				<p class="text-xs text-destructive">{$errors.password}</p>
+			{#if fieldErrors.password}
+				<p class="text-xs text-destructive">{fieldErrors.password}</p>
 			{/if}
 		</div>
 
@@ -77,7 +100,7 @@
 			<p class="text-sm text-destructive" role="alert">{flashError}</p>
 		{/if}
 
-		<Button type="submit" disabled={$submitting} class="w-full">
+		<Button type="submit" disabled={submitting} class="w-full">
 			{m.signin_submit()}
 		</Button>
 	</form>

@@ -10,7 +10,15 @@ export default defineConfig({
 		paraglideVitePlugin({
 			project: './project.inlang',
 			outdir: './src/shared/paraglide',
-			strategy: ['custom-request-locale', 'globalVariable', 'preferredLanguage', 'baseLocale']
+			strategy: ['cookie', 'globalVariable', 'preferredLanguage', 'baseLocale']
 		})
-	]
+	],
+	server: {
+		proxy: {
+			'/api': {
+				target: 'http://127.0.0.1:8787',
+				changeOrigin: false
+			}
+		}
+	}
 });

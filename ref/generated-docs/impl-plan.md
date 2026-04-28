@@ -6,16 +6,19 @@ not a record of the current state.
 
 ## Summary
 
-Build the app in vertical, test-first slices while keeping the existing
+Build the app in vertical, test-first slices on a single-Worker SPA
 architecture:
 
-- `frontend/`: SvelteKit app on Cloudflare Pages, acting as a thin BFF.
-- `backend/`: Hono Worker on Cloudflare Workers, owning D1, R2, KV, and all
-  domain logic.
+- `frontend/`: SvelteKit pure SPA via `@sveltejs/adapter-static`. Server
+  state in TanStack Query (`@tanstack/svelte-query`); UI state in Svelte 5
+  `$state` runes. No SSR, no BFF.
+- `backend/`: Hono on Cloudflare Workers, mounted under `/api/*`, also
+  serving the built SPA via the `[assets]` binding (one Worker, one origin).
+  Owns D1, R2, KV, and all domain logic. Issues the session cookie directly.
 - D1 + Drizzle for app data and migrations.
 - R2 for audio and cover assets.
 - KV for rate limiting and lightweight counters.
-- Paraglide for EN / 中文 localization.
+- Paraglide for EN / 中文 localization (cookie strategy on the client).
 - Tailwind + shadcn-svelte for UI.
 
 Decisions already locked:
@@ -24,19 +27,23 @@ Decisions already locked:
 - Delivery: vertical slices.
 - Tests: Vitest + Playwright.
 - Runtime validation: Zod.
-- Browser session cookies: set and clear in the SvelteKit BFF.
-- Rolling session refresh: backend returns refreshed expiry metadata;
-  SvelteKit resets the browser cookie.
+- Session cookie: backend sets/rolls/clears `Set-Cookie` directly. The SPA
+  shares one origin with the API so the cookie is first-party; no BFF, no
+  CORS, no `X-Session-Expires-At` round-trip.
 - Initial admin/bootstrap: manual SQL, not a seed command.
 - Infrastructure: automate Wrangler setup/deploy scripts.
 - Upload metadata: browser-side parser with filename fallback.
 - Queue: backend-persisted per user and tenant.
 - Queue API style: CRUD rows.
-- Current-session hydration: `GET /auth/session`.
+- Current-session hydration: `GET /api/auth/session` (cached by TanStack
+  Query under the `['session']` key).
 - Frontend page implementation: feature pages under `frontend/src/pages`,
-  with SvelteKit routes kept thin.
-- Local dev launcher: root `./dev.sh` starts backend and frontend together.
-- Step 4 and later acceptance includes a browser check.
+  with SvelteKit routes kept thin (just `<Page />` shells).
+- Local dev launcher: root `./dev.sh` starts backend (`wrangler dev`,
+  port 8787) and frontend (`vite dev`, port 5173) together; Vite proxies
+  `/api/*` to the backend.
+- Deploy: GitHub Actions builds the frontend then `wrangler deploy` ships
+  the single Worker. Default URL: `r-listener.<account>.workers.dev`.
 
 ## Architecture Rules
 
@@ -59,37 +66,33 @@ implementation clarifications.
 
 ### Cookie Ownership
 
-The backend creates, validates, and invalidates sessions, but it does not set
-browser cookies directly.
+The backend owns the session cookie end to end. The SPA never sees the
+session token — it just sends `fetch` requests; the browser handles the
+cookie because the API and SPA share one origin.
 
 Signin flow:
 
-1. Browser posts credentials to a SvelteKit server route/action.
-2. SvelteKit calls backend `POST /auth/signin`.
-3. Backend validates credentials, creates the session row, and returns the raw
-   session token, `sessionExpiresAt`, and signin payload to the server-only
-   caller.
-4. SvelteKit sets the app-origin `session` cookie:
-   `HttpOnly; Secure; SameSite=Lax; Path=/`, with an expiry matching the
-   backend session expiry.
+1. SPA `useSigninMutation` POSTs credentials to `/api/auth/signin`.
+2. Backend validates credentials, creates the session row, and emits
+   `Set-Cookie: session=<token>; HttpOnly; Secure; SameSite=Lax; Path=/;
+   expires=<sessionExpiresAt>` on the response.
+3. The response body contains the `CurrentSessionDto` (no token); the SPA
+   stores it in the TanStack Query `['session']` cache.
 
 Rolling refresh flow:
 
-1. Backend validates the forwarded `session` cookie on every authenticated
-   request.
-2. If the session is due for refresh, backend extends the D1 session row and
-   returns `X-Session-Expires-At`.
-3. SvelteKit resets the app-origin browser cookie with the updated expiry.
+1. Backend validates the `session` cookie on every authenticated request.
+2. If the session is due for refresh, the backend extends the D1 session
+   row and re-emits `Set-Cookie` with the new expiry on the same response.
+3. The browser updates the cookie automatically. No client code is involved.
 
 Signout flow:
 
-1. Browser posts to a SvelteKit server route/action.
-2. SvelteKit forwards the current session token to backend `POST /auth/signout`.
-3. Backend deletes the session row.
-4. SvelteKit clears the browser cookie.
-
-Backend routes still accept the forwarded `session` cookie from the BFF for
-normal authenticated requests.
+1. SPA `useSignoutMutation` POSTs to `/api/auth/signout`.
+2. Backend deletes the session row and emits a `Set-Cookie` that clears
+   the browser cookie (expired `Max-Age`).
+3. The mutation's `onSettled` removes cached queries so the next render
+   sees no session.
 
 ### Persisted Queue API
 
@@ -278,24 +281,25 @@ Backend:
 - Add root `dev.sh` that starts backend `npm run dev` on
   `127.0.0.1:8787` and frontend `npm run dev` on `localhost:5173`, with
   signal cleanup for both child processes.
-- Implement:
-  - `POST /auth/signin`
-  - `POST /auth/signout`
-  - `POST /auth/switch-tenant`
-  - `POST /auth/change-password`
-  - `GET /auth/session`
-  - `GET /me/preferences`
-  - `PATCH /me/preferences`
-- Return session token data to BFF-only signin callers.
-- Return `sessionExpiresAt` in the signin JSON alongside the BFF-only
-  `sessionToken`.
+- Implement (all under `/api`):
+  - `POST /api/auth/signin`
+  - `POST /api/auth/signout`
+  - `POST /api/auth/switch-tenant`
+  - `POST /api/auth/change-password`
+  - `GET /api/auth/session`
+  - `GET /api/me/preferences`
+  - `PATCH /api/me/preferences`
+- On signin, the backend issues `Set-Cookie: session=...; HttpOnly; Secure;
+  SameSite=Lax; Path=/` and returns the `CurrentSessionDto` body (no token).
+- Return `sessionExpiresAt` in the signin JSON.
 - On signin, bind `sessions.active_tenant_id` only for single-workspace
   users; multi-workspace users start with `active_tenant_id = null` and
-  bind via `POST /auth/switch-tenant` from the Tenant Picker.
+  bind via `POST /api/auth/switch-tenant` from the Tenant Picker.
 - The signin response's `activeTenantId` is a suggested pre-selection
   for the picker, not a commitment to bind the session.
-- `GET /auth/session` returns the current user, memberships, preferences,
-  active tenant, and session expiry for SSR reloads and app shell hydration.
+- `GET /api/auth/session` returns the current user, memberships, preferences,
+  active tenant, and session expiry. The SPA caches it under TanStack Query
+  key `['session']` as the single source of truth.
 - Enforce disabled-account and weak-password behavior.
 - Weak password means failing: at least 12 characters and at least 3 of
   lowercase, uppercase, digit, symbol.
@@ -303,23 +307,25 @@ Backend:
 
 Frontend:
 
-- Add sign-in page.
-- Add SvelteKit server handlers/actions for signin and signout.
-- Set and clear browser cookies in SvelteKit only.
-- Add tenant picker page.
+- Add sign-in page (`src/pages/signin/`). On submit calls
+  `useSigninMutation`; on success seeds the `['session']` query and
+  navigates to `/` or `/tenants`.
+- Add tenant picker page that reads memberships from the cached
+  `['session']` query and calls `useSwitchTenantMutation` on tap; the
+  mutation invalidates `['session']` so the rest of the app re-renders
+  with the new active tenant.
 - Add settings page basics:
-  - Email.
+  - Username.
   - Active workspace.
   - Switch workspace.
   - Change password.
   - Sign out.
-  - Language, autosaved immediately through the BFF.
+  - Language, autosaved through `useUpdatePreferencesMutation`.
   - Playback preferences.
-  - Theme, autosaved immediately through the BFF.
-- Add a frontend-only `/settings/preferences` route that forwards visual
-  preference patches to the backend and keeps the current locale/theme
-  state aligned without a full reload.
-- Add change password page.
+  - Theme, autosaved through `useUpdatePreferencesMutation`. The mutation
+    sets the `theme` cookie client-side (so the inline `<head>` script can
+    apply it on next cold load) and runs `applyTheme` for live UI.
+- Add change password page; on success navigates to `/signin`.
 - The change-password UI must visibly show: “at least 12 characters and at
   least 3 of lowercase, uppercase, digit, symbol.”
 - Add EN and 中文 messages for these screens.
@@ -339,8 +345,8 @@ Tests first:
 - Multi-workspace users get `sessions.active_tenant_id = null` on signin
   and always see the tenant picker; tapping a card calls
   `POST /auth/switch-tenant` to bind the active tenant.
-- Authenticated reload calls `GET /auth/session` and refreshes the browser
-  cookie when the backend returns refreshed session expiry metadata.
+- Authenticated reload calls `GET /api/auth/session` and the backend
+  re-emits `Set-Cookie` with the new expiry when rolling refresh fires.
 - Platform admins with no tenant memberships can use Tenant Picker to browse
   all tenants and enter one as admin.
 - Disabled account cannot sign in.
@@ -353,12 +359,14 @@ Tests first:
 Acceptance:
 
 - A manually bootstrapped user can sign in locally.
-- SvelteKit owns browser cookie writes.
-- Authenticated BFF calls forward the cookie to backend.
-- Browser check: start `./dev.sh`, open the frontend, verify the app loads, and
-  verify `/api/health` reports a healthy backend. Full signin, tenant picker,
-  and settings browser acceptance waits for the Step 4 frontend slice when only
-  the backend slice is implemented.
+- Backend owns the `session` cookie end-to-end (set on signin, rolled on
+  authed requests, cleared on signout).
+- The SPA never sees the session token — `fetch('/api/...')` works because
+  the cookie is first-party.
+- Browser check: start `./dev.sh`, open the frontend, verify the app loads,
+  and verify `/api/health` reports a healthy backend. Full signin, tenant
+  picker, and settings browser acceptance waits for the Step 4 frontend
+  slice when only the backend slice is implemented.
 
 ### 5. Tracks, Uploads, Lyrics, Covers, And Streaming Slice
 
@@ -707,7 +715,8 @@ Acceptance:
 
 - A fresh environment can be provisioned using documented commands and scripts.
 - A manually bootstrapped admin can create users/tenants and use the full app.
-- The app can be deployed to Cloudflare Pages and Workers.
+- The app can be deployed as a single Cloudflare Worker via GitHub Actions
+  (frontend build + `wrangler deploy`).
 
 ## Test Matrix
 

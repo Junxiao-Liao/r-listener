@@ -1,26 +1,27 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
 	import { Label } from '$shared/components/ui/label';
 	import * as m from '$shared/paraglide/messages';
-	import type { FormMessage } from '$shared/forms/superforms';
-	import { superForm } from 'sveltekit-superforms';
-	import type { Infer, SuperValidated } from 'sveltekit-superforms';
-	import type { changePasswordSchema } from './change-password.form';
+	import { ApiError } from '$shared/api/client';
+	import { useChangePasswordMutation } from '$shared/query/session.query';
+	import { changePasswordSchema, type ChangePasswordForm } from './change-password.form';
 	import PasswordRulesHint from './components/PasswordRulesHint.svelte';
 
-	type Data = {
-		form: SuperValidated<Infer<typeof changePasswordSchema>, FormMessage>;
-	};
+	const changePassword = useChangePasswordMutation();
 
-	let { data }: { data: Data } = $props();
+	let currentPassword = $state('');
+	let newPassword = $state('');
+	let confirmPassword = $state('');
+	let fieldErrors = $state<Partial<Record<keyof ChangePasswordForm, string>>>({});
 
-	// svelte-ignore state_referenced_locally
-	const { form, errors, message, enhance, submitting } = superForm(data.form);
+	const flashError = $derived(flashText($changePassword.error));
+	const submitting = $derived($changePassword.isPending);
 
-	function flashText(code: string | undefined): string | null {
-		if (!code) return null;
-		switch (code) {
+	function flashText(error: unknown): string | null {
+		if (!(error instanceof ApiError)) return null;
+		switch (error.code) {
 			case 'invalid_credentials':
 				return m.change_password_error_current();
 			case 'weak_password':
@@ -30,14 +31,36 @@
 		}
 	}
 
-	const flashError = $derived($message?.type === 'error' ? flashText($message.code) : null);
+	function fieldErrorLabel(code: string | undefined): string | null {
+		if (!code) return null;
+		if (code === 'weak_password') return m.change_password_error_weak();
+		if (code === 'mismatch') return m.change_password_error_mismatch();
+		return code;
+	}
 
-	function fieldError(code: string | string[] | undefined): string | null {
-		const c = Array.isArray(code) ? code[0] : code;
-		if (!c) return null;
-		if (c === 'weak_password') return m.change_password_error_weak();
-		if (c === 'mismatch') return m.change_password_error_mismatch();
-		return c;
+	async function handleSubmit(event: SubmitEvent) {
+		event.preventDefault();
+		const parsed = changePasswordSchema.safeParse({ currentPassword, newPassword, confirmPassword });
+		if (!parsed.success) {
+			const issues: Partial<Record<keyof ChangePasswordForm, string>> = {};
+			for (const issue of parsed.error.issues) {
+				const key = issue.path[0] as keyof ChangePasswordForm | undefined;
+				if (key && !issues[key]) issues[key] = issue.message;
+			}
+			fieldErrors = issues;
+			return;
+		}
+		fieldErrors = {};
+		try {
+			await $changePassword.mutateAsync({
+				currentPassword: parsed.data.currentPassword,
+				newPassword: parsed.data.newPassword
+			});
+			sessionStorage.setItem('signin_flash', 'changed');
+			void goto('/signin', { replaceState: true });
+		} catch {
+			// Error surfaced via $changePassword.error.
+		}
 	}
 </script>
 
@@ -48,7 +71,7 @@
 		<span class="w-4"></span>
 	</header>
 
-	<form method="POST" use:enhance class="flex flex-col gap-4">
+	<form class="flex flex-col gap-4" onsubmit={handleSubmit}>
 		<div class="grid gap-1.5">
 			<Label for="currentPassword">{m.change_password_current()}</Label>
 			<Input
@@ -56,10 +79,10 @@
 				name="currentPassword"
 				type="password"
 				autocomplete="current-password"
-				bind:value={$form.currentPassword}
+				bind:value={currentPassword}
 			/>
-			{#if $errors.currentPassword}
-				<p class="text-xs text-destructive">{fieldError($errors.currentPassword)}</p>
+			{#if fieldErrors.currentPassword}
+				<p class="text-xs text-destructive">{fieldErrorLabel(fieldErrors.currentPassword)}</p>
 			{/if}
 		</div>
 
@@ -70,11 +93,11 @@
 				name="newPassword"
 				type="password"
 				autocomplete="new-password"
-				bind:value={$form.newPassword}
+				bind:value={newPassword}
 			/>
 			<PasswordRulesHint />
-			{#if $errors.newPassword}
-				<p class="text-xs text-destructive">{fieldError($errors.newPassword)}</p>
+			{#if fieldErrors.newPassword}
+				<p class="text-xs text-destructive">{fieldErrorLabel(fieldErrors.newPassword)}</p>
 			{/if}
 		</div>
 
@@ -85,10 +108,10 @@
 				name="confirmPassword"
 				type="password"
 				autocomplete="new-password"
-				bind:value={$form.confirmPassword}
+				bind:value={confirmPassword}
 			/>
-			{#if $errors.confirmPassword}
-				<p class="text-xs text-destructive">{fieldError($errors.confirmPassword)}</p>
+			{#if fieldErrors.confirmPassword}
+				<p class="text-xs text-destructive">{fieldErrorLabel(fieldErrors.confirmPassword)}</p>
 			{/if}
 		</div>
 
@@ -96,7 +119,7 @@
 			<p class="text-sm text-destructive" role="alert">{flashError}</p>
 		{/if}
 
-		<Button type="submit" disabled={$submitting} class="w-full">
+		<Button type="submit" disabled={submitting} class="w-full">
 			{m.change_password_save()}
 		</Button>
 	</form>

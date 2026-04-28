@@ -88,8 +88,6 @@ export type CurrentSessionDto = {
 	sessionExpiresAt: Iso8601;
 };
 
-export type SigninResult = CurrentSessionDto & { sessionToken: string };
-
 export type SwitchTenantResult = {
 	user: UserDto;
 	activeTenantId: Id<'tenant'>;

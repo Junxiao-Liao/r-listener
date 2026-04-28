@@ -6,10 +6,9 @@
 	"scripts": {
 		"dev": "vite dev",
 		"build": "vite build",
-		"deploy": "WRANGLER_LOG_PATH=.wrangler/logs wrangler pages deploy .svelte-kit/cloudflare --project-name r-listener-frontend",
 		"preview": "vite preview",
 		"prepare": "svelte-kit sync || echo ''",
-		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/shared/paraglide --strategy custom-request-locale globalVariable preferredLanguage baseLocale --silent",
+		"paraglide:compile": "paraglide-js compile --project ./project.inlang --outdir ./src/shared/paraglide --strategy cookie globalVariable preferredLanguage baseLocale --silent",
 		"compile": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
@@ -21,7 +20,7 @@
 		"@inlang/paraglide-js": "^2.15.2",
 		"@internationalized/date": "^3.12.1",
 		"@playwright/test": "^1.59.1",
-		"@sveltejs/adapter-cloudflare": "^7.2.8",
+		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
 		"@tailwindcss/vite": "^4.2.2",
@@ -31,14 +30,13 @@
 		"tailwindcss": "^4.2.2",
 		"typescript": "^6.0.2",
 		"vite": "^8.0.7",
-		"vitest": "^4.1.5",
-		"wrangler": "^4.85.0"
+		"vitest": "^4.1.5"
 	},
 	"dependencies": {
 		"@lucide/svelte": "^1.9.0",
+		"@tanstack/svelte-query": "^5.62.7",
 		"bits-ui": "^2.18.0",
 		"clsx": "^2.1.1",
-		"sveltekit-superforms": "^2.30.1",
 		"tailwind-merge": "^3.5.0",
 		"tailwind-variants": "^3.2.2",
 		"zod": "^4.3.6"

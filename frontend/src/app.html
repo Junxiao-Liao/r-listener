@@ -1,23 +1,36 @@
 <!doctype html>
 
-<html lang="%paraglide.lang%" dir="%paraglide.dir%">
+<html lang="en" dir="ltr">
 	<head>
 		<meta charset="utf-8" />
 		<script>
 			(() => {
-				const cookie = document.cookie
-					.split(';')
-					.map((part) => part.trim())
-					.find((part) => part.startsWith('theme='));
-				let value = 'system';
+				const cookies = Object.fromEntries(
+					document.cookie
+						.split(';')
+						.map((part) => part.trim())
+						.filter(Boolean)
+						.map((part) => {
+							const eq = part.indexOf('=');
+							return eq < 0 ? [part, ''] : [part.slice(0, eq), part.slice(eq + 1)];
+						})
+				);
+				let theme = 'system';
 				try {
-					value = cookie ? decodeURIComponent(cookie.slice(6)) : 'system';
+					theme = cookies.theme ? decodeURIComponent(cookies.theme) : 'system';
 				} catch {}
-				const theme = ['system', 'light', 'dark'].includes(value) ? value : 'system';
+				if (!['system', 'light', 'dark'].includes(theme)) theme = 'system';
 				const prefersDark = window.matchMedia?.('(prefers-color-scheme: dark)').matches === true;
 				const dark = theme === 'dark' || (theme === 'system' && prefersDark);
 				document.documentElement.classList.toggle('dark', dark);
 				document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+
+				let lang = 'en';
+				try {
+					lang = cookies.PARAGLIDE_LOCALE ? decodeURIComponent(cookies.PARAGLIDE_LOCALE) : 'en';
+				} catch {}
+				if (!['en', 'zh'].includes(lang)) lang = 'en';
+				document.documentElement.lang = lang;
 			})();
 		</script>
 

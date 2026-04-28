@@ -5,7 +5,7 @@ export type BackendBindings = {
 	DB: D1Database;
 	R2: R2Bucket;
 	KV: KVNamespace;
-	FRONTEND_ORIGIN: string;
+	ASSETS: Fetcher;
 	SESSION_SECRET: string;
 	ENVIRONMENT?: string;
 };

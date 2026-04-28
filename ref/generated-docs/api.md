@@ -1,9 +1,9 @@
 # API
 
-Backend = Hono Worker. All endpoints live on the Worker; the SvelteKit BFF
-(`frontend/src/lib/server/api.ts`) proxies them from server routes and forwards
-the `session` cookie host-to-host. The browser never talks to the backend
-directly.
+Backend = Hono Worker. All endpoints live under `/api/*` on the Worker. The
+same Worker also serves the static SPA via the `[assets]` binding, so the
+browser, the SPA, and the API all share one origin. The browser calls the
+API directly with `fetch('/api/...')`; the session cookie is first-party.
 
 This doc describes the contract: routes, DTOs, semantics, error codes.
 
@@ -13,10 +13,9 @@ This doc describes the contract: routes, DTOs, semantics, error codes.
 
 ### 1.1 Base URL
 
-All routes are relative to the Worker origin (`BACKEND_URL`). The frontend
-BFF is expected to prefix its own `/api/...` paths and proxy them through
-(see `lib/server/api.ts`). No versioning prefix yet — add `/v1` only when
-the first breaking change ships.
+All routes are mounted under `/api` on the Worker origin (e.g.
+`https://r-listener.<account>.workers.dev/api/...`). No versioning prefix
+yet — add `/v1` only when the first breaking change ships.
 
 ### 1.2 Transport & content type
 
@@ -80,21 +79,19 @@ never interpret them.
 ### 1.6 Authentication
 
 Session cookie only. Named `session`; value is a 20-byte base32 token. The
-backend creates, validates, and invalidates sessions, and stores SHA-256 of the
-token in `sessions` (see `backend/src/auth/session.ts`). The frontend BFF sets,
-clears, and forwards the browser cookie; CORS credentials are allowed for direct
-dev calls only.
+backend owns the cookie end-to-end: it issues `Set-Cookie` on `/api/auth/signin`,
+clears it on `/api/auth/signout`, rolls it on rolling refresh, and stores
+SHA-256 of the token in `sessions` (see `backend/src/auth/session.ts`). The
+SPA never sees the token — `fetch` sends the cookie automatically because
+the API and the SPA share one origin.
 
 - `HttpOnly; Secure; SameSite=Lax; Path=/`
 - Expiry: 30 days rolling. Every authed request that is ≥1 day older than
-  the last refresh extends the session row by 30 days.
-- When a request rolls the session expiry, the backend includes
-  `X-Session-Expires-At: <ISO-8601>` in the response. The SvelteKit BFF is
-  responsible for resetting the browser cookie with the same expiry; the
-  backend still never emits `Set-Cookie`.
+  the last refresh extends the session row by 30 days and re-emits
+  `Set-Cookie` with the new expiry.
 
-Every request outside `/auth/signin` and `/health` requires a valid session.
-401 + `{code:'unauthenticated'}` otherwise.
+Every request outside `/api/auth/signin` and `/api/health` requires a valid
+session. 401 + `{code:'unauthenticated'}` otherwise.
 
 ### 1.7 Authorization
 
@@ -124,16 +121,14 @@ write receives `403` + `{code:'insufficient_role'}`.
 
 ### 1.8 CSRF
 
-The browser only ever talks to the frontend origin. The BFF attaches the
-session cookie host-to-host when calling the backend, so classical CSRF
-surface is on the frontend. The backend enforces `Origin` == `FRONTEND_ORIGIN`
-on state-changing methods (`POST|PUT|PATCH|DELETE`) as defense-in-depth; 403
-+ `{code:'forbidden_origin'}` otherwise.
+The SPA and the API are same-origin (one Worker), so the session cookie
+is first-party with `SameSite=Lax`. Cross-origin POSTs from other sites
+will not carry the cookie. No `Origin` enforcement is needed.
 
 ### 1.9 Rate limits
 
-All `/auth/*` routes are limited to 10 requests / minute / IP via a KV
-counter. 429 + `{code:'rate_limited'}`.
+All `/api/auth/*` routes are limited to 10 requests / minute / IP via a
+KV counter. 429 + `{code:'rate_limited'}`.
 
 ### 1.10 Soft delete
 
@@ -309,14 +304,14 @@ type AuditLogDto = {
 
 ## 3. Health
 
-### `GET /health`
+### `GET /api/health`
 No auth. `200 { "ok": true }`. Already scaffolded.
 
 ---
 
 ## 4. Auth
 
-### `POST /auth/signin`
+### `POST /api/auth/signin`
 
 Request:
 ```json
@@ -330,11 +325,13 @@ Response `200`:
   "tenants": [ /* TenantMembershipDto[] */ ],
   "preferences": { /* PreferencesDto */ },
   "activeTenantId": "tnt_018f..." | null,
-  "sessionToken": "abcd...", // BFF-only; stripped before any browser response
   "sessionExpiresAt": "2026-05-25T09:12:03.000Z"
 }
 ```
 
+- The backend issues `Set-Cookie: session=<token>; HttpOnly; Secure;
+  SameSite=Lax; Path=/; expires=<sessionExpiresAt>`. The token is never
+  in the response body — the browser stores the cookie automatically.
 - `activeTenantId` is a **suggested pre-selection** for the Tenant Picker:
   the last-used tenant from a prior session if still valid and the user is
   still a member; otherwise the first membership; otherwise `null` (user
@@ -342,17 +339,12 @@ Response `200`:
 - The session's `active_tenant_id` is bound only for **single-workspace
   users** (set to their sole membership). For multi-workspace users the
   session row is created with `active_tenant_id = null`; the picker calls
-  `POST /auth/switch-tenant` on tap to bind it. The signin response
+  `POST /api/auth/switch-tenant` on tap to bind it. The signin response
   `activeTenantId` is purely a UI hint for which card to highlight.
-- Creates a session row and returns the raw session token to the server-only
-  BFF caller. The backend does not emit `Set-Cookie`.
-- The SvelteKit BFF sets the browser `session` cookie with
-  `HttpOnly; Secure; SameSite=Lax; Path=/` and an expiry matching the
-  backend session expiry. It never exposes `sessionToken` to client code.
 - Errors: `401 invalid_credentials`, `403 account_disabled`,
   `429 rate_limited`.
 
-### `GET /auth/session`
+### `GET /api/auth/session`
 
 Auth: session required.
 
@@ -367,25 +359,24 @@ Response `200`:
 }
 ```
 
-- Validates the forwarded `session` cookie, applies the normal rolling refresh
-  rule, and returns the current app-shell state needed for SSR reloads.
-- The SvelteKit BFF uses `preferences.language` to resolve the request locale
-  before the first client render, so locale changes take effect on the next
-  navigation and on full reload.
+- Validates the `session` cookie, applies the normal rolling refresh rule,
+  and returns the current app-shell state. The SPA uses this as the single
+  source of truth for current user, active tenant, and preferences.
+- When the rolling refresh fires, the backend re-emits `Set-Cookie` with
+  the new expiry on the same response — the browser updates the cookie
+  transparently. Clients do nothing special.
 - Platform admins may have zero memberships. In that case `tenants` may be
   empty and `activeTenantId` may be `null`; the frontend Tenant Picker should
   let admins browse all tenants by calling the admin tenant list endpoint.
-- The BFF resets the browser cookie when this or any other authenticated
-  backend response includes `X-Session-Expires-At`.
 - Errors: `401 unauthenticated`, `403 account_disabled`.
 
-### `POST /auth/signout`
+### `POST /api/auth/signout`
 
 Auth: session required.
-Response: `204`. Deletes the current session row. The SvelteKit BFF clears the
-browser cookie after the backend confirms signout.
+Response: `204`. Deletes the current session row and emits `Set-Cookie`
+with an expired `Max-Age` to clear the browser cookie.
 
-### `POST /auth/switch-tenant`
+### `POST /api/auth/switch-tenant`
 
 Auth: session required.
 Request:
@@ -826,20 +817,22 @@ Errors: `400 validation_failed` if `q` empty.
 ### 5.7 Preferences
 
 Preferences are scoped to the signed-in user, not to a tenant. They drive
-Settings, localization, theme selection, playback defaults, and initial SSR
-rendering.
+Settings, localization, theme selection, and playback defaults.
 
-The backend contract remains `GET /me/preferences` and `PATCH /me/preferences`.
-The frontend settings page now autosaves `theme` and `language` through a
-SvelteKit server route at `/settings/preferences`, which forwards the patch to
-the backend and keeps the browser theme/locale in sync immediately.
+The backend contract is `GET /api/me/preferences` and
+`PATCH /api/me/preferences`. The settings page calls them directly via
+`useUpdatePreferencesMutation` (see `frontend/src/shared/query/prefs.query.ts`).
+On a successful patch the mutation invalidates the `['session']` query, sets
+the `theme` and `PARAGLIDE_LOCALE` cookies client-side (so the inline
+`<head>` script applies them on next cold load), and runs Paraglide
+`setLocale` and `applyTheme` for the live UI.
 
-#### `GET /me/preferences`
+#### `GET /api/me/preferences`
 
 Response `200`: `PreferencesDto`. Creates a default preference row lazily if
 one does not exist.
 
-#### `PATCH /me/preferences`
+#### `PATCH /api/me/preferences`
 
 Editable fields: `language`, `theme`, `autoPlayNext`, `showMiniPlayer`,
 `preferSyncedLyrics`, `defaultLibrarySort`. All optional; omitted fields are
@@ -978,25 +971,25 @@ Append-only; no write endpoint.
 ## 7. Upload flow (summary)
 
 ```
-┌─browser──────┐    ┌─BFF (Pages)───┐    ┌─Worker───┐    ┌─R2───┐
-│              │    │               │    │          │    │      │
-│ select file  │───▶│ /api/tracks   │───▶│ /tracks  │    │      │
-│              │    │   (init)      │    │  insert  │    │      │
-│              │◀───│               │◀───│  presign │    │      │
-│ PUT {url}    │─────────────────────────────────────────▶│ put  │
-│              │◀─────────────────────────────────────────│ 200  │
-│              │───▶│ /api/tracks/  │───▶│ /finalize│───▶│ HEAD │
-│              │    │   {id}/fin.   │    │  verify  │◀───│      │
-│              │◀───│               │◀───│  flip    │    │      │
-└──────────────┘    └───────────────┘    └──────────┘    └──────┘
+┌─browser──────┐                          ┌─Worker───┐    ┌─R2───┐
+│              │                          │          │    │      │
+│ select file  │─────────────────────────▶│ /api/    │    │      │
+│              │                          │  tracks  │    │      │
+│              │◀─────────────────────────│  presign │    │      │
+│ PUT {url}    │───────────────────────────────────────▶│ put  │
+│              │◀───────────────────────────────────────│ 200  │
+│              │─────────────────────────▶│ /api/    │───▶│ HEAD │
+│              │                          │  finalize│◀───│      │
+│              │◀─────────────────────────│  flip    │    │      │
+└──────────────┘                          └──────────┘    └──────┘
 ```
 
 Client responsibility:
-1. Call `POST /tracks` with metadata and optional `coverContentType`.
+1. Call `POST /api/tracks` with metadata and optional `coverContentType`.
 2. `PUT` file bytes directly to `upload.url` with the exact
    `Content-Type` and `Content-Length`.
 3. If `coverUpload` is present, `PUT` cover bytes directly to that URL.
-4. On R2 success, call `POST /tracks/{id}/finalize` with
+4. On R2 success, call `POST /api/tracks/{id}/finalize` with
    `durationMs` (read from `HTMLAudioElement.duration` after loading
    metadata client-side), optional `lyricsLrc`, and `coverUploaded`.
 

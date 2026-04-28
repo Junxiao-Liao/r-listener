@@ -1,9 +1,9 @@
-import type { Cookies } from '@sveltejs/kit';
 import type { Theme } from '$shared/types/dto';
 
 export const THEME_COOKIE = 'theme';
 
 const THEMES: readonly Theme[] = ['system', 'light', 'dark'] as const;
+const COOKIE_MAX_AGE_SECONDS = 34_560_000; // 400 days
 
 export function isTheme(value: unknown): value is Theme {
 	return typeof value === 'string' && (THEMES as readonly string[]).includes(value);
@@ -49,14 +49,15 @@ export function applyThemeFromCookie(): void {
 	applyTheme(parseThemeCookie(document.cookie));
 }
 
-export function applyThemeCookie(
-	cookies: Pick<Cookies, 'get' | 'set'>,
-	theme: Theme
-): void {
-	if (cookies.get(THEME_COOKIE) === theme) return;
-	cookies.set(THEME_COOKIE, theme, {
-		path: '/',
-		maxAge: 34_560_000,
-		sameSite: 'lax'
-	});
+export function setThemeCookie(theme: Theme): void {
+	if (typeof document === 'undefined') return;
+	const value = encodeURIComponent(theme);
+	const attrs = [
+		`${THEME_COOKIE}=${value}`,
+		'path=/',
+		`max-age=${COOKIE_MAX_AGE_SECONDS}`,
+		'samesite=lax'
+	];
+	if (location.protocol === 'https:') attrs.push('secure');
+	document.cookie = attrs.join('; ');
 }

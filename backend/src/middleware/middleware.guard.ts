@@ -1,27 +1,14 @@
 import { getCookie } from 'hono/cookie';
 import { createMiddleware } from 'hono/factory';
 import { SESSION_COOKIE } from '../auth/session';
+import { setSessionCookie } from '../auth/session.cookie';
 import type { BackendEnv } from '../app.type';
 import { apiError } from '../http/api-error';
 import { getClientIp } from './request-context';
 
-export const enforceMutationOrigin = () =>
-	createMiddleware<BackendEnv>(async (c, next) => {
-		if (!isStateChangingMethod(c.req.method)) {
-			await next();
-			return;
-		}
-
-		if (c.req.header('Origin') !== c.env.FRONTEND_ORIGIN) {
-			throw apiError(403, 'forbidden_origin', 'Request origin is not allowed.');
-		}
-
-		await next();
-	});
-
 export const enforceAuthRateLimit = () =>
 	createMiddleware<BackendEnv>(async (c, next) => {
-		if (!c.req.path.startsWith('/auth/') || c.req.path === '/auth/session') {
+		if (!c.req.path.startsWith('/api/auth/') || c.req.path === '/api/auth/session') {
 			await next();
 			return;
 		}
@@ -59,7 +46,7 @@ export const requireSession = () =>
 		const { refreshedSessionExpiresAt, ...sessionContext } = session;
 		c.set('session', sessionContext);
 		if (refreshedSessionExpiresAt) {
-			c.header('X-Session-Expires-At', refreshedSessionExpiresAt);
+			setSessionCookie(c, token, refreshedSessionExpiresAt);
 		}
 
 		await next();
@@ -108,10 +95,6 @@ export const requireAdmin = () =>
 
 		await next();
 	});
-
-function isStateChangingMethod(method: string): boolean {
-	return method === 'POST' || method === 'PUT' || method === 'PATCH' || method === 'DELETE';
-}
 
 function unauthenticated() {
 	return apiError(401, 'unauthenticated', 'Authentication required.');

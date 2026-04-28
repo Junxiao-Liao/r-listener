@@ -16,10 +16,10 @@ describe('validation helpers', () => {
 		});
 
 		const res = await app.request(
-			'/fixture/body',
+			'/api/fixture/body',
 			{
 				method: 'POST',
-				headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+				headers: { 'content-type': 'application/json' },
 				body: JSON.stringify({ name: 'R Listener' })
 			},
 			createTestEnv()
@@ -40,10 +40,10 @@ describe('validation helpers', () => {
 		});
 
 		const res = await app.request(
-			'/fixture/body',
+			'/api/fixture/body',
 			{
 				method: 'POST',
-				headers: { origin: 'http://localhost:5173', 'content-type': 'application/json' },
+				headers: { 'content-type': 'application/json' },
 				body: '{'
 			},
 			createTestEnv()
@@ -69,7 +69,7 @@ describe('validation helpers', () => {
 			}
 		});
 
-		const res = await app.request('/fixture/query?limit=0', {}, createTestEnv());
+		const res = await app.request('/api/fixture/query?limit=0', {}, createTestEnv());
 
 		expect(res.status).toBe(400);
 		const body = (await res.json()) as { error: unknown };

@@ -1,12 +1,11 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
 import type { Db } from './db';
 import type { BackendEnv } from './app.type';
 import { createAppContextMiddleware } from './app.middleware';
 import { registerErrorHandlers } from './http/error-handler';
 import { healthRoute } from './health/health.route';
 import { createMiddlewareService } from './middleware/middleware.service';
-import { enforceAuthRateLimit, enforceMutationOrigin } from './middleware/middleware.guard';
+import { enforceAuthRateLimit } from './middleware/middleware.guard';
 import type { MiddlewareService } from './middleware/middleware.type';
 import { authRoute } from './auth/auth.route';
 import { prefsRoute } from './prefs/prefs.route';
@@ -26,25 +25,18 @@ export function createApp(options: AppOptions = {}) {
 
 	registerErrorHandlers(app);
 
-	app.use('*', createAppContextMiddleware(middlewareServiceFactory));
+	const api = new Hono<BackendEnv>();
+	api.use('*', createAppContextMiddleware(middlewareServiceFactory));
+	api.use('*', enforceAuthRateLimit());
 
-	app.use(
-		'*',
-		cors({
-			origin: (_origin, c) => c.env.FRONTEND_ORIGIN,
-			credentials: true
-		})
-	);
+	api.route('/', healthRoute);
+	api.route('/', authRoute);
+	api.route('/', prefsRoute);
+	api.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
 
-	app.use('*', enforceMutationOrigin());
-	app.use('*', enforceAuthRateLimit());
+	options.configure?.(api);
 
-	app.route('/', healthRoute);
-	app.route('/', authRoute);
-	app.route('/', prefsRoute);
-	app.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
-
-	options.configure?.(app);
+	app.route('/api', api);
 
 	return app;
 }

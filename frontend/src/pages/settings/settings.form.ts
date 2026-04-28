@@ -9,23 +9,9 @@ export const librarySortSchema = z.enum([
 	'album:asc'
 ]);
 
-const checkboxBooleanSchema = z.preprocess((value) => {
-	const scalar = Array.isArray(value) ? value.at(-1) : value;
-	if (scalar === undefined) return undefined;
-	if (scalar === true || scalar === 'true' || scalar === 'on') return true;
-	if (scalar === false || scalar === 'false' || scalar === 'off' || scalar === '') return false;
-	return scalar;
-}, z.boolean().optional());
+export const visualPreferencePatchSchema = z.union([
+	z.object({ theme: themeSchema }).strict(),
+	z.object({ language: languageSchema }).strict()
+]);
 
-export const preferencesSchema = z.object({
-	language: languageSchema.optional(),
-	theme: themeSchema.optional(),
-	autoPlayNext: checkboxBooleanSchema,
-	showMiniPlayer: checkboxBooleanSchema,
-	preferSyncedLyrics: checkboxBooleanSchema,
-	defaultLibrarySort: librarySortSchema.optional()
-});
-
-export type PreferencesForm = z.infer<typeof preferencesSchema>;
-
-export const defaultPreferencesForm: PreferencesForm = {};
+export type VisualPreferencePatch = z.infer<typeof visualPreferencePatchSchema>;

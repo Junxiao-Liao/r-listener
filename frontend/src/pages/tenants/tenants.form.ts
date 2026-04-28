@@ -5,4 +5,3 @@ export const switchTenantSchema = z.object({
 });
 
 export type SwitchTenantForm = z.infer<typeof switchTenantSchema>;
-export const defaultSwitchTenantForm: SwitchTenantForm = { tenantId: '' };
