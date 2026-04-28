@@ -100,3 +100,60 @@ export type AdminTenantListItemDto = {
 	memberCount: number;
 	trackCount: number;
 };
+
+export type TrackStatus = 'pending' | 'ready';
+export type LyricsStatus = 'none' | 'synced' | 'plain' | 'invalid';
+
+export type TrackSortField =
+	| 'title'
+	| 'artist'
+	| 'album'
+	| 'year'
+	| 'durationMs'
+	| 'createdAt'
+	| 'updatedAt';
+export type TrackSortDirection = 'asc' | 'desc';
+export type TrackSort = `${TrackSortField}:${TrackSortDirection}`;
+
+export type TrackDto = {
+	id: Id<'track'>;
+	tenantId: Id<'tenant'>;
+	title: string;
+	artist: string | null;
+	album: string | null;
+	trackNumber: number | null;
+	genre: string | null;
+	year: number | null;
+	durationMs: number | null;
+	coverUrl: string | null;
+	lyricsLrc: string | null;
+	lyricsStatus: LyricsStatus;
+	contentType: string;
+	sizeBytes: number;
+	status: TrackStatus;
+	createdAt: Iso8601;
+	updatedAt: Iso8601;
+};
+
+export type TrackListResponse = {
+	items: TrackDto[];
+	nextCursor: string | null;
+};
+
+export type TrackPatch = {
+	title?: string;
+	artist?: string | null;
+	album?: string | null;
+	trackNumber?: number | null;
+	genre?: string | null;
+	year?: number | null;
+	durationMs?: number | null;
+};
+
+export type FinalizeTrackInput = {
+	durationMs: number;
+	lyricsLrc?: string;
+	trackNumber?: number;
+	genre?: string;
+	year?: number;
+};

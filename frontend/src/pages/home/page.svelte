@@ -2,11 +2,13 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { useSessionQuery } from '$shared/query/session.query';
+	import { isEditor } from '$shared/auth/role';
 
 	const session = useSessionQuery();
 	const activeMembership = $derived(
 		$session.data?.tenants.find((t) => t.tenantId === $session.data?.activeTenantId) ?? null
 	);
+	const editor = $derived(isEditor($session.data));
 </script>
 
 {#if $session.data}
@@ -23,6 +25,10 @@
 		</header>
 
 		<div class="flex flex-col gap-2">
+			<Button href="/library">{m.home_open_library()}</Button>
+			{#if editor}
+				<Button variant="outline" href="/library/upload">{m.home_upload_shortcut()}</Button>
+			{/if}
 			<Button variant="outline" href="/tenants">
 				{m.settings_switch_workspace()}
 			</Button>

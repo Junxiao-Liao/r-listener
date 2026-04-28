@@ -18,7 +18,7 @@
 
 	const fallback: Tab[] = [
 		{ href: '/', label: m.nav_home, icon: House },
-		{ href: null, label: m.nav_library, icon: Library },
+		{ href: '/library', label: m.nav_library, icon: Library },
 		{ href: null, label: m.nav_upload, icon: Upload },
 		{ href: null, label: m.nav_playlists, icon: ListMusic },
 		{ href: '/settings', label: m.nav_settings, icon: Settings }
@@ -28,6 +28,11 @@
 
 	function getLabel(label: Tab['label']) {
 		return typeof label === 'function' ? label() : label;
+	}
+
+	function isActive(href: string, current: string): boolean {
+		if (href === '/') return current === '/';
+		return current === href || current.startsWith(`${href}/`);
 	}
 </script>
 
@@ -39,7 +44,7 @@
 	{#each items as item (item.label)}
 		{@const Icon = item.icon}
 		{@const label = getLabel(item.label)}
-		{@const active = item.href !== null && page.url.pathname === item.href}
+		{@const active = item.href !== null && isActive(item.href, page.url.pathname)}
 		{@const disabled = item.href === null}
 		{#if disabled}
 			<button

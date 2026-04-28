@@ -20,7 +20,9 @@ yet — add `/v1` only when the first breaking change ships.
 ### 1.2 Transport & content type
 
 - `Content-Type: application/json; charset=utf-8` for request and response
-  bodies, except audio/cover uploads (binary PUT to R2) and streaming (see §7, §8).
+  bodies, except track audio uploads (`multipart/form-data` to
+  `POST /tracks`, proxied by the Worker to R2) and streaming
+  (`GET /tracks/{id}/stream`, raw bytes piped from R2 with Range support).
 - Timestamps: **ISO-8601 UTC strings** on the wire (`2026-04-25T09:12:03.000Z`).
   Stored as unix seconds in D1 (`integer('created_at', { mode: 'timestamp' })`).
 - IDs: opaque strings. Convention: prefixed UUIDv7 generated at insert time;
@@ -430,9 +432,10 @@ blocked edit calls return `403 insufficient_role`.
 ### 5.1 Tracks
 
 #### `GET /tracks`
-Query: `limit`, `cursor`, `q` (optional, case-insensitive substring on
-`title|artist|album`), `sort` (`createdAt:desc` default; `title:asc`,
-`artist:asc`, `album:asc` allowed).
+Query: `limit` (default 50, max 100), `cursor` (opaque, exclusive), `q`
+(optional, case-insensitive substring on `title|artist|album`), `sort`
+(`createdAt:desc` default; any of `title|artist|album|year|durationMs|createdAt|updatedAt`
+× `asc|desc`), `includePending` (boolean, default false).
 
 Response `200`: `{ items: TrackDto[], nextCursor }`. Excludes
 `status='pending'` and soft-deleted rows by default. `?includePending=true`
@@ -447,113 +450,80 @@ receive `404 track_not_found` for pending track ids. Soft-deletion is invisible
 to clients (no 410, no owner-only signal), matching the UI's "deletions are
 non-reversible" principle.
 
-#### `POST /tracks` — **upload init** (step 1 of 3)
+#### `POST /tracks` — **upload (step 1 of 2): Worker-proxied audio bytes**
 
-Request:
-```json
-{
-  "title": "Song",
-  "artist": "A" | null,
-  "album": "B" | null,
-  "trackNumber": 1 | null,
-  "genre": "Rock" | null,
-  "year": 2026 | null,
-  "contentType": "audio/mpeg",
-  "sizeBytes": 8421376,
-  "coverContentType": "image/jpeg" | null
-}
-```
+`Content-Type: multipart/form-data` with these parts:
 
-Validation:
-- `contentType ∈ { audio/mpeg, audio/mp4, audio/aac, audio/wav,
-  audio/x-wav, audio/flac, audio/ogg, audio/opus, audio/webm }`
-- `sizeBytes <= MAX_AUDIO_BYTES` (env, default 100 MiB)
-- `coverContentType ∈ { image/jpeg, image/png, image/webp }` when present
-- `title` 1..200 chars; `artist`/`album`/`genre` 0..200;
-  `trackNumber` positive integer; `year` 1000..9999
+| field    | required | description                                                     |
+|----------|----------|-----------------------------------------------------------------|
+| `file`   | yes      | The raw audio bytes. `file.name` is used as the title fallback. |
+| `title`  | no       | Optional override. Falls back to `file.name` minus extension.   |
+| `artist` | no       | Optional.                                                       |
+| `album`  | no       | Optional.                                                       |
 
-Response `201`:
-```json
-{
-  "track": { /* TrackDto, status:"pending" */ },
-  "upload": {
-    "url": "https://...r2.cloudflarestorage.com/...?X-Amz-...",
-    "method": "PUT",
-    "headers": { "Content-Type": "audio/mpeg" },
-    "expiresAt": "2026-04-25T09:27:03.000Z"
-  },
-  "coverUpload": {
-    "url": "https://...r2.cloudflarestorage.com/...?X-Amz-...",
-    "method": "PUT",
-    "headers": { "Content-Type": "image/jpeg" },
-    "expiresAt": "2026-04-25T09:27:03.000Z"
-  } | null
-}
-```
+Validation (server-side):
+- `file.type ∈ { audio/mpeg, audio/mp4, audio/mp3, audio/ogg, audio/flac,
+  audio/wav, audio/x-wav, audio/aac, audio/x-m4a, audio/webm }`
+- `file.size <= MAX_AUDIO_BYTES` (default 100 MiB) and `> 0`
+- `title`/`artist`/`album` non-empty when present (1..200 chars)
 
-- Inserts a track row with `status='pending'` and R2 key
-  `tenants/{tenantId}/tracks/{trackId}.{ext}`.
-- `url` is a 15-minute presigned PUT bound to exact `Content-Type` and
-  `Content-Length`. R2 rejects mismatched uploads.
-- `coverUpload` is returned only when `coverContentType` is present; the
-  client may upload cover art before finalizing the track.
-- Pending rows older than 1 hour with no `/finalize` are GC'd by a
-  future Cron Trigger.
+The Worker writes the bytes to R2 at
+`tenants/{tenantId}/tracks/{trackId}.{ext}` and inserts a row with
+`status='pending'`. There is **no** S3-presigned URL flow; clients send the
+audio directly to the Worker.
 
-Errors: `400 validation_failed`, `413 payload_too_large`,
-`415 unsupported_media_type`.
+Response `201`: `TrackDto` with `status='pending'`.
 
-#### `PUT` (upload, step 2) — **direct to R2, not to the Worker**
+Errors: `400 validation_failed` / `400 upload_missing`,
+`413 payload_too_large`, `415 unsupported_media_type`.
 
-Browser performs:
-```
-PUT {upload.url}
-Content-Type: audio/mpeg
-Content-Length: 8421376
-<binary>
-```
-No backend involvement. Returns an R2 200 + ETag.
-
-#### `POST /tracks/{id}/finalize` — step 3 of 3
+#### `POST /tracks/{id}/finalize` — step 2 of 2
 
 Request:
 ```json
 {
   "durationMs": 215432,
-  "lyricsLrc": "[ti:...]\n[00:12.34]line\n..." | null,
-  "coverUploaded": true | false
+  "lyricsLrc": "[ti:...]\n[00:12.34]line\n..." | undefined,
+  "trackNumber": 1 | undefined,
+  "genre": "Rock" | undefined,
+  "year": 2026 | undefined
 }
 ```
 
 Server actions:
-1. `HEAD` the R2 object; verify it exists, `Content-Type` matches, and
-   `Content-Length <= MAX_AUDIO_BYTES`.
-2. Trust `durationMs` from client; validate `> 0` and `< 6h`.
-3. If `coverUploaded=true`, `HEAD` the cover object and persist
-   `cover_r2_key` when it exists and matches the requested content type.
-4. Parse `lyricsLrc` to derive `lyricsStatus` (`synced`, `plain`,
-   `invalid`, or `none`).
-5. Flip `status` to `"ready"`, persist `durationMs`, lyrics fields,
-   `sizeBytes` from R2, `updatedAt = now`.
+1. Look up the pending track row and `HEAD` its R2 object; reject with
+   `400 upload_missing` if the audio is gone (the client should re-upload).
+2. Trust `durationMs` from client; validate `> 0` and `<= 6 h`.
+3. Parse `lyricsLrc` (when present) to derive `lyricsStatus`
+   (`none`, `synced`, `plain`, or `invalid`) — see "lyrics status detection"
+   below.
+4. Flip `status` to `'ready'`, persist `durationMs`, lyrics fields,
+   `trackNumber`, `genre`, `year`, `updatedAt = now`.
 
-Response `200`: `TrackDto` with `status:"ready"`.
+Response `200`: `TrackDto` with `status:'ready'`.
 
 Errors:
 - `404 track_not_found`
 - `409 track_already_finalized` if `status='ready'`
-- `424 upload_missing` if R2 object not found
-- `415 unsupported_media_type` on mismatch
-- `413 payload_too_large` on size mismatch
+- `400 upload_missing` if the R2 object is gone
 
 > **On duration:** computed server-side is nice-to-have but ffprobe-wasm
 > on Workers is heavyweight. For now the client reports `durationMs`
-> (trivial via `HTMLAudioElement.duration` at upload time) and we
-> validate range. A later Queue consumer can re-derive authoritatively.
+> (trivial via `HTMLAudioElement.duration` at upload time, or
+> `music-metadata-browser`) and we validate range. A later Queue
+> consumer can re-derive authoritatively.
+
+**Lyrics status detection** (per-line, mirrored client-side for preview):
+- empty/whitespace → `none`
+- ≥80% of non-empty lines match `[mm:ss(.xx)?]` → `synced`
+- non-empty text with no brackets → `plain`
+- bracketed lines that aren't valid LRC stamps → `invalid`
 
 #### `PATCH /tracks/{id}`
 
-Editable fields: `title`, `artist`, `album`, `trackNumber`, `genre`, `year`.
-All optional; omitted fields unchanged; `null` clears nullable fields.
+Editable fields: `title`, `artist`, `album`, `trackNumber`, `genre`,
+`year`, `durationMs`. All optional; omitted fields unchanged; `null`
+clears nullable fields.
 
 ```json
 { "title": "New name", "genre": "Ambient", "year": 2026 }
@@ -579,46 +549,33 @@ Response `200`: `TrackDto` with server-derived `lyricsStatus`:
 
 Clears lyric text. Response `200`: `TrackDto` with `lyricsStatus:"none"`.
 
-#### `POST /tracks/{id}/cover-upload`
+#### Cover endpoints — **deferred**
 
-Request:
-```json
-{ "contentType": "image/jpeg", "sizeBytes": 245760 }
-```
-
-Response `200`: `{ "upload": { "url": "...", "method": "PUT", "headers": { "Content-Type": "image/jpeg" }, "expiresAt": "..." } }`.
-The client PUTs directly to R2, then calls `POST /tracks/{id}/cover-finalize`.
-
-#### `POST /tracks/{id}/cover-finalize`
-
-Verifies the uploaded cover object and makes it active. Response `200`:
-`TrackDto` with a refreshed `coverUrl`.
-
-#### `DELETE /tracks/{id}/cover`
-
-Removes cover art from the track metadata. Response `200`: `TrackDto`.
+`POST /tracks/{id}/cover-upload`, `POST /tracks/{id}/cover-finalize`, and
+`DELETE /tracks/{id}/cover` are not implemented in the current slice.
+`coverR2Key` stays `null` and `coverUrl` is always `null`. The frontend
+renders a deterministic colored placeholder derived from the track title
+when no cover exists.
 
 #### `DELETE /tracks/{id}`
 
 Soft delete: sets `deleted_at`. R2 object retained for later GC.
 Response: `204`. Idempotent: second call returns `404 not_found`.
 
-#### `GET /tracks/{id}/stream-url`
+#### `GET /tracks/{id}/stream` — **Worker-proxied audio stream**
 
-Response `200`:
-```json
-{
-  "url": "https://...r2.cloudflarestorage.com/...?X-Amz-...",
-  "expiresAt": "2026-04-25T09:27:03.000Z"
-}
-```
+Returns the raw audio bytes as `application/octet-stream`-typed (with the
+track's stored `Content-Type` echoed back) `ReadableStream` piped from R2.
+Supports HTTP `Range` for seeking — critical for iOS background playback
+and the click-to-seek UX. The frontend sets this as
+`<audio src="/api/tracks/{id}/stream">` — the cookie is first-party so
+auth works without any extra plumbing.
 
-- Presigned GET URL, TTL 15 minutes. R2 serves bytes directly, supporting
-  HTTP Range for seeking — critical for iOS background playback and the
-  click-to-seek UX. The frontend sets this as `<audio src>`.
-- Call site hint: re-fetch when `expiresAt` is within 60 s or on `error`
-  event from `<audio>`.
-- Errors: `404 track_not_found`, `409 track_not_ready` if
+- Returns `200` with full body, `Content-Length` and `Accept-Ranges: bytes`.
+- Returns `206` with `Content-Range` when a `Range` header is present.
+- There is no presigned URL or expiry — the SPA does not need to refresh
+  stream URLs.
+- Errors: `404 track_not_found`, `404 track_not_ready` if
   `status!=='ready'`.
 
 ### 5.2 Playlists
@@ -972,32 +929,37 @@ Append-only; no write endpoint.
 
 ```
 ┌─browser──────┐                          ┌─Worker───┐    ┌─R2───┐
-│              │                          │          │    │      │
-│ select file  │─────────────────────────▶│ /api/    │    │      │
-│              │                          │  tracks  │    │      │
-│              │◀─────────────────────────│  presign │    │      │
-│ PUT {url}    │───────────────────────────────────────▶│ put  │
-│              │◀───────────────────────────────────────│ 200  │
-│              │─────────────────────────▶│ /api/    │───▶│ HEAD │
-│              │                          │  finalize│◀───│      │
-│              │◀─────────────────────────│  flip    │    │      │
+│ select file  │                          │          │    │      │
+│ parse meta   │── multipart ────────────▶│ POST     │── put ───▶│
+│              │                          │ /tracks  │    │      │
+│              │◀─── TrackDto pending ────│          │    │      │
+│              │── JSON ─────────────────▶│ POST     │── head ─▶│
+│              │                          │ /tracks/ │◀──── ok ──│
+│              │                          │  {id}/   │    │      │
+│              │◀─── TrackDto ready ──────│ finalize │    │      │
 └──────────────┘                          └──────────┘    └──────┘
 ```
 
 Client responsibility:
-1. Call `POST /api/tracks` with metadata and optional `coverContentType`.
-2. `PUT` file bytes directly to `upload.url` with the exact
-   `Content-Type` and `Content-Length`.
-3. If `coverUpload` is present, `PUT` cover bytes directly to that URL.
-4. On R2 success, call `POST /api/tracks/{id}/finalize` with
-   `durationMs` (read from `HTMLAudioElement.duration` after loading
-   metadata client-side), optional `lyricsLrc`, and `coverUploaded`.
+1. Parse audio metadata in the browser (e.g. `music-metadata-browser`)
+   to get title/artist/album/durationMs/embedded lyrics/cover. The Upload
+   Review screen lets the user fix title/artist/album before sending.
+2. `POST /api/tracks` as `multipart/form-data` with `file` plus optional
+   `title`/`artist`/`album`. The Worker streams the bytes to R2 itself.
+3. `POST /api/tracks/{id}/finalize` with `durationMs` and optional
+   `lyricsLrc`, `trackNumber`, `genre`, `year`. The server derives
+   `lyricsStatus` from the LRC text.
+
+Sibling `.lrc` files paired with audio by base filename override
+embedded lyrics tags; if neither is present, `lyricsLrc` is omitted.
 
 Failure modes the client must handle:
-- R2 PUT times out / 4xx → surface error, allow retry. The track row stays
-  `pending`; finalize is never called; GC cleans up after 1 h.
-- Finalize returns `424 upload_missing` → prompt user to re-upload (the
-  token probably expired before they finished).
+- `POST /tracks` times out / 4xx → surface error, allow retry. No row
+  is created on a 4xx; on a 5xx after the row was inserted the track
+  stays `pending` and is reachable via `?includePending=true` for retry
+  or delete from the Upload Progress screen.
+- Finalize returns `400 upload_missing` → the audio object is gone;
+  prompt the user to re-upload.
 - Finalize returns `409 track_already_finalized` → idempotent success,
   treat as OK.
 
@@ -1006,12 +968,13 @@ Failure modes the client must handle:
 ## 8. Streaming flow
 
 ```
-<audio>.src = (await GET /tracks/{id}/stream-url).url
+<audio src="/api/tracks/{id}/stream"></audio>
 ```
 
-R2 serves the bytes with Range support. The Worker is out of the hot path.
-Re-fetch `stream-url` on `<audio>` `error` or when the cached URL is
-within 60 s of expiry.
+The Worker proxies the R2 object as a `ReadableStream` and forwards
+HTTP Range requests so seeking and iOS background playback work
+naturally. The session cookie is first-party so `<audio>` requests are
+authenticated automatically — no extra fetch, no presigned URL refresh.
 
 Media Session metadata (title/artist/album) comes from the `TrackDto`
 returned by `GET /tracks/{id}`, not from the audio stream itself.
@@ -1048,7 +1011,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 422  | `cannot_self_downgrade`      | Admin tried to demote/deactivate themselves      |
 | 422  | `cannot_self_delete`         | Admin tried to delete themselves                 |
 | 422  | `cannot_remove_last_owner`   | Admin tried to remove/demote a tenant's last owner |
-| 424  | `upload_missing`             | `/finalize` but R2 object absent                 |
+| 400  | `upload_missing`             | `POST /tracks` with empty body, or `/finalize` when the R2 object is absent |
 | 429  | `rate_limited`               | Auth rate limit exceeded                         |
 | 500  | `internal_error`             | Fallback; logged with request id                 |
 
@@ -1080,7 +1043,7 @@ backend/src/
     tracks.type.ts
     tracks.dto.ts
     tracks.repository.ts
-    tracks.service.ts     presign, finalize, soft-delete, lyrics, covers, stream-url
+    tracks.service.ts     upload (Worker-proxied), finalize, soft-delete, lyrics, stream
     tracks.route.ts       /tracks/*
   playlists/
     playlists.orm.ts         playlists, playlist_tracks
