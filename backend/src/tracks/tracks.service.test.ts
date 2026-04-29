@@ -195,6 +195,32 @@ describe('tracks service', () => {
 			);
 		});
 
+		it('ignores LRC metadata tags when parsing synced lyrics status', async () => {
+			const repo = createRepo();
+			const r2 = createR2();
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+
+			const lrc = [
+				'[ti:Someone Like You]',
+				'[ar:Adele]',
+				'[by:SpotiFlac]',
+				'',
+				'[00:14.01]I heard that you\'re settled down',
+				'[00:21.03]That you found a girl and you\'re married now',
+				'[01:10.57]'
+			].join('\n');
+
+			await service.finalizeTrack({
+				trackId: tkid('trk_a'),
+				tenantId: tid('tnt_a'),
+				input: { durationMs: 180000, lyricsLrc: lrc }
+			});
+
+			expect(repo.finalizeTrack).toHaveBeenCalledWith(
+				expect.objectContaining({ lyricsStatus: 'synced' })
+			);
+		});
+
 		it('parses plain lyrics status', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
@@ -211,7 +237,23 @@ describe('tracks service', () => {
 			);
 		});
 
-		it('parses invalid lyrics status', async () => {
+		it('parses invalid lyrics status for bracket-only lines', async () => {
+			const repo = createRepo();
+			const r2 = createR2();
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+
+			await service.finalizeTrack({
+				trackId: tkid('trk_a'),
+				tenantId: tid('tnt_a'),
+				input: { durationMs: 180000, lyricsLrc: '[bad]\n[wrong]\n' }
+			});
+
+			expect(repo.finalizeTrack).toHaveBeenCalledWith(
+				expect.objectContaining({ lyricsStatus: 'invalid' })
+			);
+		});
+
+		it('parses plain lyrics status for brackets with text content', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
 			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
@@ -223,7 +265,39 @@ describe('tracks service', () => {
 			});
 
 			expect(repo.finalizeTrack).toHaveBeenCalledWith(
-				expect.objectContaining({ lyricsStatus: 'invalid' })
+				expect.objectContaining({ lyricsStatus: 'plain' })
+			);
+		});
+
+		it('classifies metadata-only LRC as none', async () => {
+			const repo = createRepo();
+			const r2 = createR2();
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+
+			await service.finalizeTrack({
+				trackId: tkid('trk_a'),
+				tenantId: tid('tnt_a'),
+				input: { durationMs: 180000, lyricsLrc: '[ti:Title]\n[ar:Artist]\n' }
+			});
+
+			expect(repo.finalizeTrack).toHaveBeenCalledWith(
+				expect.objectContaining({ lyricsStatus: 'none' })
+			);
+		});
+
+		it('classifies multi-timestamp lines as synced', async () => {
+			const repo = createRepo();
+			const r2 = createR2();
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+
+			await service.finalizeTrack({
+				trackId: tkid('trk_a'),
+				tenantId: tid('tnt_a'),
+				input: { durationMs: 180000, lyricsLrc: '[00:01.00][00:02.00]repeat\n' }
+			});
+
+			expect(repo.finalizeTrack).toHaveBeenCalledWith(
+				expect.objectContaining({ lyricsStatus: 'synced' })
 			);
 		});
 	});

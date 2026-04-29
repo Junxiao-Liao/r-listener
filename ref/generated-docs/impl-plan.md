@@ -396,12 +396,13 @@ can stream ready tracks without editing shared content.
 - **Audio MIME types**: `audio/mpeg`, `audio/mp4`, `audio/mp3`, `audio/ogg`,
   `audio/flac`, `audio/wav`, `audio/x-wav`, `audio/aac`,
   `audio/x-m4a`, `audio/webm`.
-- **Lyrics status detection**: Per-line parser. Each line is classified:
-  - Has `[mm:ss.xx]` format → line is LRC-tagged
-  - Empty/null overall → `none`
-  - ≥80% lines match LRC pattern → `synced`
-  - Non-empty but <80% LRC lines → `plain`
-  - Some `[brackets]` but malformed patterns → `invalid`
+- **Lyrics status detection**: Uses `lrc-kit` library for parsing, mirrored
+  client-side for preview:
+  - Empty/whitespace → `none`
+  - At least one timed lyric parsed by `lrc-kit` → `synced`
+  - Non-empty text with no timed lyrics → `plain`
+  - All non-metadata lines are empty bracket tags (no text after `]`) → `invalid`
+  - Metadata-only (e.g. `[ti:...]\n[ar:...]`) → `none`
 - **Browser metadata parsing**: Use `music-metadata-browser` library to extract
   title, artist, album, track number, genre, year, duration, embedded cover
   bytes, and embedded lyrics (ID3 USLT/SYLT) from all common audio formats

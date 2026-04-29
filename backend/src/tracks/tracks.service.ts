@@ -6,6 +6,7 @@ import type { CreateTrackInput, FinalizeTrackInput, LyricsInput, TrackQuery, Upd
 import type { ListTracksResult, TracksRepository } from './tracks.repository';
 import { createTracksRepository } from './tracks.repository';
 import type { LyricsStatus, TrackDto } from './tracks.type';
+import { Lrc } from 'lrc-kit';
 
 const MAX_AUDIO_BYTES = 100 * 1024 * 1024; // 100 MB
 
@@ -339,46 +340,34 @@ function parseRangeHeader(header: string): { offset: number; length?: number } |
 }
 
 function parseLyricsStatus(lyricsLrc: string | null): LyricsStatus {
-	if (!lyricsLrc || lyricsLrc.trim().length === 0) {
-		return 'none';
-	}
+	if (!lyricsLrc || lyricsLrc.trim().length === 0) return 'none';
 
+	const lrc = Lrc.parse(lyricsLrc);
+
+	if (lrc.lyrics.length > 0) return 'synced';
+
+	const metadataRe = /^\[[A-Za-z]+:[^\]]*\]$/;
 	const lines = lyricsLrc.split('\n');
-	const lrcLineRegex = /^\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/;
-	let lrcLineCount = 0;
-	let bracketLineCount = 0;
-	let totalLines = 0;
+	let hasValidText = false;
+	let hasBracketOnlyLines = false;
 
 	for (const rawLine of lines) {
 		const line = rawLine.trim();
 		if (line.length === 0) continue;
-		totalLines++;
+		if (metadataRe.test(line)) continue;
 
-		if (lrcLineRegex.test(line)) {
-			lrcLineCount++;
-		}
-
-		if (/^\[.*\]/.test(line)) {
-			bracketLineCount++;
-
-			if (!lrcLineRegex.test(line)) {
-				// Has brackets but doesn't match LRC timestamp format
-				return 'invalid';
+		const bracketEnd = line.indexOf(']');
+		if (line.startsWith('[') && bracketEnd >= 0) {
+			const afterBracket = line.slice(bracketEnd + 1).trim();
+			if (afterBracket.length === 0) {
+				hasBracketOnlyLines = true;
+				continue;
 			}
 		}
+		hasValidText = true;
 	}
 
-	if (totalLines === 0) {
-		return 'none';
-	}
-
-	if (lrcLineCount > 0 && lrcLineCount / totalLines >= 0.8) {
-		return 'synced';
-	}
-
-	if (bracketLineCount > 0 && lrcLineCount / totalLines < 0.8) {
-		return 'invalid';
-	}
-
-	return 'plain';
+	if (hasValidText) return 'plain';
+	if (hasBracketOnlyLines) return 'invalid';
+	return 'none';
 }

@@ -1,38 +1,39 @@
-// Browser-side lyrics helpers. Status detection mirrors the backend's
-// parseLyricsStatus rules so the user sees the same classification on Upload
-// Review as the server will derive on finalize.
+import { Lrc } from 'lrc-kit';
 
 export type LyricsStatus = 'none' | 'synced' | 'plain' | 'invalid';
 
-const LRC_LINE = /^\[(\d{1,3}):(\d{2})(?:\.(\d{1,3}))?\]/;
-const ANY_BRACKET_LINE = /^\[.*\]/;
+const METADATA_RE = /^\[[A-Za-z]+:[^\]]*\]$/;
 
 export function detectLyricsStatus(input: string | null | undefined): LyricsStatus {
 	if (!input || input.trim().length === 0) return 'none';
 
+	const lrc = Lrc.parse(input);
+
+	if (lrc.lyrics.length > 0) return 'synced';
+
 	const lines = input.split(/\r?\n/);
-	let total = 0;
-	let lrc = 0;
-	let bracketed = 0;
+	let hasValidText = false;
+	let hasBracketOnlyLines = false;
 
 	for (const raw of lines) {
 		const line = raw.trim();
 		if (line.length === 0) continue;
-		total++;
+		if (METADATA_RE.test(line)) continue;
 
-		const isLrc = LRC_LINE.test(line);
-		if (isLrc) lrc++;
-
-		if (ANY_BRACKET_LINE.test(line)) {
-			bracketed++;
-			if (!isLrc) return 'invalid';
+		const bracketEnd = line.indexOf(']');
+		if (line.startsWith('[') && bracketEnd >= 0) {
+			const afterBracket = line.slice(bracketEnd + 1).trim();
+			if (afterBracket.length === 0) {
+				hasBracketOnlyLines = true;
+				continue;
+			}
 		}
+		hasValidText = true;
 	}
 
-	if (total === 0) return 'none';
-	if (lrc > 0 && lrc / total >= 0.8) return 'synced';
-	if (bracketed > 0 && lrc / total < 0.8) return 'invalid';
-	return 'plain';
+	if (hasValidText) return 'plain';
+	if (hasBracketOnlyLines) return 'invalid';
+	return 'none';
 }
 
 export type SyltFrame = { timeMs: number; text: string };
@@ -55,23 +56,9 @@ function pad2(n: number): string {
 
 export type LrcLine = { timeMs: number; text: string };
 
-// Parse synced LRC into ordered { timeMs, text } pairs. Lines without a
-// matching stamp are dropped. Used by the lyrics view; safe to call on plain
-// text (returns []).
 export function parseSyncedLrc(input: string): LrcLine[] {
-	const out: LrcLine[] = [];
-	for (const raw of input.split(/\r?\n/)) {
-		const line = raw.trim();
-		const match = LRC_LINE.exec(line);
-		if (!match) continue;
-		const minutes = Number(match[1]);
-		const seconds = Number(match[2]);
-		const fractionRaw = match[3] ?? '0';
-		const fraction = Number(fractionRaw.padEnd(3, '0').slice(0, 3));
-		const timeMs = minutes * 60_000 + seconds * 1_000 + fraction;
-		const text = line.slice(match[0].length).trim();
-		out.push({ timeMs, text });
-	}
-	out.sort((a, b) => a.timeMs - b.timeMs);
-	return out;
+	const lrc = Lrc.parse(input);
+	return lrc.lyrics
+		.map((l) => ({ timeMs: l.timestamp * 1000, text: l.content }))
+		.sort((a, b) => a.timeMs - b.timeMs);
 }

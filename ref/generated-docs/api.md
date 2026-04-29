@@ -513,11 +513,12 @@ Errors:
 > `music-metadata-browser`) and we validate range. A later Queue
 > consumer can re-derive authoritatively.
 
-**Lyrics status detection** (per-line, mirrored client-side for preview):
+**Lyrics status detection** (uses `lrc-kit`, mirrored client-side for preview):
 - empty/whitespace → `none`
-- ≥80% of non-empty lines match `[mm:ss(.xx)?]` → `synced`
-- non-empty text with no brackets → `plain`
-- bracketed lines that aren't valid LRC stamps → `invalid`
+- at least one timed lyric parsed by `lrc-kit` → `synced`
+- unsynced text with real text content → `plain`
+- all non-metadata lines are empty bracket tags (no text after `]`) → `invalid`
+- metadata-only (e.g. `[ti:...]\n[ar:...]`) → `none`
 
 #### `PATCH /tracks/{id}`
 
