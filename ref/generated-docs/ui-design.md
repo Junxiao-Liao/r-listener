@@ -32,11 +32,12 @@ Overall mobile app structure:
 Use a bottom navigation bar with:
 - Home
 - Library
-- Upload
 - Playlists
 - Settings
 
-(There is no "Admin" tab. Platform admins reach the admin area via Settings → Admin.)
+Upload is not a bottom tab. Editors reach upload from the Home shortcut or
+Library upload action. There is no "Admin" tab. Platform admins reach the admin
+area via Settings → Admin.
 
 Show a persistent mini-player above the bottom navigation whenever appropriate. The mini-player should include tiny album art, track title, artist, play/pause button, and an expand affordance.
 
@@ -74,12 +75,13 @@ after Sign In.
 Purpose: main landing page after workspace selection.
 UI elements:
 - Greeting/header (includes active workspace name)
-- Search entry point (backed by a server-side search endpoint across tracks/playlists)
+- Search entry point that navigates to a dedicated Search page backed by the
+  server-side tracks/playlists search endpoint
+- Shortcut row with concise labels: Library, Playlists, Player, Upload
 - Continue Listening card (populated from server-side playback history)
 - Recently Played horizontal list (server-side history)
 - Recently Uploaded horizontal list
 - Recently Updated Playlists section
-- Upload shortcut card
 - Bottom navigation
 - Mini-player if something is playing
 Do not include public recommendations or trending music.
@@ -497,6 +499,7 @@ Arrange the design board in sections from left to right or top to bottom:
 Use clear section labels and page labels. Use connector arrows to show important flows:
 - Sign In → Tenant Picker → Home (single-workspace users skip the picker)
 - Settings → Switch Workspace → Tenant Picker
+- Home → Search
 - Home → Full Player
 - Mini-player → Full Player
 - Library → Music Detail → Edit Metadata

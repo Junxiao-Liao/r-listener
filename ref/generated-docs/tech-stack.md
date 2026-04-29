@@ -90,6 +90,8 @@ Deployment:
 Tests:
   Vitest for backend and frontend unit/service coverage
   Playwright for critical mobile-first browser flows
+  Playwright runs against `vite preview` after `vite build`; tests that need
+  authenticated app data mock `/api/*` for deterministic browser coverage
 
 Bootstrap:
   First admin, first tenant, and initial owner membership are created by

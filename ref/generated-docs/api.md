@@ -746,9 +746,9 @@ Clears the current user's queue for the active tenant. Response: `204`.
 
 ### 5.6 Unified search
 
-The Home page search box queries tracks and playlists together. Library
-and Playlists pages can keep using the per-resource `q` on
-`GET /tracks` and `GET /playlists` for filtered lists.
+The Home page search box navigates to `/search?q=...`, where the SPA queries
+tracks and playlists together. Library and Playlists pages can keep using the
+per-resource `q` on `GET /tracks` and `GET /playlists` for filtered lists.
 
 #### `GET /search`
 Query: `q` (required, ≥ 1 char), `limit` (default 20, max 50), `cursor`,
@@ -767,7 +767,10 @@ Response `200`:
 ```
 
 Ranking: prefix match on title/name beats substring match; ties broken
-by `updatedAt:desc`. Implementation is a simple SQL query today (D1 has
+by `updatedAt:desc`. Track search matches title, artist, and album. Playlist
+search matches name and description. The response remains a mixed `items`
+array; the current UI groups the hits into Tracks and Playlists sections.
+Implementation is simple D1 SQL plus an in-service ranking pass today (D1 has
 no full-text); revisit if the library grows beyond a few thousand rows.
 
 Errors: `400 validation_failed` if `q` empty.
@@ -1068,9 +1071,10 @@ backend/src/
     queue.service.ts     add/remove/reorder/current, dense position DTOs
     queue.route.ts       /queue/*
   search/
-    search.type.ts    SearchHitDto
-    search.dto.ts
-    search.service.ts ranking heuristic across tracks + playlists
+    search.type.ts    SearchHitDto, SearchResultDto
+    search.dto.ts     q/limit/cursor/kinds query validation
+    search.repository.ts SQL candidate loading + ranking helper
+    search.service.ts trims/validates q and delegates search
     search.route.ts   /search
   prefs/
     prefs.orm.ts         user_preferences

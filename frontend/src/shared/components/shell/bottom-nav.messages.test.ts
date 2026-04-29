@@ -5,7 +5,6 @@ import zh from '../../../../messages/zh.json';
 const bottomNavKeys = [
 	'nav_home',
 	'nav_library',
-	'nav_upload',
 	'nav_playlists',
 	'nav_settings'
 ] as const;

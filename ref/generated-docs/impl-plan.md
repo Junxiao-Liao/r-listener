@@ -619,13 +619,13 @@ Frontend:
 
 - Implement Home page:
   - Greeting with active workspace.
-  - Search entry.
+  - Search entry that navigates to `/search?q=...`.
   - Continue Listening.
   - Recently Played.
   - Recently Uploaded.
   - Recently Updated Playlists.
-  - Upload shortcut.
-- Implement search result UI for tracks and playlists.
+  - Concise shortcut buttons: Library, Playlists, Player, Upload.
+- Implement dedicated `/search` result UI with grouped tracks and playlists.
 - Add empty/loading/error states.
 
 Tests first:
@@ -635,11 +635,15 @@ Tests first:
 - Wrong-tenant and soft-deleted resources do not appear.
 - Home renders empty states for a new tenant.
 - Home navigation reaches upload, library, playlist, and player flows.
+- Playwright mocks `/api/*` and runs against the production preview server
+  (`build` then `vite preview`) to avoid dev-server HMR churn.
 
 Acceptance:
 
 - Home is useful for a tenant with and without music.
 - Search finds only private active-tenant content.
+- Bottom navigation contains Home, Library, Playlists, and Settings. Upload is
+  reached from Home and Library for editors.
 
 ### 9. Admin Slice
 

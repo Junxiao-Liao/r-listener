@@ -2,7 +2,6 @@
 	import { page } from '$app/state';
 	import House from '@lucide/svelte/icons/house';
 	import Library from '@lucide/svelte/icons/library';
-	import Upload from '@lucide/svelte/icons/upload';
 	import ListMusic from '@lucide/svelte/icons/list-music';
 	import Settings from '@lucide/svelte/icons/settings';
 	import * as m from '$shared/paraglide/messages';
@@ -19,7 +18,6 @@
 	const fallback: Tab[] = [
 		{ href: '/', label: m.nav_home, icon: House },
 		{ href: '/library', label: m.nav_library, icon: Library },
-		{ href: null, label: m.nav_upload, icon: Upload },
 		{ href: '/playlists', label: m.nav_playlists, icon: ListMusic },
 		{ href: '/settings', label: m.nav_settings, icon: Settings }
 	];
@@ -37,7 +35,7 @@
 </script>
 
 <nav
-	class="grid grid-cols-5"
+	class="grid grid-cols-4"
 	style="height: var(--bottom-nav-h);"
 	aria-label="Primary"
 >
