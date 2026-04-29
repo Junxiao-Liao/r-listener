@@ -75,8 +75,8 @@ Cursor-based. Every list endpoint accepts:
 - `limit` — integer, default 50, max 200
 - `cursor` — opaque string from a prior response's `nextCursor`
 
-Cursors are server-signed opaque blobs encoding (sort-key, id). Clients
-never interpret them.
+Cursors are opaque server-generated blobs encoding the next page boundary.
+Clients never interpret them.
 
 ### 1.6 Authentication
 
@@ -205,7 +205,7 @@ type TrackDto = {
   genre: string | null;
   year: number | null;
   durationMs: number | null;
-  coverUrl: string | null;    // presigned cover image GET URL, expires like stream-url
+  coverUrl: string | null;    // currently null; cover support is deferred
   lyricsLrc: string | null;   // raw lyric text, may be LRC or plain text
   lyricsStatus: "none" | "synced" | "plain" | "invalid";
   contentType: string;        // common audio MIME: MP3, M4A/MP4, AAC, WAV, FLAC, OGG/Opus, WebM
@@ -663,7 +663,7 @@ Batched ingest. Request:
   `lastPositionMs` set from the event with the latest `startedAt`. An
   `ended` event clears `lastPositionMs` to 0 so the track does not appear
   in Continue Listening but still counts as Recently Played.
-- Tracks not visible to the caller (wrong tenant, soft-deleted) are
+- Tracks not visible to the caller (wrong tenant, pending, soft-deleted) are
   silently dropped; no 4xx for stale client buffers.
 
 Response: `204`.
@@ -677,8 +677,8 @@ Response `200`: `{ items: RecentTrackDto[], nextCursor }`, sorted
 
 #### `GET /me/continue-listening`
 Query: `limit` (default 10, max 20). No cursor (short list by design).
-Response `200`: `{ items: RecentTrackDto[] }`, sorted `lastPlayedAt:desc`,
-including only rows with `lastPositionMs > 0` and
+Response `200`: `{ items: RecentTrackDto[], nextCursor: null }`, sorted
+`lastPlayedAt:desc`, including only rows with `lastPositionMs > 0` and
 `lastPositionMs < track.durationMs - 15_000` (i.e. meaningfully resumable).
 
 ### 5.5 Queue
@@ -1004,7 +1004,7 @@ returned by `GET /tracks/{id}`, not from the audio stream itself.
 | 409  | `playlist_name_conflict`     | Create/rename into an existing name              |
 | 409  | `track_already_in_playlist`  | Duplicate playlist-track                         |
 | 409  | `track_already_finalized`    | Second `/finalize` call                          |
-| 409  | `track_not_ready`            | Stream or queue operation references pending track |
+| 404/409 | `track_not_ready`         | Stream or queue operation references pending track |
 | 413  | `payload_too_large`          | Upload exceeds `MAX_AUDIO_BYTES`                 |
 | 415  | `unsupported_media_type`     | Non-allowed audio MIME                           |
 | 422  | `weak_password`              | Password fails policy                            |

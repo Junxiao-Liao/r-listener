@@ -2,22 +2,42 @@
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
 	import * as m from '$shared/paraglide/messages';
+	import { getPlayer } from '$shared/player/player.context';
+	import { usePlayListMutation } from '$shared/player/play-list';
+	import TrackActions from '$shared/player/TrackActions.svelte';
 	import type { TrackDto } from '$shared/types/dto';
 
-	type Props = { track: TrackDto };
-	let { track }: Props = $props();
+	type Props = { track: TrackDto; siblings?: TrackDto[] };
+	let { track, siblings = [track] }: Props = $props();
+
+	const player = getPlayer();
+	const playList = usePlayListMutation();
 
 	const subtitle = $derived(
 		[track.artist, track.album].filter((v): v is string => !!v && v.length > 0).join(' · ')
 	);
+
+	const playableSiblings = $derived(siblings.filter((t) => t.status === 'ready'));
+
+	async function playFromVisibleList() {
+		if (track.status !== 'ready') return;
+		const state = await $playList.mutateAsync({
+			tracks: playableSiblings.length > 0 ? playableSiblings : [track],
+			startTrackId: track.id
+		});
+		player.setQueueState(state, { autoplay: true });
+	}
 </script>
 
-<a
-	href={`/library/${track.id}`}
-	class="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted focus-visible:bg-muted focus:outline-none"
->
+
+<div class="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted focus-within:bg-muted">
 	<CoverPlaceholder seed={track.title} class="size-12 text-lg" />
-	<span class="flex min-w-0 flex-1 flex-col">
+	<button
+		type="button"
+		disabled={track.status !== 'ready' || $playList.isPending}
+		class="flex min-w-0 flex-1 flex-col text-left disabled:cursor-not-allowed disabled:opacity-70"
+		onclick={playFromVisibleList}
+	>
 		<span class="flex items-center gap-2 text-sm font-medium">
 			<span class="truncate">{track.title}</span>
 			{#if track.status === 'pending'}
@@ -29,8 +49,9 @@
 		{#if subtitle.length > 0}
 			<span class="truncate text-xs text-muted-foreground">{subtitle}</span>
 		{/if}
-	</span>
+	</button>
 	<span class="shrink-0 text-xs text-muted-foreground tabular-nums">
 		{formatDurationMs(track.durationMs)}
 	</span>
-</a>
+	<TrackActions {track} siblings={playableSiblings} />
+</div>

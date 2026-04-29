@@ -26,7 +26,7 @@ Opaque text primary keys, prefixed by entity for human grepability:
 | `playlists`         | `pls_`  | `pls_018f0000-0000-7000-8000-000000000000` |
 | `playlist_tracks`   | `plt_`  | `plt_018f0000-0000-7000-8000-000000000000` |
 | `playback_history`  | —       | composite `(user, tenant, track)` |
-| `queue_items`       | `que_`  | `que_018f0000-0000-7000-8000-000000000000` |
+| `queue_items`       | `qi_`   | `qi_018f0000-0000-7000-8000-000000000000`  |
 | `user_preferences`  | —       | `user_id` is the PK           |
 | `audit_logs`        | `aud_`  | `aud_018f0000-0000-7000-8000-000000000000` |
 
@@ -246,8 +246,8 @@ export const tracks = sqliteTable('tracks', {
 }));
 ```
 
-`TrackDto` exposes `trackNumber`, `genre`, `year`, a derived presigned
-`coverUrl`, `lyricsLrc`, and `lyricsStatus`. The service derives
+`TrackDto` exposes `trackNumber`, `genre`, `year`, `coverUrl` (currently
+`null` until cover support ships), `lyricsLrc`, and `lyricsStatus`. The service derives
 `lyricsStatus` whenever lyrics are created, replaced, removed, or finalized.
 
 Users are soft-deleted, not physically deleted, so `uploader_id` remains
@@ -352,9 +352,10 @@ to the active tenant. Queue rows may only reference ready, non-deleted tracks in
 the same tenant; that readiness rule is enforced in the queue service because it
 depends on track status and soft-delete state.
 
-Internal column `position_frac` mirrors playlist ordering: reorders usually touch
-one row, while DTOs expose dense 1-based `position` via
-`ROW_NUMBER() OVER (PARTITION BY user_id, tenant_id ORDER BY position_frac)`.
+Internal column `position_frac` stores the persisted ordering key. The queue
+service currently compacts affected queues back to dense numeric values after
+add, reorder, and delete operations, while DTOs expose dense 1-based `position`
+by reading rows ordered by `position_frac`.
 
 ```ts
 export const queueItems = sqliteTable('queue_items', {
@@ -378,13 +379,12 @@ export const queueItems = sqliteTable('queue_items', {
 ```
 
 Operations:
-- Add appends after `max(position_frac)` or inserts at the midpoint around a
-  requested 1-based position.
-- Reorder computes a new midpoint against neighbouring queue rows and rebalances
-  the partition when gaps become too small.
-- Setting `is_current = true` first clears sibling current markers inside the
-  same transaction.
-- Remove/clear soft-delete queue rows and compact DTO positions on the next read.
+- Add appends or inserts at a requested 1-based position, then rewrites the
+  affected user's active-tenant queue to dense `position_frac` values.
+- Reorder rewrites the affected queue to dense `position_frac` values.
+- Setting `is_current = true` first clears sibling current markers for the same
+  `(user_id, tenant_id)`.
+- Remove/clear soft-delete queue rows; remove also compacts the remaining queue.
 
 ### 2.10 `user_preferences`
 
@@ -457,8 +457,8 @@ because SQLite cannot express them as constraints:
    `role IN ('owner', 'member')`, unless the caller is a platform admin.
    Viewers may still write personal listener state: playback history, queue,
    preferences, and password changes.
-5. **Track readiness on stream/queue.** `GET /tracks/{id}/stream-url`
-   rejects with 409 `track_not_ready` when `status != 'ready'`. Queue add
+5. **Track readiness on stream/queue.** `GET /tracks/{id}/stream`
+   rejects with 404 `track_not_ready` when `status != 'ready'`. Queue add
    rejects pending, soft-deleted, or wrong-tenant tracks. Pending uploads are
    filtered from `GET /tracks` unless `?includePending=true`; that flag is
    editor/admin-only.
@@ -552,8 +552,8 @@ The DB/UI-required contracts are reflected in `api.md`:
 - `PlaylistDto` exposes `totalDurationMs`, computed at read time.
 - `QueueItemDto` and `QueueStateDto` expose persisted per-user/per-tenant queue
   state with dense positions and a single current item.
-- Track upload supports optional cover upload; existing tracks support
-  cover upload/finalize/remove and lyrics upload/replace/remove.
+- Cover upload/finalize/remove is deferred; `coverUrl` is currently `null`.
+  Existing tracks support lyrics upload/replace/remove.
 - `GET/PATCH /me/preferences` exists and signin embeds `preferences`.
 - Admin list DTOs expose the summary counts needed by the mobile admin UI.
 - Admin user detail embeds memberships, and tenant creation requires an

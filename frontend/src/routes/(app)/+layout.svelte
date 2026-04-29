@@ -3,6 +3,8 @@
 	import { page } from '$app/state';
 	import AppShell from '$shared/components/shell/AppShell.svelte';
 	import BottomNav from '$shared/components/shell/BottomNav.svelte';
+	import MiniPlayer from '$shared/player/MiniPlayer.svelte';
+	import PlayerHost from '$shared/player/PlayerHost.svelte';
 	import { useSessionQuery } from '$shared/query/session.query';
 
 	let { children } = $props();
@@ -26,15 +28,27 @@
 			!!$session.data &&
 			(!!$session.data.activeTenantId || page.url.pathname === '/tenants')
 	);
+	const showMiniPlayer = $derived(
+		showNav &&
+			ready &&
+			!page.url.pathname.startsWith('/player') &&
+			page.url.pathname !== '/tenants' &&
+			($session.data?.preferences.showMiniPlayer ?? true)
+	);
 </script>
 
-<AppShell>
-	{#if ready}
-		{@render children()}
-	{/if}
-	{#snippet bottomNav()}
-		{#if showNav && ready}
-			<BottomNav />
+<PlayerHost>
+	<AppShell>
+		{#if ready}
+			{@render children()}
 		{/if}
-	{/snippet}
-</AppShell>
+		{#snippet bottomNav()}
+			{#if showNav && ready}
+				{#if showMiniPlayer}
+					<MiniPlayer />
+				{/if}
+				<BottomNav />
+			{/if}
+		{/snippet}
+	</AppShell>
+</PlayerHost>

@@ -157,3 +157,45 @@ export type FinalizeTrackInput = {
 	genre?: string;
 	year?: number;
 };
+
+// Queue --------------------------------------------------------------
+export type QueueItemDto = {
+	id: Id<'queue_item'>;
+	tenantId: Id<'tenant'>;
+	userId: Id<'user'>;
+	trackId: Id<'track'>;
+	position: number;
+	isCurrent: boolean;
+	addedAt: Iso8601;
+	updatedAt: Iso8601;
+	track: TrackDto;
+};
+
+export type QueueStateDto = {
+	items: QueueItemDto[];
+	currentItemId: Id<'queue_item'> | null;
+	updatedAt: Iso8601 | null;
+};
+
+// Playback -----------------------------------------------------------
+export type PlaybackEventKind = 'play' | 'progress' | 'ended';
+
+export type PlaybackEventInput = {
+	trackId: Id<'track'>;
+	startedAt: Iso8601;
+	positionMs: number;
+	event: PlaybackEventKind;
+	playlistId: Id<'playlist'> | null;
+};
+
+export type RecentTrackDto = {
+	track: TrackDto;
+	lastPlayedAt: Iso8601;
+	lastPositionMs: number;
+	playlistId: Id<'playlist'> | null;
+};
+
+export type RecentTracksResponse = {
+	items: RecentTrackDto[];
+	nextCursor: string | null;
+};

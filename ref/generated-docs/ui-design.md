@@ -104,6 +104,8 @@ UI elements:
 - Empty state variant if no music exists
 Possible row menu actions:
 - Play
+- Play Next
+- Add to Queue
 - Add to Playlist
 - View Lyrics
 - Edit Metadata
@@ -126,6 +128,7 @@ UI elements:
   - Invalid Lyrics
 - Primary Play button
 - Secondary actions:
+  - Add to Queue
   - Edit Metadata
   - Upload/Replace Lyrics
   - Add to Playlist
@@ -263,6 +266,7 @@ UI elements:
 - Edit/reorder mode entry
 Track menu actions:
 - Play Next
+- Add to Queue
 - Remove from Playlist
 - View Details
 - View Lyrics

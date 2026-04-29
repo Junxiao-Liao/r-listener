@@ -53,7 +53,7 @@
 		<ul class="flex flex-col gap-1">
 			{#each items as track (track.id)}
 				<li>
-					<TrackRow {track} />
+					<TrackRow {track} siblings={items} />
 				</li>
 			{/each}
 		</ul>

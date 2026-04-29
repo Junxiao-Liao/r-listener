@@ -528,7 +528,8 @@ Frontend:
 - Implement queue page with CRUD-backed add/remove/reorder/current behavior.
 - Register Media Session metadata and handlers for play, pause, previous, and
   next.
-- Re-fetch stream URLs when close to expiry or on audio error.
+- Treat `/api/tracks/{id}/stream` as a stable Worker-proxied stream URL; reload
+  the audio element on error.
 - Batch playback progress events and flush on interval and `pagehide`.
 
 Tests first:
@@ -807,7 +808,7 @@ Manual:
 - iOS lock-screen controls.
 - Android media controls.
 - Large upload retry/failure.
-- Expired stream URL recovery.
+- Stream error recovery by reloading the stable Worker-proxied stream URL.
 
 ## Assumptions
 

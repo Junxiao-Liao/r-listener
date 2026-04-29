@@ -17,3 +17,8 @@ export type RecentTrackDto = {
 	lastPositionMs: number;
 	playlistId: Id<'playlist'> | null;
 };
+
+export type RecentTracksPage = {
+	items: RecentTrackDto[];
+	nextCursor: string | null;
+};

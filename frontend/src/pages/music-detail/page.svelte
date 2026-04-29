@@ -4,6 +4,9 @@
 	import { Button } from '$shared/components/ui/button';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatBytes, formatDurationMs } from '$shared/format/duration';
+	import { getPlayer } from '$shared/player/player.context';
+	import { usePlayListMutation } from '$shared/player/play-list';
+	import { useAddQueueItemsMutation } from '$shared/query/queue.query';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import {
 		useDeleteTrackMutation,
@@ -17,15 +20,32 @@
 
 	const session = useSessionQuery();
 	const editor = $derived(isEditor($session.data));
+	const player = getPlayer();
 
 	const track = useTrackQuery(() => trackId);
 	const remove = useDeleteTrackMutation();
+	const playList = usePlayListMutation();
+	const addToQueue = useAddQueueItemsMutation();
 
 	let confirmingDelete = $state(false);
 
 	async function confirmDelete() {
 		await $remove.mutateAsync({ trackId });
 		void goto('/library', { replaceState: true });
+	}
+
+	async function playNow() {
+		const t = $track.data;
+		if (!t || t.status !== 'ready') return;
+		const state = await $playList.mutateAsync({ tracks: [t], startTrackId: t.id });
+		player.setQueueState(state, { autoplay: true });
+	}
+
+	async function appendToQueue() {
+		const t = $track.data;
+		if (!t || t.status !== 'ready') return;
+		const state = await $addToQueue.mutateAsync({ trackIds: [t.id], position: null });
+		player.setQueueState(state);
 	}
 
 	const subtitle = $derived(
@@ -65,12 +85,19 @@
 		</header>
 
 		{#if t.status === 'ready'}
-			<audio
-				class="w-full"
-				controls
-				preload="metadata"
-				src={`/api/tracks/${t.id}/stream`}
-			></audio>
+			<div class="flex flex-col gap-2 sm:flex-row">
+				<Button disabled={$playList.isPending} onclick={playNow} class="sm:flex-1">
+					{m.queue_play_now()}
+				</Button>
+				<Button
+					variant="outline"
+					disabled={$addToQueue.isPending}
+					onclick={appendToQueue}
+					class="sm:flex-1"
+				>
+					{m.queue_add_to_end()}
+				</Button>
+			</div>
 		{:else}
 			<p class="rounded-md bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
 				{m.track_pending_hint()}

@@ -12,6 +12,8 @@ import { prefsRoute } from './prefs/prefs.route';
 import { createAdminRoute } from './admin/admin.route';
 import type { AdminService } from './admin/admin.service';
 import { tracksRoute } from './tracks/tracks.route';
+import { playbackRoute } from './playback/playback.route';
+import { queueRoute } from './queue/queue.route';
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
@@ -35,6 +37,8 @@ export function createApp(options: AppOptions = {}) {
 	api.route('/', prefsRoute);
 	api.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
 	api.route('/', tracksRoute);
+	api.route('/', playbackRoute);
+	api.route('/', queueRoute);
 
 	options.configure?.(api);
 
