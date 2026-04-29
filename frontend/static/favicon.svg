@@ -1,0 +1,66 @@
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#151A3D"/>
+      <stop offset="0.55" stop-color="#202A63"/>
+      <stop offset="1" stop-color="#111827"/>
+    </linearGradient>
+
+    <linearGradient id="accent" x1="156" y1="128" x2="366" y2="384" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#7DD3FC"/>
+      <stop offset="0.45" stop-color="#A78BFA"/>
+      <stop offset="1" stop-color="#34D399"/>
+    </linearGradient>
+
+    <filter id="softShadow" x="80" y="72" width="360" height="392" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="18" stdDeviation="18" flood-color="#000000" flood-opacity="0.28"/>
+    </filter>
+  </defs>
+
+  <!-- App tile -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Soft glow -->
+  <circle cx="170" cy="132" r="96" fill="#7DD3FC" opacity="0.12"/>
+  <circle cx="368" cy="380" r="118" fill="#A78BFA" opacity="0.13"/>
+
+  <!-- Private capsule / shield form -->
+  <path
+    d="M256 86C316 118 370 124 394 126C399 127 403 131 403 136V245C403 333 342 395 256 428C170 395 109 333 109 245V136C109 131 113 127 118 126C142 124 196 118 256 86Z"
+    fill="#FFFFFF"
+    opacity="0.08"
+    filter="url(#softShadow)"
+  />
+
+  <path
+    d="M256 105C309 132 351 138 374 141V245C374 316 326 369 256 399C186 369 138 316 138 245V141C161 138 203 132 256 105Z"
+    stroke="url(#accent)"
+    stroke-width="18"
+    stroke-linejoin="round"
+  />
+
+  <!-- Waveform -->
+  <path
+    d="M157 267C174 247 188 247 204 267C221 288 235 288 252 267C269 247 283 247 300 267C317 288 331 288 355 258"
+    stroke="#FFFFFF"
+    stroke-opacity="0.38"
+    stroke-width="16"
+    stroke-linecap="round"
+  />
+
+  <!-- Music note -->
+  <path
+    d="M306 158V304C306 336 281 362 248 362C219 362 196 344 196 319C196 292 222 272 253 272C264 272 274 274 282 279V185L343 173C355 171 365 180 365 192V207C365 217 358 225 348 227L306 235V158Z"
+    fill="url(#accent)"
+  />
+
+  <!-- Note cut highlight -->
+  <path
+    d="M306 185L350 176C357 175 363 180 363 187V199C363 205 359 210 353 211L306 220V185Z"
+    fill="#FFFFFF"
+    opacity="0.26"
+  />
+
+  <!-- Inner privacy dot -->
+  <circle cx="256" cy="317" r="24" fill="#FFFFFF" opacity="0.18"/>
+</svg>
