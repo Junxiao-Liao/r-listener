@@ -23,7 +23,7 @@ export function useUpdatePreferencesMutation() {
 				applyTheme(preferences.theme);
 			}
 			if (preferences.language) {
-				void setLocale(preferences.language, { reload: false });
+				void setLocale(preferences.language);
 			}
 		}
 	});
