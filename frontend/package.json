@@ -37,10 +37,11 @@
 		"@tanstack/svelte-query": "^5.62.7",
 		"bits-ui": "^2.18.0",
 		"clsx": "^2.1.1",
+		"lrc-kit": "^1.2.1",
 		"music-metadata-browser": "^2.5.11",
+		"svelte-dnd-action": "^0.9.69",
 		"tailwind-merge": "^3.5.0",
 		"tailwind-variants": "^3.2.2",
-		"lrc-kit": "^1.2.1",
 		"zod": "^4.3.6"
 	}
 }

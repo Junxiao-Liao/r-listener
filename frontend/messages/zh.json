@@ -180,5 +180,62 @@
 
 	"upload_stuck_title": "服务器上的待处理上传",
 	"upload_stuck_loading": "正在查询…",
-	"upload_stuck_none": "没有未处理的上传。"
+	"upload_stuck_none": "没有未处理的上传。",
+
+	"playlists_title": "播放列表",
+	"playlists_create": "新建播放列表",
+	"playlists_search_placeholder": "搜索播放列表",
+	"playlists_empty_title": "还没有播放列表",
+	"playlists_empty_hint": "新建一个播放列表来整理音乐。",
+	"playlists_track_count": "{count} 首",
+	"playlists_track_count_one": "1 首",
+	"playlists_loading": "加载中…",
+	"playlists_error": "无法加载播放列表。",
+
+	"playlist_create_title": "新建播放列表",
+	"playlist_create_save": "创建",
+	"playlist_create_cancel": "取消",
+	"playlist_field_name": "名称",
+	"playlist_field_description": "描述",
+	"playlist_field_description_optional": "描述(可选)",
+	"playlist_name_required": "请填写名称。",
+	"playlist_name_conflict": "已存在同名播放列表。",
+
+	"playlist_edit_title": "编辑播放列表",
+	"playlist_edit_save": "保存",
+	"playlist_edit_cancel": "取消",
+	"playlist_edit_delete": "删除播放列表",
+	"playlist_edit_delete_confirm": "删除此播放列表?",
+	"playlist_edit_delete_confirm_body": "音乐仍保留在曲库中。此操作不可撤销。",
+	"playlist_edit_delete_yes": "删除",
+	"playlist_edit_delete_no": "取消",
+
+	"playlist_detail_play": "播放",
+	"playlist_detail_add_music": "添加音乐",
+	"playlist_detail_reorder": "调整顺序",
+	"playlist_detail_edit": "编辑",
+	"playlist_detail_empty": "此播放列表为空。",
+	"playlist_detail_loading": "加载中…",
+	"playlist_detail_error": "无法加载播放列表。",
+	"playlist_detail_total_duration": "共 {duration}",
+	"playlist_track_remove": "从播放列表中移除",
+
+	"playlist_add_music_title": "添加音乐",
+	"playlist_add_music_search": "搜索音乐",
+	"playlist_add_music_already_added": "已在播放列表中",
+	"playlist_add_music_selected": "已选择 {count} 首",
+	"playlist_add_music_add_selected": "添加",
+	"playlist_add_music_empty": "没有匹配的音乐。",
+	"playlist_add_music_no_library": "曲库为空。",
+
+	"playlist_reorder_title": "调整顺序",
+	"playlist_reorder_done": "完成",
+	"playlist_reorder_hint": "拖动以调整顺序,自动保存。",
+
+	"track_action_add_to_playlist": "添加到播放列表",
+	"playlist_picker_title": "添加到播放列表",
+	"playlist_picker_empty": "还没有播放列表。",
+	"playlist_picker_create": "新建播放列表",
+	"playlist_picker_added": "已添加",
+	"playlist_picker_already_added": "已在列表中"
 }

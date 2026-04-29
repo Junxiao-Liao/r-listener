@@ -199,3 +199,51 @@ export type RecentTracksResponse = {
 	items: RecentTrackDto[];
 	nextCursor: string | null;
 };
+
+// Playlists ----------------------------------------------------------
+export type PlaylistDto = {
+	id: Id<'playlist'>;
+	tenantId: Id<'tenant'>;
+	name: string;
+	description: string | null;
+	trackCount: number;
+	totalDurationMs: number;
+	createdAt: Iso8601;
+	updatedAt: Iso8601;
+};
+
+export type PlaylistTrackDto = {
+	playlistId: Id<'playlist'>;
+	trackId: Id<'track'>;
+	position: number;
+	addedAt: Iso8601;
+	track: TrackDto;
+};
+
+export type PlaylistListResponse = {
+	items: PlaylistDto[];
+	nextCursor: string | null;
+};
+
+export type PlaylistTrackListResponse = {
+	items: PlaylistTrackDto[];
+	nextCursor: string | null;
+};
+
+export type PlaylistSortField = 'name' | 'createdAt' | 'updatedAt';
+export type PlaylistSort = `${PlaylistSortField}:${'asc' | 'desc'}`;
+
+export type CreatePlaylistInput = {
+	name: string;
+	description?: string | null;
+};
+
+export type UpdatePlaylistInput = {
+	name?: string;
+	description?: string | null;
+};
+
+export type AddPlaylistTrackInput = {
+	trackId: Id<'track'>;
+	position?: number | null;
+};

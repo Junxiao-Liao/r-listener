@@ -180,5 +180,62 @@
 
 	"upload_stuck_title": "Stuck pending uploads",
 	"upload_stuck_loading": "Checking server…",
-	"upload_stuck_none": "Nothing pending on the server."
+	"upload_stuck_none": "Nothing pending on the server.",
+
+	"playlists_title": "Playlists",
+	"playlists_create": "Create playlist",
+	"playlists_search_placeholder": "Search playlists",
+	"playlists_empty_title": "No playlists yet",
+	"playlists_empty_hint": "Create one to organize your music.",
+	"playlists_track_count": "{count} tracks",
+	"playlists_track_count_one": "1 track",
+	"playlists_loading": "Loading…",
+	"playlists_error": "Couldn't load playlists.",
+
+	"playlist_create_title": "New playlist",
+	"playlist_create_save": "Create",
+	"playlist_create_cancel": "Cancel",
+	"playlist_field_name": "Name",
+	"playlist_field_description": "Description",
+	"playlist_field_description_optional": "Description (optional)",
+	"playlist_name_required": "Name is required.",
+	"playlist_name_conflict": "A playlist with this name already exists.",
+
+	"playlist_edit_title": "Edit playlist",
+	"playlist_edit_save": "Save",
+	"playlist_edit_cancel": "Cancel",
+	"playlist_edit_delete": "Delete playlist",
+	"playlist_edit_delete_confirm": "Delete this playlist?",
+	"playlist_edit_delete_confirm_body": "Tracks remain in your library. This cannot be undone.",
+	"playlist_edit_delete_yes": "Delete",
+	"playlist_edit_delete_no": "Cancel",
+
+	"playlist_detail_play": "Play",
+	"playlist_detail_add_music": "Add music",
+	"playlist_detail_reorder": "Reorder",
+	"playlist_detail_edit": "Edit",
+	"playlist_detail_empty": "This playlist is empty.",
+	"playlist_detail_loading": "Loading…",
+	"playlist_detail_error": "Couldn't load this playlist.",
+	"playlist_detail_total_duration": "Total {duration}",
+	"playlist_track_remove": "Remove from playlist",
+
+	"playlist_add_music_title": "Add music",
+	"playlist_add_music_search": "Search tracks",
+	"playlist_add_music_already_added": "Already in playlist",
+	"playlist_add_music_selected": "{count} selected",
+	"playlist_add_music_add_selected": "Add selected",
+	"playlist_add_music_empty": "No tracks match your search.",
+	"playlist_add_music_no_library": "Your library is empty.",
+
+	"playlist_reorder_title": "Reorder",
+	"playlist_reorder_done": "Done",
+	"playlist_reorder_hint": "Drag to reorder. Changes save automatically.",
+
+	"track_action_add_to_playlist": "Add to playlist",
+	"playlist_picker_title": "Add to playlist",
+	"playlist_picker_empty": "No playlists yet.",
+	"playlist_picker_create": "Create playlist",
+	"playlist_picker_added": "Added",
+	"playlist_picker_already_added": "Already added"
 }

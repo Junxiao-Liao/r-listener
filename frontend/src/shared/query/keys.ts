@@ -7,5 +7,10 @@ export const queryKeys = {
 	track: (id: string) => ['tracks', 'detail', id] as const,
 	queue: ['queue'] as const,
 	recentTracks: ['playback', 'recent'] as const,
-	continueListening: ['playback', 'continue'] as const
+	continueListening: ['playback', 'continue'] as const,
+	playlists: ['playlists'] as const,
+	playlistsList: (params: { sort: string; q?: string }) =>
+		['playlists', 'list', params] as const,
+	playlist: (id: string) => ['playlists', 'detail', id] as const,
+	playlistTracks: (id: string) => ['playlists', 'detail', id, 'tracks'] as const
 };

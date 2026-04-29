@@ -1,12 +1,16 @@
 <script lang="ts">
 	import EllipsisVertical from '@lucide/svelte/icons/ellipsis-vertical';
 	import Info from '@lucide/svelte/icons/info';
+	import ListMusic from '@lucide/svelte/icons/list-music';
 	import ListPlus from '@lucide/svelte/icons/list-plus';
 	import Play from '@lucide/svelte/icons/play';
 	import PlaySquare from '@lucide/svelte/icons/play-square';
 	import { goto } from '$app/navigation';
 	import * as m from '$shared/paraglide/messages';
+	import { isEditor } from '$shared/auth/role';
 	import { useAddQueueItemsMutation } from '$shared/query/queue.query';
+	import { useSessionQuery } from '$shared/query/session.query';
+	import AddToPlaylistSheet from '$shared/player/AddToPlaylistSheet.svelte';
 	import { usePlayListMutation } from '$shared/player/play-list';
 	import { getPlayer } from '$shared/player/player.context';
 	import type { TrackDto } from '$shared/types/dto';
@@ -22,11 +26,14 @@
 
 	let { track, siblings, showDetailsLink = true }: Props = $props();
 
+	const session = useSessionQuery();
+	const editor = $derived(isEditor($session.data));
 	const addItems = useAddQueueItemsMutation();
 	const playList = usePlayListMutation();
 	const player = getPlayer();
 
 	let open = $state(false);
+	let showPlaylistSheet = $state(false);
 	let containerEl: HTMLDivElement | undefined;
 	const canQueue = $derived(track.status === 'ready');
 
@@ -71,6 +78,11 @@
 	function showDetails() {
 		close();
 		void goto(`/library/${track.id}`);
+	}
+
+	function openPlaylistPicker() {
+		close();
+		showPlaylistSheet = true;
 	}
 </script>
 
@@ -129,6 +141,17 @@
 					<span>{m.queue_add_to_end()}</span>
 				</button>
 			{/if}
+			{#if editor && canQueue}
+				<button
+					type="button"
+					role="menuitem"
+					class="flex items-center gap-2 rounded px-2 py-1.5 text-left hover:bg-muted"
+					onclick={openPlaylistPicker}
+				>
+					<ListMusic class="size-4" />
+					<span>{m.track_action_add_to_playlist()}</span>
+				</button>
+			{/if}
 			{#if showDetailsLink}
 				<button
 					type="button"
@@ -143,3 +166,10 @@
 		</div>
 	{/if}
 </div>
+
+{#if showPlaylistSheet}
+	<AddToPlaylistSheet
+		trackId={track.id}
+		onclose={() => (showPlaylistSheet = false)}
+	/>
+{/if}

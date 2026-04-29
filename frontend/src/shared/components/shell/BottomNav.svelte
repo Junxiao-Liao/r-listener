@@ -20,7 +20,7 @@
 		{ href: '/', label: m.nav_home, icon: House },
 		{ href: '/library', label: m.nav_library, icon: Library },
 		{ href: null, label: m.nav_upload, icon: Upload },
-		{ href: null, label: m.nav_playlists, icon: ListMusic },
+		{ href: '/playlists', label: m.nav_playlists, icon: ListMusic },
 		{ href: '/settings', label: m.nav_settings, icon: Settings }
 	];
 

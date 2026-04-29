@@ -13,6 +13,8 @@ export type ApiErrorCode =
 	| 'tenant_not_found'
 	| 'track_not_found'
 	| 'queue_item_not_found'
+	| 'playlist_not_found'
+	| 'playlist_track_not_found'
 	| 'username_conflict'
 	| 'already_member'
 	| 'playlist_name_conflict'
