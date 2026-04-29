@@ -1,6 +1,8 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import * as m from '$shared/paraglide/messages';
+	import { Button } from '$shared/components/ui/button';
 	import {
 		useSessionQuery,
 		useSwitchTenantMutation
@@ -34,7 +36,11 @@
 
 {#if $session.data}
 	<section class="flex flex-col gap-4 py-6">
-		<header>
+		<header class="flex flex-col items-start gap-4">
+			<Button variant="ghost" class="-ml-2 text-muted-foreground" href="/">
+				<ArrowLeft class="mr-2 size-4" />
+				<span>{m.nav_home()}</span>
+			</Button>
 			<h1 class="text-2xl font-semibold">{m.tenants_title()}</h1>
 		</header>
 

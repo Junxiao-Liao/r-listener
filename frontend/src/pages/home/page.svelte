@@ -1,5 +1,6 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
+	import ChevronDown from '@lucide/svelte/icons/chevron-down';
 	import Clock3 from '@lucide/svelte/icons/clock-3';
 	import History from '@lucide/svelte/icons/history';
 	import Library from '@lucide/svelte/icons/library';
@@ -7,6 +8,7 @@
 	import PlayCircle from '@lucide/svelte/icons/play-circle';
 	import Search from '@lucide/svelte/icons/search';
 	import Upload from '@lucide/svelte/icons/upload';
+	import User from '@lucide/svelte/icons/user';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
@@ -49,15 +51,15 @@
 
 {#if $session.data}
 	<section class="flex flex-col gap-6 py-6">
-		<header class="flex flex-col gap-1">
-			<p class="text-sm text-muted-foreground">{m.home_workspace()}</p>
-			<h1 class="text-2xl font-semibold">
-				{activeMembership?.tenantName ?? '—'}
-			</h1>
-			<p class="text-sm text-muted-foreground">
-				{m.home_greeting()}
-				{$session.data.user.username}
-			</p>
+		<header class="flex items-center justify-between">
+			<Button variant="ghost" href="/tenants" class="h-auto flex items-center gap-1.5 px-2 py-1 -ml-2 text-xl font-semibold hover:bg-muted/50 rounded-md transition-colors">
+				<span>{activeMembership?.tenantName ?? '—'}</span>
+				<ChevronDown class="size-4 text-muted-foreground" />
+			</Button>
+			<div class="flex items-center gap-1.5 text-sm font-medium text-muted-foreground bg-muted/50 px-3 py-1.5 rounded-full">
+				<User class="size-4" />
+				<span>{$session.data.user.username}</span>
+			</div>
 		</header>
 
 		<form class="flex gap-2" onsubmit={submitSearch} role="search">
