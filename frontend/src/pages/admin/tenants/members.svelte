@@ -3,7 +3,8 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import ConfirmAction from '$shared/components/ConfirmAction.svelte';
-	import { Input } from '$shared/components/ui/input';
+	import EntityCombobox from '$pages/admin/components/EntityCombobox.svelte';
+	import { createUserSelectorSearch } from '$pages/admin/admin-selector.service';
 	import {
 		useAdminTenantMembersQuery,
 		useCreateAdminMembershipMutation,
@@ -15,10 +16,12 @@
 	type Props = { tenantId: Id<'tenant'> };
 	let { tenantId }: Props = $props();
 
-	let userId = $state('');
+	let userId = $state<Id<'user'> | ''>('');
 	let role = $state<TenantRole>('member');
 	let pendingRole = $state<Record<string, TenantRole>>({});
 
+	const userSearch = (params: Parameters<ReturnType<typeof createUserSelectorSearch>>[0]) =>
+		createUserSelectorSearch({ excludeTenantId: tenantId })(params);
 	const members = useAdminTenantMembersQuery(() => tenantId);
 	const createMembership = useCreateAdminMembershipMutation();
 	const updateMembership = useUpdateAdminMembershipMutation();
@@ -55,13 +58,21 @@
 
 	<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); void addMember(); }}>
 		<h2 class="text-sm font-semibold">{m.admin_add_member()}</h2>
-		<Input placeholder={m.admin_user_id()} bind:value={userId} required />
+		<EntityCombobox
+			bind:value={userId}
+			search={userSearch}
+			placeholder={m.admin_user_id()}
+			required
+		/>
 		<select class="h-9 rounded-md border border-input bg-background px-2 text-sm" bind:value={role}>
 			<option value="owner">{m.admin_role_owner()}</option>
 			<option value="member">{m.admin_role_member()}</option>
 			<option value="viewer">{m.admin_role_viewer()}</option>
 		</select>
 		<Button type="submit" disabled={$createMembership.isPending}>{m.admin_add()}</Button>
+		{#if $createMembership.error}
+			<p class="text-sm text-destructive">{$createMembership.error.message}</p>
+		{/if}
 	</form>
 
 	{#if $members.isPending}
@@ -105,10 +116,16 @@
 							description={m.admin_remove_member_description()}
 							trigger={m.action_remove()}
 							confirm={m.action_remove()}
+							class="min-w-0 flex-1 shrink"
 							disabled={removingLastOwner || $deleteMembership.isPending}
 							onconfirm={() => removeMember(member.user.id)}
 						/>
 					</div>
+					{#if $updateMembership.error || $deleteMembership.error}
+						<p class="text-sm text-destructive">
+							{($updateMembership.error ?? $deleteMembership.error)?.message}
+						</p>
+					{/if}
 				</li>
 			{/each}
 		</ul>

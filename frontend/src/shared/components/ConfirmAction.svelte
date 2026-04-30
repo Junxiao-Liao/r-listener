@@ -10,16 +10,25 @@
 		trigger: string;
 		confirm: string;
 		disabled?: boolean;
+		class?: string;
 		onconfirm: () => void | Promise<void>;
 	};
 
-	let { title, description, trigger, confirm, disabled = false, onconfirm }: Props = $props();
+	let {
+		title,
+		description,
+		trigger,
+		confirm,
+		disabled = false,
+		class: className,
+		onconfirm
+	}: Props = $props();
 </script>
 
 <AlertDialog.Root>
 	<AlertDialog.Trigger
 		disabled={disabled}
-		class={cn(buttonVariants({ variant: 'destructive' }), 'w-full')}
+		class={cn(buttonVariants({ variant: 'destructive' }), 'w-full', className)}
 	>
 		{trigger}
 	</AlertDialog.Trigger>

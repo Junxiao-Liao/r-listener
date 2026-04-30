@@ -4,17 +4,25 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
+	import EntityCombobox from '$pages/admin/components/EntityCombobox.svelte';
+	import {
+		applyAdminListFilter,
+		clearAdminListFilter
+	} from '$pages/admin/admin-list-filter.service';
+	import { createUserSelectorSearch } from '$pages/admin/admin-selector.service';
 	import {
 		useAdminTenantsQuery,
 		useCreateAdminTenantMutation
 	} from '$shared/query/admin.query';
 	import type { Id } from '$shared/types/dto';
 
-	let q = $state('');
+	let draftQ = $state('');
+	let appliedQ = $state('');
 	let name = $state('');
-	let ownerUserId = $state('');
+	let ownerUserId = $state<Id<'user'> | ''>('');
 
-	const tenants = useAdminTenantsQuery(() => true, () => ({ q: q || undefined }));
+	const ownerSearch = createUserSelectorSearch();
+	const tenants = useAdminTenantsQuery(() => true, () => ({ q: appliedQ || undefined }));
 	const createTenant = useCreateAdminTenantMutation();
 
 	async function submit() {
@@ -23,6 +31,18 @@
 			ownerUserId: ownerUserId as Id<'user'>
 		});
 		void goto(`/admin/tenants/${result.tenant.id}`);
+	}
+
+	function applyFilter() {
+		const next = applyAdminListFilter({ draft: draftQ, applied: appliedQ });
+		draftQ = next.draft;
+		appliedQ = next.applied;
+	}
+
+	function clearFilter() {
+		const next = clearAdminListFilter();
+		draftQ = next.draft;
+		appliedQ = next.applied;
 	}
 </script>
 
@@ -38,14 +58,25 @@
 	<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); void submit(); }}>
 		<h2 class="text-sm font-semibold">{m.admin_create_tenant()}</h2>
 		<Input placeholder={m.admin_tenant_name()} bind:value={name} required />
-		<Input placeholder={m.admin_owner_user_id()} bind:value={ownerUserId} required />
+		<EntityCombobox
+			bind:value={ownerUserId}
+			search={ownerSearch}
+			placeholder={m.admin_owner_user_id()}
+			required
+		/>
 		<Button type="submit" disabled={$createTenant.isPending}>{m.admin_create()}</Button>
 		{#if $createTenant.error}
 			<p class="text-sm text-destructive">{$createTenant.error.message}</p>
 		{/if}
 	</form>
 
-	<Input placeholder={m.admin_filter_tenants()} bind:value={q} />
+	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={(e) => { e.preventDefault(); applyFilter(); }}>
+		<Input placeholder={m.admin_filter_tenants()} bind:value={draftQ} />
+		<div class="flex gap-2">
+			<Button type="submit">{m.admin_search()}</Button>
+			<Button type="button" variant="outline" onclick={clearFilter}>{m.admin_clear()}</Button>
+		</div>
+	</form>
 
 	{#if $tenants.isPending}
 		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>

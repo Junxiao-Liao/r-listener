@@ -4,20 +4,28 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
+	import EntityCombobox from '$pages/admin/components/EntityCombobox.svelte';
+	import {
+		applyAdminListFilter,
+		clearAdminListFilter
+	} from '$pages/admin/admin-list-filter.service';
+	import { createTenantSelectorSearch } from '$pages/admin/admin-selector.service';
 	import {
 		useAdminUsersQuery,
 		useCreateAdminUserMutation
 	} from '$shared/query/admin.query';
 	import type { Id, TenantRole } from '$shared/types/dto';
 
-	let q = $state('');
+	let draftQ = $state('');
+	let appliedQ = $state('');
 	let username = $state('');
 	let password = $state('');
 	let isAdmin = $state(false);
-	let tenantId = $state('');
+	let tenantId = $state<Id<'tenant'> | ''>('');
 	let role = $state<TenantRole>('member');
 
-	const users = useAdminUsersQuery(() => ({ q: q || undefined, includeInactive: true }));
+	const tenantSearch = createTenantSelectorSearch();
+	const users = useAdminUsersQuery(() => ({ q: appliedQ || undefined, includeInactive: true }));
 	const createUser = useCreateAdminUserMutation();
 
 	function userStatusLabel(isActive: boolean) {
@@ -29,9 +37,21 @@
 			username,
 			password,
 			isAdmin,
-			initialMembership: tenantId ? { tenantId: tenantId as Id<'tenant'>, role } : undefined
+			initialMembership: tenantId ? { tenantId, role } : undefined
 		});
 		void goto(`/admin/users/${created.id}`);
+	}
+
+	function applyFilter() {
+		const next = applyAdminListFilter({ draft: draftQ, applied: appliedQ });
+		draftQ = next.draft;
+		appliedQ = next.applied;
+	}
+
+	function clearFilter() {
+		const next = clearAdminListFilter();
+		draftQ = next.draft;
+		appliedQ = next.applied;
 	}
 </script>
 
@@ -52,7 +72,11 @@
 			<input type="checkbox" bind:checked={isAdmin} />
 			{m.admin_platform_admin()}
 		</label>
-		<Input placeholder={m.admin_initial_tenant_id()} bind:value={tenantId} />
+		<EntityCombobox
+			bind:value={tenantId}
+			search={tenantSearch}
+			placeholder={m.admin_initial_tenant_id()}
+		/>
 		<select class="h-9 rounded-md border border-input bg-background px-2 text-sm" bind:value={role}>
 			<option value="owner">{m.admin_role_owner()}</option>
 			<option value="member">{m.admin_role_member()}</option>
@@ -64,7 +88,13 @@
 		{/if}
 	</form>
 
-	<Input placeholder={m.admin_filter_users()} bind:value={q} />
+	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={(e) => { e.preventDefault(); applyFilter(); }}>
+		<Input placeholder={m.admin_filter_users()} bind:value={draftQ} />
+		<div class="flex gap-2">
+			<Button type="submit">{m.admin_search()}</Button>
+			<Button type="button" variant="outline" onclick={clearFilter}>{m.admin_clear()}</Button>
+		</div>
+	</form>
 
 	{#if $users.isPending}
 		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>

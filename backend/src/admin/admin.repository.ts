@@ -5,8 +5,10 @@ import {
 	inArray,
 	isNull,
 	like,
+	notExists,
 	sql
 } from 'drizzle-orm';
+import { alias } from 'drizzle-orm/sqlite-core';
 import type { AuditTargetType } from '../audit/audit.type';
 import { auditLogs } from '../audit/audit.orm';
 import { sessions } from '../auth/auth.orm';
@@ -104,6 +106,23 @@ export function createAdminRepository(db: Db): AdminRepository {
 			const filters = [isNull(users.deletedAt)];
 			if (!query.includeInactive) filters.push(eq(users.isActive, true));
 			if (query.q) filters.push(like(users.username, `%${escapeLike(query.q.toLowerCase())}%`));
+			if (query.excludeTenantId) {
+				const activeMembership = alias(memberships, 'active_membership');
+				filters.push(
+					notExists(
+						db
+							.select({ id: activeMembership.id })
+							.from(activeMembership)
+							.where(
+								and(
+									eq(activeMembership.userId, users.id),
+									eq(activeMembership.tenantId, query.excludeTenantId),
+									isNull(activeMembership.deletedAt)
+								)
+							)
+					)
+				);
+			}
 
 			const rows = await db
 				.select()
@@ -211,6 +230,23 @@ export function createAdminRepository(db: Db): AdminRepository {
 			const offset = decodeCursor(query.cursor);
 			const filters = [isNull(tenants.deletedAt)];
 			if (query.q) filters.push(like(tenants.name, `%${escapeLike(query.q)}%`));
+			if (query.excludeUserId) {
+				const activeMembership = alias(memberships, 'active_membership');
+				filters.push(
+					notExists(
+						db
+							.select({ id: activeMembership.id })
+							.from(activeMembership)
+							.where(
+								and(
+									eq(activeMembership.tenantId, tenants.id),
+									eq(activeMembership.userId, query.excludeUserId),
+									isNull(activeMembership.deletedAt)
+								)
+							)
+					)
+				);
+			}
 			const rows = await db
 				.select()
 				.from(tenants)

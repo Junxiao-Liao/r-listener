@@ -22,10 +22,12 @@ export type AdminListParams = {
 	q?: string;
 	limit?: number;
 	cursor?: string | null;
+	excludeUserId?: Id<'user'>;
 };
 
 export type AdminUsersParams = AdminListParams & {
 	includeInactive?: boolean;
+	excludeTenantId?: Id<'tenant'>;
 };
 
 function listPath(base: string, params: Record<string, string | number | boolean | null | undefined>) {
@@ -38,7 +40,12 @@ function listPath(base: string, params: Record<string, string | number | boolean
 }
 
 export function buildAdminTenantsPath(params: AdminListParams = {}) {
-	return listPath('/admin/tenants', { limit: params.limit, cursor: params.cursor, q: params.q });
+	return listPath('/admin/tenants', {
+		limit: params.limit,
+		cursor: params.cursor,
+		q: params.q,
+		excludeUserId: params.excludeUserId
+	});
 }
 
 export function buildAdminUsersPath(params: AdminUsersParams = {}) {
@@ -46,6 +53,8 @@ export function buildAdminUsersPath(params: AdminUsersParams = {}) {
 		limit: params.limit,
 		cursor: params.cursor,
 		q: params.q,
+		excludeUserId: params.excludeUserId,
+		excludeTenantId: params.excludeTenantId,
 		includeInactive: params.includeInactive ? 'true' : undefined
 	});
 }
@@ -53,7 +62,7 @@ export function buildAdminUsersPath(params: AdminUsersParams = {}) {
 export function useAdminTenantsQuery(enabled: () => boolean, params: () => AdminListParams = () => ({})) {
 	return createQuery<ListResponse<AdminTenantListItemDto>, ApiError>({
 		get queryKey() {
-			return queryKeys.adminTenants;
+			return queryKeys.adminTenants(params());
 		},
 		queryFn: () => api<ListResponse<AdminTenantListItemDto>>(buildAdminTenantsPath(params())),
 		get enabled() {
@@ -153,7 +162,7 @@ export function useCreateAdminTenantMutation() {
 		AdminCreateTenantInput
 	>({
 		mutationFn: (body) => api('/admin/tenants', { method: 'POST', body }),
-		onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.adminTenants })
+		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
 	});
 }
 
@@ -164,7 +173,7 @@ export function useUpdateAdminTenantMutation() {
 			api<TenantDto>(`/admin/tenants/${tenantId}`, { method: 'PATCH', body: patch }),
 		onSuccess: (_, { tenantId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenant(tenantId) });
-			void qc.invalidateQueries({ queryKey: queryKeys.adminTenants });
+			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
 		}
 	});
 }
@@ -189,8 +198,12 @@ export function useCreateAdminMembershipMutation() {
 				method: 'POST',
 				body: { userId, role }
 			}),
-		onSuccess: (_, { tenantId }) =>
-			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) })
+		onSuccess: (_, { tenantId, userId }) => {
+			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
+			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
+			void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+		}
 	});
 }
 
@@ -206,8 +219,10 @@ export function useUpdateAdminMembershipMutation() {
 				method: 'PATCH',
 				body: { role }
 			}),
-		onSuccess: (_, { tenantId }) =>
-			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) })
+		onSuccess: (_, { tenantId, userId }) => {
+			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
+			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
+		}
 	});
 }
 
@@ -216,7 +231,11 @@ export function useDeleteAdminMembershipMutation() {
 	return createMutation<void, ApiError, { tenantId: Id<'tenant'>; userId: Id<'user'> }>({
 		mutationFn: ({ tenantId, userId }) =>
 			api<void>(`/admin/tenants/${tenantId}/members/${userId}`, { method: 'DELETE' }),
-		onSuccess: (_, { tenantId }) =>
-			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) })
+		onSuccess: (_, { tenantId, userId }) => {
+			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
+			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
+			void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
+			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+		}
 	});
 }

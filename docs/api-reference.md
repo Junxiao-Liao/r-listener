@@ -801,7 +801,8 @@ Unauthorized callers receive `403 admin_required`.
 
 #### `GET /admin/users`
 Query: `limit`, `cursor`, `q` (username substring),
-`includeInactive`. Response: `{ items: AdminUserListItemDto[], nextCursor }`.
+`includeInactive`, `excludeTenantId`. Response: `{ items: AdminUserListItemDto[], nextCursor }`.
+- `excludeTenantId` omits users who already have an active membership in that tenant.
 
 #### `GET /admin/users/{id}`
 Response: `AdminUserDetailDto`.
@@ -846,8 +847,9 @@ authorized workspace users. `204`. Self-delete rejected
 ### 6.2 Tenants
 
 #### `GET /admin/tenants`
-Query: `limit`, `cursor`, `q`. Response:
+Query: `limit`, `cursor`, `q`, `excludeUserId`. Response:
 `{ items: AdminTenantListItemDto[], nextCursor }`.
+- `excludeUserId` omits tenants where that user already has an active membership.
 
 #### `GET /admin/tenants/{id}`
 Response: `TenantDto`.

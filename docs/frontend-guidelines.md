@@ -371,15 +371,14 @@ UI elements:
 Purpose: platform admin CRUD on users (cross-tenant).
 UI elements:
 - Page title "Admin · Users"
-- Search bar (username)
-- Filter chips: All / Admins / Disabled
+- Search bar with Search / Clear controls (username)
 - User list rows:
   - Username
   - Admin badge, if applicable
   - Disabled badge, if applicable
   - Workspace count
   - Created date
-- "Create User" button (opens page #22)
+- "Create User" form with username, temporary password, platform admin toggle, and optional initial workspace membership chosen from a searchable selector
 - Row tap opens User Detail (username, admin flag, disabled flag, workspace memberships with roles, Reset Password, Disable/Enable, Delete)
 - Destructive actions use confirmation sheets
 Note: admins cannot demote or delete themselves; show these actions disabled with a tooltip/explanation.
@@ -392,7 +391,7 @@ UI elements:
 - Password field
 - Confirm password field
 - "Mark as platform admin" toggle (off by default)
-- Optional "Add to workspace" selector with role (Owner / Member / Viewer; can be skipped; memberships can be added later)
+- Optional "Add to workspace" selector with role (Owner / Member / Viewer; searchable by workspace name and id; can be skipped; memberships can be added later)
 - Create button
 After creation: brief success toast and return to Users list. The admin is responsible for sharing the username+password out-of-band; the app does NOT display a copyable credential dialog.
 
@@ -400,13 +399,13 @@ After creation: brief success toast and return to Users list. The admin is respo
 Purpose: platform admin CRUD on tenants (workspaces).
 UI elements:
 - Page title "Admin · Tenants"
-- Search bar (name)
+- Search bar with Search / Clear controls (name)
 - Tenant list rows:
   - Workspace name
   - Member count (all active Owner / Member / Viewer memberships)
   - Track count, optional
   - Created date
-- "Create Tenant" button with form (name, required initial owner)
+- "Create Tenant" form with name and required initial owner chosen from a searchable user selector
 - Row tap opens Tenant Detail:
   - Edit name
   - Members list (tap opens page #24)
@@ -422,7 +421,7 @@ UI elements:
   - Role (Owner / Member / Viewer)
   - Joined date
   - Remove button
-- "Add Member" action — search existing users by username, pick a role
+- "Add Member" form — search existing active users by username, pick a role
 - Role change affordance per row (Owner / Member / Viewer) with confirmation
 - Do not allow removing the last Owner; show the action disabled with an explanation
 

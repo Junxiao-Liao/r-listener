@@ -28,7 +28,14 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 
 	route.get('/admin/users', ...guards, async (c) => {
 		const service = serviceFactory(c.var.db);
-		return c.json(await service.listUsers(parseQuery(c, adminUserListQuerySchema)));
+		const query = parseQuery(c, adminUserListQuerySchema);
+		return c.json(
+			await service.listUsers({
+				...query,
+				excludeUserId: query.excludeUserId as Id<'user'> | undefined,
+				excludeTenantId: query.excludeTenantId as Id<'tenant'> | undefined
+			})
+		);
 	});
 
 	route.post('/admin/users', ...guards, async (c) => {
@@ -90,7 +97,13 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 
 	route.get('/admin/tenants', ...guards, async (c) => {
 		const service = serviceFactory(c.var.db);
-		return c.json(await service.listTenants(parseQuery(c, adminListQuerySchema)));
+		const query = parseQuery(c, adminListQuerySchema);
+		return c.json(
+			await service.listTenants({
+				...query,
+				excludeUserId: query.excludeUserId as Id<'user'> | undefined
+			})
+		);
 	});
 
 	route.post('/admin/tenants', ...guards, async (c) => {

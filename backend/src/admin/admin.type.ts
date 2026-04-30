@@ -28,10 +28,12 @@ export type AdminListQuery = {
 	limit: number;
 	cursor?: string | undefined;
 	q?: string | undefined;
+	excludeUserId?: Id<'user'> | undefined;
 };
 
 export type AdminUserListQuery = AdminListQuery & {
 	includeInactive: boolean;
+	excludeTenantId?: Id<'tenant'> | undefined;
 };
 
 export type AdminCreateUserInput = {

@@ -5,10 +5,12 @@ import { usernameSchema } from '../users/users.dto';
 export const adminListQuerySchema = z.object({
 	limit: z.coerce.number().int().positive().max(200).default(50),
 	cursor: z.string().optional(),
-	q: z.string().optional()
+	q: z.string().optional(),
+	excludeUserId: z.string().optional()
 });
 
 export const adminUserListQuerySchema = adminListQuerySchema.extend({
+	excludeTenantId: z.string().optional(),
 	includeInactive: z
 		.union([z.literal('true'), z.literal('false'), z.boolean()])
 		.optional()

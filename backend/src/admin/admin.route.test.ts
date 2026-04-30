@@ -19,7 +19,45 @@ describe('admin route', () => {
 
 		expect(res.status).toBe(200);
 		expect(await res.json()).toEqual({ items: tenants, nextCursor: null });
-		expect(service.listTenants).toHaveBeenCalledWith({ limit: 50, q: undefined, cursor: undefined });
+		expect(service.listTenants).toHaveBeenCalledWith({
+			limit: 50,
+			q: undefined,
+			cursor: undefined,
+			excludeUserId: undefined
+		});
+	});
+
+	it('passes admin list exclusion query params to the service', async () => {
+		const service = createAdminService();
+		const app = createFixtureApp({ session: sessionFixture({ userIsAdmin: true }), service });
+
+		const usersRes = await app.request(
+			'/api/admin/users?q=ali&excludeTenantId=tnt_a',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+		const tenantsRes = await app.request(
+			'/api/admin/tenants?q=team&excludeUserId=usr_b',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(usersRes.status).toBe(200);
+		expect(tenantsRes.status).toBe(200);
+		expect(service.listUsers).toHaveBeenCalledWith({
+			limit: 50,
+			q: 'ali',
+			cursor: undefined,
+			excludeUserId: undefined,
+			excludeTenantId: 'tnt_a',
+			includeInactive: false
+		});
+		expect(service.listTenants).toHaveBeenCalledWith({
+			limit: 50,
+			q: 'team',
+			cursor: undefined,
+			excludeUserId: 'usr_b'
+		});
 	});
 
 	it('rejects non-admin users before calling the service', async () => {
