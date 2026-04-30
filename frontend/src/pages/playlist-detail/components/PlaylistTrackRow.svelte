@@ -2,6 +2,7 @@
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import { isEditor } from '$shared/auth/role';
 	import * as m from '$shared/paraglide/messages';
+	import { Button } from '$shared/components/ui/button';
 	import { formatDurationMs } from '$shared/format/duration';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useRemovePlaylistTrackMutation } from '$shared/query/playlists.query';
@@ -22,6 +23,8 @@
 	const remove = useRemovePlaylistTrackMutation(playlistId);
 	const player = getPlayer();
 
+	let confirmingRemove = $state(false);
+
 	const subtitle = $derived(
 		[item.track.artist, item.track.album]
 			.filter((v): v is string => !!v && v.length > 0)
@@ -36,6 +39,7 @@
 
 	async function removeTrack() {
 		await $remove.mutateAsync({ trackId: item.track.id });
+		confirmingRemove = false;
 	}
 </script>
 
@@ -55,15 +59,34 @@
 	<span class="shrink-0 text-xs text-muted-foreground tabular-nums">
 		{formatDurationMs(item.track.durationMs)}
 	</span>
-	{#if editor}
+	{#if editor && !confirmingRemove}
 		<button
 			type="button"
 			class="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
 			aria-label={m.playlist_track_remove()}
 			disabled={$remove.isPending}
-			onclick={removeTrack}
+			onclick={() => (confirmingRemove = true)}
 		>
 			<Trash2 class="size-4" />
 		</button>
+	{:else if editor && confirmingRemove}
+		<span class="flex items-center gap-1">
+			<Button
+				variant="destructive"
+				size="xs"
+				disabled={$remove.isPending}
+				onclick={removeTrack}
+			>
+				{m.action_remove()}
+			</Button>
+			<Button
+				variant="ghost"
+				size="xs"
+				disabled={$remove.isPending}
+				onclick={() => (confirmingRemove = false)}
+			>
+				{m.action_cancel()}
+			</Button>
+		</span>
 	{/if}
 </div>

@@ -2,6 +2,7 @@
 	import { goto } from '$app/navigation';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
+	import ConfirmAction from '$shared/components/ConfirmAction.svelte';
 	import {
 		useSessionQuery,
 		useSignoutMutation
@@ -21,7 +22,14 @@
 	}
 </script>
 
-{#if $session.data}
+{#if $session.isPending}
+	<section class="flex flex-col gap-8 py-6">
+		<header>
+			<h1 class="text-2xl font-semibold">{m.settings_title()}</h1>
+		</header>
+		<p class="text-sm text-muted-foreground">{m.settings_loading()}</p>
+	</section>
+{:else if $session.data}
 	<section class="flex flex-col gap-8 py-6">
 		<header>
 			<h1 class="text-2xl font-semibold">{m.settings_title()}</h1>
@@ -35,12 +43,12 @@
 				<div
 					class="flex items-center justify-between gap-3 border-b border-border px-4 py-3"
 				>
-					<dt class="text-sm text-muted-foreground">{m.settings_username()}</dt>
-					<dd class="text-sm">{$session.data.user.username}</dd>
+					<dt class="shrink-0 text-sm text-muted-foreground">{m.settings_username()}</dt>
+					<dd class="min-w-0 truncate text-sm">{$session.data.user.username}</dd>
 				</div>
 				<div class="flex items-center justify-between gap-3 px-4 py-3">
-					<dt class="text-sm text-muted-foreground">{m.settings_active_workspace()}</dt>
-					<dd class="text-sm">{activeMembership?.tenantName ?? '—'}</dd>
+					<dt class="shrink-0 text-sm text-muted-foreground">{m.settings_active_workspace()}</dt>
+					<dd class="min-w-0 truncate text-sm">{activeMembership?.tenantName ?? '—'}</dd>
 				</div>
 			</dl>
 
@@ -53,14 +61,14 @@
 			{#if $session.data.user.isAdmin}
 				<Button variant="outline" href="/admin" class="w-full">{m.admin_dashboard_title()}</Button>
 			{/if}
-			<Button
-				variant="destructive"
-				class="w-full"
+			<ConfirmAction
+				title={m.sign_out_confirm_title()}
+				description={m.sign_out_confirm_description()}
+				trigger={m.settings_sign_out()}
+				confirm={m.settings_sign_out()}
 				disabled={$signout.isPending}
-				onclick={handleSignout}
-			>
-				{m.settings_sign_out()}
-			</Button>
+				onconfirm={handleSignout}
+			/>
 		</section>
 
 		<PreferencesForm preferences={$session.data.preferences} />

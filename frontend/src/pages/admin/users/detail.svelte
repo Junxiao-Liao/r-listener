@@ -68,7 +68,13 @@
 		<h1 class="text-2xl font-semibold">{m.admin_user_detail()}</h1>
 	</header>
 
-	{#if $user.data}
+	{#if $user.isPending}
+		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>
+	{:else if $user.isError || !$user.data}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.admin_user_not_found()}
+		</p>
+	{:else}
 		<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); void save(); }}>
 			<Input bind:value={username} />
 			<label class="flex items-center gap-2 text-sm">
@@ -94,12 +100,17 @@
 			{/each}
 		</section>
 
-		<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); void reset(); }}>
+		<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); }}>
 			<h2 class="text-sm font-semibold">{m.admin_reset_password()}</h2>
 			<Input type="password" bind:value={newPassword} required />
-			<Button type="submit" variant="outline" disabled={$resetPassword.isPending}>
-				{m.admin_reset_password()}
-			</Button>
+			<ConfirmAction
+				title={m.admin_reset_password_confirm_title()}
+				description={m.admin_reset_password_confirm_description()}
+				trigger={m.admin_reset_password()}
+				confirm={m.admin_reset_password()}
+				disabled={!newPassword || $resetPassword.isPending}
+				onconfirm={reset}
+			/>
 		</form>
 
 		<section class="grid gap-3 rounded-md border border-border p-3">

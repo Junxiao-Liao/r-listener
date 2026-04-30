@@ -46,19 +46,28 @@
 	</form>
 
 	<Input placeholder={m.admin_filter_tenants()} bind:value={q} />
-	<ul class="flex flex-col gap-2">
-		{#each $tenants.data?.items ?? [] as tenant (tenant.id)}
-			<li class="rounded-md border border-border p-3">
-				<a class="flex items-center justify-between gap-3" href={`/admin/tenants/${tenant.id}`}>
-					<span class="font-medium">{tenant.name}</span>
-					<span class="text-xs text-muted-foreground">
-						{m.admin_tenant_summary({
-							members: tenant.memberCount,
-							tracks: tenant.trackCount
-						})}
-					</span>
-				</a>
-			</li>
-		{/each}
-	</ul>
+
+	{#if $tenants.isPending}
+		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>
+	{:else if $tenants.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.admin_tenants_error()}
+		</p>
+	{:else}
+		<ul class="flex flex-col gap-2">
+			{#each $tenants.data?.items ?? [] as tenant (tenant.id)}
+				<li class="rounded-md border border-border p-3">
+					<a class="flex items-center justify-between gap-3" href={`/admin/tenants/${tenant.id}`}>
+						<span class="truncate font-medium">{tenant.name}</span>
+						<span class="shrink-0 text-xs text-muted-foreground">
+							{m.admin_tenant_summary({
+								members: tenant.memberCount,
+								tracks: tenant.trackCount
+							})}
+						</span>
+					</a>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </section>

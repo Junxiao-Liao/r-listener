@@ -43,7 +43,13 @@
 		<h1 class="text-2xl font-semibold">{m.admin_tenant_detail()}</h1>
 	</header>
 
-	{#if $tenant.data}
+	{#if $tenant.isPending}
+		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>
+	{:else if $tenant.isError || !$tenant.data}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.admin_tenant_not_found()}
+		</p>
+	{:else}
 		<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); void save(); }}>
 			<Input bind:value={name} />
 			<Button type="submit" disabled={$updateTenant.isPending}>{m.admin_save()}</Button>

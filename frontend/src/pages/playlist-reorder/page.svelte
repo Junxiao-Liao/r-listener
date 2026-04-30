@@ -67,6 +67,10 @@
 
 	{#if $tracks.isPending}
 		<p class="text-sm text-muted-foreground">{m.playlist_detail_loading()}</p>
+	{:else if $tracks.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.playlist_reorder_error()}
+		</p>
 	{:else if rows.length === 0}
 		<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
 			{m.playlist_detail_empty()}

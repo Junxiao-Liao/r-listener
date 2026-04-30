@@ -70,6 +70,10 @@
 
 	{#if $tracks.isPending}
 		<p class="text-sm text-muted-foreground">{m.playlists_loading()}</p>
+	{:else if $tracks.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.playlist_add_music_error()}
+		</p>
 	{:else if items.length === 0}
 		<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
 			{q.trim() ? m.playlist_add_music_empty() : m.playlist_add_music_no_library()}
@@ -126,7 +130,7 @@
 {#if selectedCount > 0}
 	<div
 		class="fixed inset-x-0 z-30 mx-auto flex max-w-xl items-center justify-between gap-3 border-t border-border bg-background px-4 py-3 shadow-lg"
-		style="bottom: calc(var(--bottom-nav-h, 0px) + env(safe-area-inset-bottom, 0px));"
+		style="bottom: calc(var(--bottom-nav-h, 0px) + var(--mini-player-h, 0px) + env(safe-area-inset-bottom, 0px));"
 	>
 		<span class="text-sm">{m.playlist_add_music_selected({ count: selectedCount })}</span>
 		<Button onclick={addSelected} disabled={saving}>

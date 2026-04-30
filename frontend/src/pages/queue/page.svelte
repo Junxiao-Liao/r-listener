@@ -24,6 +24,7 @@
 	const clearQueue = useClearQueueMutation();
 
 	let confirmingClear = $state(false);
+	let confirmRemoveId: Id<'queue_item'> | null = $state(null);
 	let dragId: Id<'queue_item'> | null = $state(null);
 	let dragOverId: Id<'queue_item'> | null = $state(null);
 
@@ -69,6 +70,7 @@
 
 	async function remove(item: QueueItemDto) {
 		await $deleteItem.mutateAsync({ itemId: item.id });
+		confirmRemoveId = null;
 	}
 
 	async function clearAll() {
@@ -118,7 +120,11 @@
 	{/if}
 
 	{#if $queueQuery.isPending}
-		<p class="text-sm text-muted-foreground">…</p>
+		<p class="text-sm text-muted-foreground">{m.home_loading()}</p>
+	{:else if $queueQuery.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.queue_error()}
+		</p>
 	{:else if items.length === 0}
 		<p class="rounded-md bg-muted/40 px-3 py-6 text-center text-sm text-muted-foreground">
 			{m.queue_empty()}
@@ -177,15 +183,36 @@
 					>
 						<Play class="size-4" />
 					</button>
-					<button
-						type="button"
-						class="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
-						aria-label={m.queue_remove()}
-						onclick={() => remove(item)}
-						disabled={$deleteItem.isPending}
-					>
-						<X class="size-4" />
-					</button>
+					{#if confirmRemoveId === item.id}
+						<span class="flex items-center gap-1">
+							<Button
+								variant="destructive"
+								size="xs"
+								disabled={$deleteItem.isPending}
+								onclick={() => remove(item)}
+							>
+								{m.action_remove()}
+							</Button>
+							<Button
+								variant="ghost"
+								size="xs"
+								disabled={$deleteItem.isPending}
+								onclick={() => (confirmRemoveId = null)}
+							>
+								{m.action_cancel()}
+							</Button>
+						</span>
+					{:else}
+						<button
+							type="button"
+							class="grid size-8 place-items-center rounded-full text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+							aria-label={m.queue_remove()}
+							onclick={() => (confirmRemoveId = item.id)}
+							disabled={$deleteItem.isPending}
+						>
+							<X class="size-4" />
+						</button>
+					{/if}
 				</li>
 			{/each}
 		</ul>

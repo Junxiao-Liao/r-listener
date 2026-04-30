@@ -34,7 +34,18 @@
 	}
 </script>
 
-{#if $session.data}
+{#if $session.isPending}
+	<section class="flex flex-col gap-4 py-6">
+		<header class="flex flex-col items-start gap-4">
+			<Button variant="ghost" class="-ml-2 text-muted-foreground" href="/">
+				<ArrowLeft class="mr-2 size-4" />
+				<span>{m.nav_home()}</span>
+			</Button>
+			<h1 class="text-2xl font-semibold">{m.tenants_title()}</h1>
+		</header>
+		<p class="text-sm text-muted-foreground">{m.tenants_loading()}</p>
+	</section>
+{:else if $session.data}
 	<section class="flex flex-col gap-4 py-6">
 		<header class="flex flex-col items-start gap-4">
 			<Button variant="ghost" class="-ml-2 text-muted-foreground" href="/">

@@ -65,19 +65,28 @@
 	</form>
 
 	<Input placeholder={m.admin_filter_users()} bind:value={q} />
-	<ul class="flex flex-col gap-2">
-		{#each $users.data?.items ?? [] as user (user.id)}
-			<li class="rounded-md border border-border p-3">
-				<a class="flex items-center justify-between gap-3" href={`/admin/users/${user.id}`}>
-					<span class="font-medium">{user.username}</span>
-					<span class="text-xs text-muted-foreground">
-						{m.admin_user_summary({
-							count: user.workspaceCount,
-							status: userStatusLabel(user.isActive)
-						})}
-					</span>
-				</a>
-			</li>
-		{/each}
-	</ul>
+
+	{#if $users.isPending}
+		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>
+	{:else if $users.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.admin_users_error()}
+		</p>
+	{:else}
+		<ul class="flex flex-col gap-2">
+			{#each $users.data?.items ?? [] as user (user.id)}
+				<li class="rounded-md border border-border p-3">
+					<a class="flex items-center justify-between gap-3" href={`/admin/users/${user.id}`}>
+						<span class="truncate font-medium">{user.username}</span>
+						<span class="shrink-0 text-xs text-muted-foreground">
+							{m.admin_user_summary({
+								count: user.workspaceCount,
+								status: userStatusLabel(user.isActive)
+							})}
+						</span>
+					</a>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </section>

@@ -94,7 +94,7 @@
 		class="grid size-9 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
 		aria-haspopup="menu"
 		aria-expanded={open}
-		aria-label="More actions"
+		aria-label={m.track_actions_more()}
 		onclick={(e) => {
 			e.preventDefault();
 			e.stopPropagation();

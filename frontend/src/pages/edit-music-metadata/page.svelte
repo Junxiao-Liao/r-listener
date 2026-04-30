@@ -184,7 +184,7 @@
 	<form class="flex flex-col gap-6 py-6" onsubmit={handleSave}>
 		<header>
 			<h1 class="text-2xl font-semibold">{m.edit_track_title()}</h1>
-			<p class="mt-1 text-sm text-muted-foreground">{$track.data.title}</p>
+			<p class="mt-1 truncate text-sm text-muted-foreground">{$track.data.title}</p>
 		</header>
 
 		<section class="grid gap-4 sm:grid-cols-2">

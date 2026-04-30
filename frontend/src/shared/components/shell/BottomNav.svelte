@@ -37,7 +37,7 @@
 <nav
 	class="grid grid-cols-4"
 	style="height: var(--bottom-nav-h);"
-	aria-label="Primary"
+	aria-label={m.bottom_nav_aria_label()}
 >
 	{#each items as item (item.label)}
 		{@const Icon = item.icon}

@@ -64,45 +64,53 @@
 		<Button type="submit" disabled={$createMembership.isPending}>{m.admin_add()}</Button>
 	</form>
 
-	<ul class="flex flex-col gap-2">
-		{#each $members.data?.items ?? [] as member (member.user.id)}
-			{@const removingLastOwner = member.role === 'owner' && ownerCount <= 1}
-			<li class="grid gap-3 rounded-md border border-border p-3">
-				<div>
-					<p class="font-medium">{member.user.username}</p>
-					<p class="text-xs text-muted-foreground">{member.user.id}</p>
-				</div>
-				<select
-					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-					value={pendingRole[member.user.id] ?? member.role}
-					onchange={(e) => (pendingRole[member.user.id] = e.currentTarget.value as TenantRole)}
-					disabled={removingLastOwner}
-				>
-					<option value="owner">{m.admin_role_owner()}</option>
-					<option value="member">{m.admin_role_member()}</option>
-					<option value="viewer">{m.admin_role_viewer()}</option>
-				</select>
-				{#if removingLastOwner}
-					<p class="text-sm text-muted-foreground">{m.admin_last_owner_guard()}</p>
-				{/if}
-				<div class="flex gap-2">
-					<Button
-						variant="outline"
-						disabled={removingLastOwner || $updateMembership.isPending}
-						onclick={() => void updateRole(member.user.id)}
+	{#if $members.isPending}
+		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>
+	{:else if $members.isError}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{m.admin_members_error()}
+		</p>
+	{:else}
+		<ul class="flex flex-col gap-2">
+			{#each $members.data?.items ?? [] as member (member.user.id)}
+				{@const removingLastOwner = member.role === 'owner' && ownerCount <= 1}
+				<li class="grid gap-3 rounded-md border border-border p-3">
+					<div>
+						<p class="truncate font-medium">{member.user.username}</p>
+						<p class="text-xs text-muted-foreground">{member.user.id}</p>
+					</div>
+					<select
+						class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+						value={pendingRole[member.user.id] ?? member.role}
+						onchange={(e) => (pendingRole[member.user.id] = e.currentTarget.value as TenantRole)}
+						disabled={removingLastOwner}
 					>
-						{m.admin_update()}
-					</Button>
-					<ConfirmAction
-						title={m.admin_remove_member()}
-						description={m.admin_remove_member_description()}
-						trigger={m.action_remove()}
-						confirm={m.action_remove()}
-						disabled={removingLastOwner || $deleteMembership.isPending}
-						onconfirm={() => removeMember(member.user.id)}
-					/>
-				</div>
-			</li>
-		{/each}
-	</ul>
+						<option value="owner">{m.admin_role_owner()}</option>
+						<option value="member">{m.admin_role_member()}</option>
+						<option value="viewer">{m.admin_role_viewer()}</option>
+					</select>
+					{#if removingLastOwner}
+						<p class="text-sm text-muted-foreground">{m.admin_last_owner_guard()}</p>
+					{/if}
+					<div class="flex gap-2">
+						<Button
+							variant="outline"
+							disabled={removingLastOwner || $updateMembership.isPending}
+							onclick={() => void updateRole(member.user.id)}
+						>
+							{m.admin_update()}
+						</Button>
+						<ConfirmAction
+							title={m.admin_remove_member()}
+							description={m.admin_remove_member_description()}
+							trigger={m.action_remove()}
+							confirm={m.action_remove()}
+							disabled={removingLastOwner || $deleteMembership.isPending}
+							onconfirm={() => removeMember(member.user.id)}
+						/>
+					</div>
+				</li>
+			{/each}
+		</ul>
+	{/if}
 </section>

@@ -39,6 +39,7 @@
 	let pendingFromServer = $state<TrackDto[]>([]);
 	let pendingLoading = $state(true);
 	let pendingError = $state<string | null>(null);
+	let pendingDeleteId = $state<Id<'track'> | null>(null);
 
 	async function refreshPending() {
 		pendingLoading = true;
@@ -51,8 +52,8 @@
 			});
 			const res = await api<TrackListResponse>(`/tracks?${search.toString()}`);
 			pendingFromServer = res.items.filter((t) => t.status === 'pending');
-		} catch (err) {
-			pendingError = err instanceof Error ? err.message : 'Failed to load pending uploads.';
+		} 		catch (err) {
+			pendingError = err instanceof Error ? err.message : m.upload_stuck_error();
 		} finally {
 			pendingLoading = false;
 		}
@@ -65,6 +66,8 @@
 			void qc.invalidateQueries({ queryKey: queryKeys.tracks });
 		} catch {
 			// ignore — user can retry
+		} finally {
+			pendingDeleteId = null;
 		}
 	}
 
@@ -246,13 +249,32 @@
 								{new Date(t.createdAt).toLocaleString()} · {formatDurationMs(t.durationMs)}
 							</span>
 						</div>
-						<button
-							type="button"
-							class="text-xs text-destructive underline-offset-4 hover:underline"
-							onclick={() => deletePending(t.id)}
-						>
-							{m.action_delete()}
-						</button>
+						{#if pendingDeleteId === t.id}
+							<span class="flex items-center gap-1">
+								<Button
+									variant="destructive"
+									size="xs"
+									onclick={() => deletePending(t.id)}
+								>
+									{m.action_delete()}
+								</Button>
+								<Button
+									variant="ghost"
+									size="xs"
+									onclick={() => (pendingDeleteId = null)}
+								>
+									{m.action_cancel()}
+								</Button>
+							</span>
+						{:else}
+							<button
+								type="button"
+								class="text-xs text-destructive underline-offset-4 hover:underline"
+								onclick={() => (pendingDeleteId = t.id)}
+							>
+								{m.action_delete()}
+							</button>
+						{/if}
 					</li>
 				{/each}
 			</ul>

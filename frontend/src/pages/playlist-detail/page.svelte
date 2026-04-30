@@ -55,9 +55,9 @@
 		<header class="flex flex-col items-center gap-3 text-center sm:flex-row sm:items-end sm:text-left">
 			<CoverPlaceholder seed={p.name} class="size-32 text-3xl" />
 			<div class="flex flex-1 flex-col gap-1">
-				<h1 class="text-2xl font-semibold">{p.name}</h1>
+				<h1 class="min-w-0 truncate text-2xl font-semibold">{p.name}</h1>
 				{#if p.description}
-					<p class="text-sm text-muted-foreground">{p.description}</p>
+					<p class="min-w-0 truncate text-sm text-muted-foreground">{p.description}</p>
 				{/if}
 				<p class="text-xs text-muted-foreground">
 					{p.trackCount === 1
@@ -92,6 +92,10 @@
 
 		{#if $tracks.isPending}
 			<p class="text-sm text-muted-foreground">{m.playlist_detail_loading()}</p>
+		{:else if $tracks.isError}
+			<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+				{m.playlist_detail_error()}
+			</p>
 		{:else if items.length === 0}
 			<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
 				{m.playlist_detail_empty()}

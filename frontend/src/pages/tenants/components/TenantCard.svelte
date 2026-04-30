@@ -41,8 +41,8 @@
 		'disabled:cursor-not-allowed disabled:opacity-60'
 	)}
 >
-	<div class="flex flex-col gap-0.5">
-		<span class="font-medium leading-tight">{tenant.tenantName}</span>
+	<div class="min-w-0 flex-1 flex flex-col gap-0.5">
+		<span class="truncate font-medium leading-tight">{tenant.tenantName}</span>
 		<span class="text-xs text-muted-foreground">{roleLabel(tenant.role)}</span>
 	</div>
 	{#if lastUsed}

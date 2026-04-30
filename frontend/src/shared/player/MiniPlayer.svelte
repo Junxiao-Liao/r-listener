@@ -20,7 +20,7 @@
 	<div
 		class="border-t border-border bg-background/95 backdrop-blur"
 		role="region"
-		aria-label="Mini player"
+		aria-label={m.mini_player_region()}
 	>
 		<a
 			href="/player"

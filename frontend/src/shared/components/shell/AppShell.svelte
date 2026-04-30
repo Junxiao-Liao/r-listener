@@ -9,7 +9,7 @@
 <div class="min-h-screen bg-background text-foreground">
 	<main
 		class="mx-auto w-full max-w-[var(--content-max-w)] px-4 pt-[var(--safe-top)]"
-		style="padding-bottom: calc(var(--bottom-nav-h) + var(--safe-bottom) + 1rem);"
+		style="padding-bottom: calc(var(--bottom-nav-h) + var(--mini-player-h) + var(--safe-bottom) + 1rem);"
 	>
 		{@render children()}
 	</main>
