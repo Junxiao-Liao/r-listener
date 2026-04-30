@@ -32,7 +32,7 @@ import type {
 
 export type AdminRepository = {
 	readonly db: Db;
-	withTransaction<T>(fn: (repository: AdminRepository) => Promise<T>): Promise<T>;
+	batch: Db['batch'];
 	listUsers(query: AdminUserListQuery): Promise<AdminListResponse<AdminUserListItemDto>>;
 	findUserById(userId: Id<'user'>): Promise<UserDto | null>;
 	findUserByUsername(username: string): Promise<UserDto | null>;
@@ -98,8 +98,7 @@ export type AdminRepository = {
 export function createAdminRepository(db: Db): AdminRepository {
 	const repository: AdminRepository = {
 		db,
-		withTransaction: (fn) =>
-			db.transaction((tx) => fn(createAdminRepository(tx as unknown as Db))),
+		batch: (...args: any[]) => (db.batch as any)(...args),
 		listUsers: async (query) => {
 			const offset = decodeCursor(query.cursor);
 			const filters = [isNull(users.deletedAt)];

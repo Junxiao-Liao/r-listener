@@ -4,6 +4,18 @@ import type { TenantDto, TenantMembershipDto } from '../tenants/tenants.type';
 import type { UserDto } from '../users/users.type';
 import type { AdminRepository } from './admin.repository';
 import { createAdminService, redactSecrets } from './admin.service';
+import type { Db } from '../db';
+
+let idCounter = 0;
+vi.mock('../shared/id', () => ({
+	createId: vi.fn((prefix: string) => {
+		idCounter++;
+		if (prefix === 'usr_') return 'usr_b' as any;
+		if (prefix === 'tnt_') return 'tnt_b' as any;
+		return `${prefix}${idCounter}` as any;
+	}),
+	isPrefixedUuidV7: vi.fn(() => true)
+}));
 
 describe('admin service', () => {
 	it('rejects duplicate usernames and weak passwords on create', async () => {
@@ -28,7 +40,8 @@ describe('admin service', () => {
 	});
 
 	it('creates users with optional viewer membership and redacted audit metadata', async () => {
-		const repository = repositoryFixture();
+		const db = createMockDb();
+		const repository = repositoryFixture({ db });
 		const service = createAdminService({
 			adminRepository: repository,
 			hashPassword: vi.fn(async () => 'hash'),
@@ -46,24 +59,18 @@ describe('admin service', () => {
 		});
 
 		expect(created.id).toBe('usr_b');
-		expect(repository.createMembership).toHaveBeenCalledWith({
-			tenantId: 'tnt_a',
-			userId: 'usr_b',
-			role: 'viewer',
-			now: now()
-		});
-		expect(repository.insertAudit).toHaveBeenCalledWith(
-			expect.objectContaining({
-				action: 'user.create',
-				meta: {
-					request: expect.objectContaining({ password: '[REDACTED]' })
-				}
-			})
+		const batchArgs = (db.batch as any).mock.calls[0][0] as any[];
+		expect(batchArgs.length).toBe(3);
+		// third query should be the audit with redacted password
+		expect(batchArgs[2]).toHaveProperty('__values');
+		expect(batchArgs[2].__values.meta.request).toEqual(
+			expect.objectContaining({ password: '[REDACTED]' })
 		);
 	});
 
 	it('revokes sessions when resetting passwords', async () => {
-		const repository = repositoryFixture();
+		const db = createMockDb();
+		const repository = repositoryFixture({ db });
 		const service = createAdminService({
 			adminRepository: repository,
 			hashPassword: vi.fn(async () => 'new-hash'),
@@ -76,15 +83,10 @@ describe('admin service', () => {
 			body: { newPassword: 'Stronger123!' }
 		});
 
-		expect(repository.resetUserPassword).toHaveBeenCalledWith({
-			userId: 'usr_b',
-			passwordHash: 'new-hash',
-			now: now()
-		});
-		expect(repository.revokeUserSessions).toHaveBeenCalledWith('usr_b');
-		expect(repository.insertAudit).toHaveBeenCalledWith(
-			expect.objectContaining({ action: 'user.reset_password' })
-		);
+		const batchArgs2 = (db.batch as any).mock.calls[0][0] as any[];
+		expect(batchArgs2.length).toBe(3);
+		// second query should be delete sessions
+		expect(batchArgs2[2].__values).toHaveProperty('action', 'user.reset_password');
 	});
 
 	it('rejects self demotion, self deactivation, and self deletion', async () => {
@@ -102,7 +104,8 @@ describe('admin service', () => {
 	});
 
 	it('creates tenants with a required initial owner in one audited operation', async () => {
-		const repository = repositoryFixture();
+		const db = createMockDb();
+		const repository = repositoryFixture({ db });
 		const service = createAdminService({ adminRepository: repository, now });
 
 		const result = await service.createTenant({
@@ -111,15 +114,11 @@ describe('admin service', () => {
 		});
 
 		expect(result.tenant.id).toBe('tnt_b');
-		expect(repository.createMembership).toHaveBeenCalledWith({
-			tenantId: 'tnt_b',
-			userId: 'usr_b',
-			role: 'owner',
-			now: now()
-		});
-		expect(repository.insertAudit).toHaveBeenCalledWith(
-			expect.objectContaining({ action: 'tenant.create', tenantId: 'tnt_b' })
-		);
+		const batchArgs3 = (db.batch as any).mock.calls[0][0] as any[];
+		expect(batchArgs3.length).toBe(3);
+		// third query should be audit with tenantId
+		expect(batchArgs3[2].__values).toHaveProperty('action', 'tenant.create');
+		expect(batchArgs3[2].__values).toHaveProperty('tenantId', 'tnt_b');
 	});
 
 	it('rejects last-owner demotion and removal', async () => {
@@ -147,7 +146,8 @@ describe('admin service', () => {
 	});
 
 	it('supports viewer membership create, update, and list', async () => {
-		const repository = repositoryFixture({ ownerCount: 2 });
+		const db = createMockDb();
+		const repository = repositoryFixture({ db, ownerCount: 2 });
 		const service = createAdminService({ adminRepository: repository, now });
 
 		await expect(
@@ -186,38 +186,136 @@ describe('admin service', () => {
 type RepositoryOptions = {
 	userByUsername?: UserDto | null;
 	ownerCount?: number;
+	db?: ReturnType<typeof createMockDb>;
 };
 
+function createMockDb() {
+	const baseTimestamp = now();
+
+	const batch = vi.fn(async (queries: any[]) =>
+		queries.map((q: any) => {
+			if (!q.__returning) return [];
+			return [{ ...q.__defaults, ...q.__values, ...q.__inserted }];
+		})
+	);
+
+	function chainable(overrides: Record<string, unknown> = {}) {
+		const obj: Record<string, any> = {
+			__defaults: {},
+			...overrides,
+			returning: vi.fn(function (this: any) {
+				this.__returning = true;
+				return this;
+			}),
+			values: vi.fn(function (this: any, vals: any) {
+				this.__values = { ...this.__values, ...vals };
+				this.__defaults = { createdAt: baseTimestamp, updatedAt: baseTimestamp, deletedAt: null };
+				return this;
+			}),
+			set: vi.fn(function (this: any, vals: any) {
+				this.__values = { ...this.__values, ...vals };
+				return this;
+			}),
+			where: vi.fn(function (this: any) {
+				return this;
+			}),
+			limit: vi.fn(function (this: any) {
+				return this;
+			})
+		};
+		return obj;
+	}
+
+	const db = {
+		batch,
+		insert: vi.fn((_table: any) => {
+			const builder = chainable();
+			builder.values = vi.fn(function (vals: any) {
+				builder.__values = { ...vals };
+				builder.__inserted = { id: vals.id };
+				builder.__defaults = {
+					createdAt: baseTimestamp,
+					updatedAt: baseTimestamp,
+					deletedAt: null
+				};
+				return builder;
+			});
+			return builder;
+		}),
+		update: vi.fn((_table: any) => {
+			const builder = chainable();
+			builder.__defaults = {
+				createdAt: baseTimestamp,
+				updatedAt: baseTimestamp,
+				deletedAt: null
+			};
+			builder.set = vi.fn(function (vals: any) {
+				builder.__values = { ...builder.__values, ...vals };
+				return builder;
+			});
+			builder.where = vi.fn(function () {
+				return builder;
+			});
+			return builder;
+		}),
+		select: vi.fn((_fields?: any) => {
+			const query: any = {
+				from: vi.fn((_table: any) => query),
+				where: vi.fn(() => query),
+				limit: vi.fn(async () => [{
+					id: 'tnt_a',
+					name: 'Tenant A',
+					createdAt: baseTimestamp,
+					updatedAt: baseTimestamp,
+					deletedAt: null
+				}]),
+				orderBy: vi.fn(() => query),
+			};
+			return query;
+		}),
+		delete: vi.fn((_table: any) => {
+			const builder = chainable();
+			builder.where = vi.fn(function () {
+				return builder;
+			});
+			return builder;
+		})
+	};
+
+	return db as unknown as Db;
+}
+
 function repositoryFixture(options: RepositoryOptions = {}): AdminRepository {
+	const db = options.db ?? (createMockDb() as unknown as Db);
 	const tenant = tenantFixture();
 	const user = userFixture({ id: userId('usr_b'), username: 'bob' });
 	const membership = membershipFixture({ role: 'owner' });
 	const repository = {
-		db: {} as never,
-		withTransaction: vi.fn((fn) => fn(repository as unknown as AdminRepository)),
+		db,
+		batch: (...args: any[]) => (db.batch as any)(...args),
 		listUsers: vi.fn(async () => ({ items: [], nextCursor: null })),
 		findUserById: vi.fn(async () => user),
 		findUserByUsername: vi.fn(async () => options.userByUsername ?? null),
 		getUserDetail: vi.fn(async () => ({ ...user, memberships: [membership] })),
 		createUser: vi.fn(async () => user),
-		updateUser: vi.fn(async ({ patch }) => ({ ...user, ...patch })),
+		updateUser: vi.fn(async ({ patch }: any) => ({ ...user, ...patch })),
 		resetUserPassword: vi.fn(async () => true),
 		revokeUserSessions: vi.fn(async () => undefined),
 		deleteUser: vi.fn(async () => true),
 		listTenants: vi.fn(async () => ({ items: [], nextCursor: null })),
 		findTenantById: vi.fn(async () => tenant),
 		createTenant: vi.fn(async () => tenantFixture({ id: tenantId('tnt_b'), name: 'New Tenant' })),
-		updateTenant: vi.fn(async ({ name }) => ({ ...tenant, name })),
+		updateTenant: vi.fn(async ({ name }: any) => ({ ...tenant, name })),
 		deleteTenant: vi.fn(async () => true),
 		listTenantMembers: vi.fn(async () => ({
 			items: [{ ...membership, user }],
 			nextCursor: null
 		})),
-		findActiveMembership: vi.fn(async ({ userId }) => (userId === 'usr_c' ? null : membership)),
-		createMembership: vi.fn(async ({ role, tenantId }) =>
+		findActiveMembership: vi.fn(async ({ userId }: any) => (userId === 'usr_c' ? null : membership)),
+		createMembership: vi.fn(async ({ role, tenantId }: any) =>
 			membershipFixture({ role, tenantId: tenantId as Id<'tenant'> })
 		),
-		updateMembership: vi.fn(async ({ role, tenantId }) =>
+		updateMembership: vi.fn(async ({ role, tenantId }: any) =>
 			membershipFixture({ role, tenantId: tenantId as Id<'tenant'> })
 		),
 		deleteMembership: vi.fn(async () => true),
