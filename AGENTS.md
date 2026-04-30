@@ -7,10 +7,16 @@
     - HOFs.
     - Split large into small typed modules/functions with one responsibility
       and explicit dependencies.
-- Type def should be centralized within the feature, using `*.type.ts`
-  naming (similarly `*.service.ts`, `*.repository.ts`, `*.query.ts`, `*.form.ts`).
 - Test driven dev. Write tests first, as complete as possible.
+- Make modules self-contained and orthogonal as much as possible
 
 # Files
 
 @FILE_TREE.md
+
+# Docs
+
+When you add or change a route, update `docs/api-reference.md`.
+When you add or change a table, update `docs/database-schema.md`.
+When you add or change a script, update `docs/scripts.md`.
+When the architecture or stack changes, update `docs/overview.md`.
