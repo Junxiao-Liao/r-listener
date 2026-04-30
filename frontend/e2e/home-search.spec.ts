@@ -7,7 +7,7 @@ test.beforeEach(async ({ page }) => {
 test('home renders empty states for a new tenant', async ({ page }) => {
 	await gotoApp(page, '/');
 
-	await expect(page.getByRole('heading', { name: 'Family Music' })).toBeVisible();
+	await expect(page.getByRole('link', { name: 'Family Music' })).toBeVisible();
 	await expect(page.getByText('Nothing to resume yet.')).toBeVisible();
 	await expect(page.getByText('Play a track and it will appear here.')).toBeVisible();
 	await expect(page.getByText('No tracks in this workspace yet.')).toBeVisible();
