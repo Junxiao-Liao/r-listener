@@ -62,7 +62,7 @@
 - **Database:** Cloudflare D1
 - **ORM:** Drizzle ORM
 - **Object Storage:** Cloudflare R2
-- **Auth:** HttpOnly cookie session (set and rolled by backend; first-party). `argon2id` via hash-wasm. Sessions persisted in D1.
+- **Auth:** HttpOnly cookie session (set and rolled by backend; first-party). New password hashes use versioned PBKDF2-SHA256 via Web Crypto so hashing stays Worker-friendly; legacy Argon2id hashes remain verifiable. Sessions persisted in D1.
 - **Queue:** Persisted in D1 per user and active tenant. Backend exposes CRUD-style `/api/queue` routes. Frontend treats queue state as durable cross-device state.
 - **Cache:** Cloudflare KV
 - **Validation:** Zod for runtime request/DTO validation (backend) and form validation (frontend)

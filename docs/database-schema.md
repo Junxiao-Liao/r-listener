@@ -96,7 +96,7 @@ expired.
 export const users = sqliteTable('users', {
   id:                  text('id').primaryKey(),
   username:            text('username').notNull(),
-  passwordHash:        text('password_hash').notNull(),       // argon2id encoded
+  passwordHash:        text('password_hash').notNull(),       // versioned password hash
   isAdmin:             integer('is_admin', { mode: 'boolean' }).notNull().default(false),
   isActive:            integer('is_active', { mode: 'boolean' }).notNull().default(true),
   lastActiveTenantId:  text('last_active_tenant_id').references(() => tenants.id, { onDelete: 'set null' }),
