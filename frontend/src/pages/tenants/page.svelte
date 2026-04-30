@@ -21,7 +21,7 @@
 	const adminTenants = useAdminTenantsQuery(() => isAdminWithNoMemberships);
 
 	const memberships = $derived<TenantMembershipDto[]>($session.data?.tenants ?? []);
-	const adminList = $derived<AdminTenantListItemDto[]>($adminTenants.data?.tenants ?? []);
+	const adminList = $derived<AdminTenantListItemDto[]>($adminTenants.data?.items ?? []);
 	const lastActiveTenantId = $derived($session.data?.user.lastActiveTenantId ?? null);
 
 	async function pick(tenantId: Id<'tenant'>) {

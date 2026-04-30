@@ -58,6 +58,12 @@ export type TenantMembershipDto = {
 	createdAt: Iso8601;
 };
 
+export type TenantDto = {
+	id: Id<'tenant'>;
+	name: string;
+	createdAt: Iso8601;
+};
+
 export type PreferencesDto = {
 	language: Language;
 	theme: Theme;
@@ -99,6 +105,45 @@ export type AdminTenantListItemDto = {
 	createdAt: Iso8601;
 	memberCount: number;
 	trackCount: number;
+};
+
+export type AdminUserListItemDto = UserDto & {
+	workspaceCount: number;
+};
+
+export type AdminUserDetailDto = UserDto & {
+	memberships: TenantMembershipDto[];
+};
+
+export type AdminTenantMemberDto = TenantMembershipDto & {
+	user: UserDto;
+};
+
+export type ListResponse<T> = {
+	items: T[];
+	nextCursor: string | null;
+};
+
+export type AdminCreateUserInput = {
+	username: string;
+	password: string;
+	isAdmin: boolean;
+	initialMembership?: { tenantId: Id<'tenant'>; role: TenantRole };
+};
+
+export type AdminUpdateUserInput = {
+	username?: string;
+	isAdmin?: boolean;
+	isActive?: boolean;
+};
+
+export type AdminCreateTenantInput = {
+	name: string;
+	ownerUserId: Id<'user'>;
+};
+
+export type AdminUpdateTenantInput = {
+	name: string;
 };
 
 export type TrackStatus = 'pending' | 'ready';

@@ -1,6 +1,10 @@
 export const queryKeys = {
 	session: ['session'] as const,
 	adminTenants: ['admin', 'tenants'] as const,
+	adminUsers: (params: Record<string, unknown> = {}) => ['admin', 'users', params] as const,
+	adminUser: (id: string) => ['admin', 'users', id] as const,
+	adminTenant: (id: string) => ['admin', 'tenants', id] as const,
+	adminTenantMembers: (id: string) => ['admin', 'tenants', id, 'members'] as const,
 	tracks: ['tracks'] as const,
 	tracksList: (params: { sort: string; q?: string; includePending: boolean }) =>
 		['tracks', 'list', params] as const,

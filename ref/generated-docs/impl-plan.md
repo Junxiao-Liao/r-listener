@@ -196,7 +196,6 @@ backend/src/
   search/
   prefs/
   admin/
-  audit/
   middleware/
 ```
 
@@ -221,7 +220,6 @@ Database modules:
 - Playback history.
 - Queue items.
 - User preferences.
-- Audit logs.
 
 Update `backend/src/db/schema.ts` to re-export all feature ORM modules so
 Drizzle migrations see the complete graph.
@@ -647,7 +645,7 @@ Acceptance:
 
 ### 9. Admin Slice
 
-Goal: platform admins can manage users, tenants, memberships, and audit logs.
+Goal: platform admins can manage users, tenants, and memberships.
 
 Backend:
 
@@ -655,23 +653,18 @@ Backend:
   - Users list/detail/create/update/reset-password/delete.
   - Tenants list/detail/create/update/delete.
   - Tenant members list/create/update/delete.
-  - Audit logs list.
-- Wrap mutating admin operations with audit log writes.
-- Redact secrets in audit metadata.
 - Enforce:
   - Admin required.
   - Cannot demote/deactivate self.
   - Cannot delete self.
   - Cannot remove or demote the last tenant owner to member/viewer.
 - Allow membership roles `owner`, `member`, and `viewer`.
-- Implement admin tenant enter by using switch-tenant behavior and audit action
-  `tenant.admin_enter`.
+- Implement admin tenant enter by using switch-tenant behavior.
 
 Frontend:
 
 - Add Settings -> Admin entry for platform admins only.
-- Let platform admins enter the admin area even when they have no tenant
-  memberships or active tenant.
+- Let platform admins enter the admin area even when they have no tenant memberships or active tenant.
 - Implement:
   - Admin Users.
   - Admin User Detail.
@@ -679,7 +672,6 @@ Frontend:
   - Admin Tenants.
   - Admin Tenant Detail.
   - Admin Tenant Members.
-  - Admin Audit Logs.
 - Add confirmation sheets for destructive actions.
 - Disable impossible self/last-owner actions with clear inline explanation.
 - Include Viewer in admin membership role selectors.
@@ -693,14 +685,11 @@ Tests first:
 - Tenant create requires initial owner.
 - Last owner cannot be removed or demoted.
 - Admin can create, update, and list viewer memberships.
-- Mutating admin actions create audit logs.
-- Audit log filters work.
 
 Acceptance:
 
-- Admin can create user, create tenant, add membership, enter workspace, and see
-  audit entries for the actions.
-- Admin user deletion removes access but keeps that user's uploaded tracks and
+- Admin can create user, create tenant, add membership, and enter workspace.
+- Admin user deletion removes access but keeps that user's uploaded tracks and playlists.
   playlists visible to remaining authorized workspace users.
 
 ### 10. Localization, UI Polish, And Responsive Completion
@@ -782,7 +771,7 @@ Backend Vitest:
 - Upload and stream validation.
 - Playlist and queue ordering.
 - Playback history.
-- Admin audit and safety rules.
+- Admin safety rules.
 
 Frontend Vitest:
 
@@ -804,7 +793,7 @@ Playwright:
 - Playlist CRUD and reorder.
 - Viewer disabled edit affordances.
 - Settings and preferences.
-- Admin user/tenant/member/audit flows.
+- Admin user/tenant/member flows.
 - EN and 中文 smoke coverage.
 
 Manual:

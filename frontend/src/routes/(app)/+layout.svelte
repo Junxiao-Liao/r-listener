@@ -5,6 +5,7 @@
 	import BottomNav from '$shared/components/shell/BottomNav.svelte';
 	import MiniPlayer from '$shared/player/MiniPlayer.svelte';
 	import PlayerHost from '$shared/player/PlayerHost.svelte';
+	import { canOpenAppPathWithoutActiveTenant } from '$shared/auth/admin-route';
 	import { useSessionQuery } from '$shared/query/session.query';
 
 	let { children } = $props();
@@ -17,16 +18,20 @@
 			void goto('/signin', { replaceState: true });
 			return;
 		}
-		if (!$session.data.activeTenantId && page.url.pathname !== '/tenants') {
+		if (
+			!$session.data.activeTenantId &&
+			!canOpenAppPathWithoutActiveTenant($session.data, page.url.pathname)
+		) {
 			void goto('/tenants', { replaceState: true });
 		}
 	});
 
-	const showNav = $derived(page.url.pathname !== '/tenants');
+	const showNav = $derived(page.url.pathname !== '/tenants' && !page.url.pathname.startsWith('/admin'));
 	const ready = $derived(
 		!$session.isPending &&
 			!!$session.data &&
-			(!!$session.data.activeTenantId || page.url.pathname === '/tenants')
+			(!!$session.data.activeTenantId ||
+				canOpenAppPathWithoutActiveTenant($session.data, page.url.pathname))
 	);
 	const showMiniPlayer = $derived(
 		showNav &&

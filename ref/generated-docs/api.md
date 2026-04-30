@@ -288,18 +288,6 @@ type QueueStateDto = {
 type SearchHitDto =
   | { kind: "track"; track: TrackDto }
   | { kind: "playlist"; playlist: PlaylistDto };
-
-// Audit ---------------------------------------------------------------
-type AuditLogDto = {
-  id: Id<"audit">;
-  actorId: Id<"user">;        // admin who performed it
-  action: string;             // "user.create", "tenant.delete", ...
-  targetType: "user" | "tenant" | "membership" | "track" | "playlist";
-  targetId: string;
-  tenantId: Id<"tenant"> | null;
-  meta: Record<string, unknown>;
-  createdAt: Iso8601;
-};
 ```
 
 ---
@@ -391,8 +379,7 @@ Response `200`:
 ```
 
 - Non-admin: 403 `tenant_forbidden` if not a member.
-- Admin: may switch to any tenant (including tenants they're not a member
-  of); action is written to `audit_logs` as `tenant.admin_enter`.
+- Admin: may switch to any tenant (including tenants they're not a member of).
 - Errors: `404 tenant_not_found`, `403 tenant_forbidden`.
 
 ### `POST /auth/change-password`
@@ -812,9 +799,6 @@ Response `200`: `PreferencesDto`.
 All routes below require `is_admin = true` on the signed-in user.
 Unauthorized callers receive `403 admin_required`.
 
-Every mutating admin route writes one `audit_logs` row. The `meta` object
-captures the request body (with secrets redacted: `password`, tokens).
-
 ### 6.1 Users
 
 #### `GET /admin/users`
@@ -841,26 +825,24 @@ Validation: username is trimmed, lowercased, 3-32 characters, and may contain on
 `"member"`, or `"viewer"`.
 Response `201`: `UserDto`.
 Errors: `409 username_conflict`, `422 weak_password`.
-Audit: `user.create`.
 
 #### `PATCH /admin/users/{id}`
 Editable: `username`, `isAdmin`, `isActive`.
 An admin cannot demote themselves (`isAdmin: false` on own id) or deactivate
 themselves (`422 cannot_self_downgrade`).
-Response: `UserDto`. Audit: `user.update`.
+Response: `UserDto`.
 
 #### `POST /admin/users/{id}/reset-password`
 ```json
 { "newPassword": "..." }
 ```
-Response: `204`. Revokes all sessions for the target user. Audit:
-`user.reset_password`.
+Response: `204`. Revokes all sessions for the target user.
 
 #### `DELETE /admin/users/{id}`
 Soft delete; revokes all sessions; removes the user from all tenant
 memberships (memberships soft-deleted too). Uploaded tracks, playlist records,
 and other shared workspace content created by the user remain visible to other
-authorized workspace users. `204`. Audit: `user.delete`. Self-delete rejected
+authorized workspace users. `204`. Self-delete rejected
 `422 cannot_self_delete`.
 
 ### 6.2 Tenants
@@ -880,15 +862,14 @@ Response: `TenantDto`.
   created without an initial owner.
 - Response `201`: `{ tenant: TenantDto, ownership: TenantMembershipDto }`.
 - Errors: `404 user_not_found`.
-- Audit: `tenant.create`.
 
 #### `PATCH /admin/tenants/{id}`
-Editable: `name`. Response: `TenantDto`. Audit: `tenant.update`.
+Editable: `name`. Response: `TenantDto`.
 
 #### `DELETE /admin/tenants/{id}`
 Soft delete. Tracks and playlists in the tenant are cascade-soft-deleted
 (mark `deleted_at`). Active sessions with this as `active_tenant_id` have
-their `active_tenant_id` set to `null`. `204`. Audit: `tenant.delete`.
+their `active_tenant_id` set to `null`. `204`.
 
 ### 6.3 Tenant membership
 
@@ -904,7 +885,6 @@ Response: `{ items: (TenantMembershipDto & { user: UserDto })[], nextCursor }`.
 ```
 `role` may be `"owner"`, `"member"`, or `"viewer"`. Response `201`:
 `TenantMembershipDto`. Errors: `404 user_not_found`, `409 already_member`.
-Audit: `membership.create`.
 
 #### `PATCH /admin/tenants/{id}/members/{userId}`
 ```json
@@ -912,22 +892,12 @@ Audit: `membership.create`.
 ```
 `role` may be `"owner"`, `"member"`, or `"viewer"`.
 Response: `TenantMembershipDto`. Demoting the last owner is rejected with
-`422 cannot_remove_last_owner`. Audit: `membership.update`.
+`422 cannot_remove_last_owner`.
 
 #### `DELETE /admin/tenants/{id}/members/{userId}`
 Soft-deletes the membership. Sessions with this tenant active drop
 `active_tenant_id`. Removing the last owner is rejected with
-`422 cannot_remove_last_owner`. `204`. Audit: `membership.delete`.
-
-### 6.4 Audit logs
-
-#### `GET /admin/audit-logs`
-Query: `limit`, `cursor`, `actorId`, `tenantId`, `action`, `targetType`,
-`from` (ISO), `to` (ISO).
-Response: `{ items: AuditLogDto[], nextCursor }`. Sort: `createdAt:desc`.
-Append-only; no write endpoint.
-
----
+`422 cannot_remove_last_owner`. `204`.
 
 ## 7. Upload flow (summary)
 
@@ -1086,14 +1056,8 @@ backend/src/
   admin/
     admin.type.ts
     admin.dto.ts
-    admin.service.ts     audit wrappers over per-feature services
+    admin.service.ts
     admin.route.ts       /admin/*
-  audit/
-    audit.orm.ts
-    audit.type.ts
-    audit.dto.ts
-    audit.repository.ts
-    audit.route.ts       /admin/audit-logs (read-only)
   middleware/
     middleware.type.ts
     middleware.service.ts

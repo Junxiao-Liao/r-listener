@@ -50,6 +50,9 @@
 			<Button variant="outline" href="/settings/change-password" class="w-full">
 				{m.settings_change_password()}
 			</Button>
+			{#if $session.data.user.isAdmin}
+				<Button variant="outline" href="/admin" class="w-full">{m.admin_dashboard_title()}</Button>
+			{/if}
 			<Button
 				variant="destructive"
 				class="w-full"
