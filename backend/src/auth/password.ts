@@ -1,14 +1,8 @@
-import { argon2id } from '@noble/hashes/argon2.js';
-
 const PBKDF2_ALGORITHM = 'pbkdf2-sha256';
-const PBKDF2_ITERATIONS = 100_000;
-const MAX_WORKER_PBKDF2_ITERATIONS = 100_000;
+const PBKDF2_ITERATIONS = 50_000;
+const MAX_WORKER_PBKDF2_ITERATIONS = 50_000;
 const SALT_BYTE_LENGTH = 16;
 const HASH_BYTE_LENGTH = 32;
-
-// Legacy hashes were generated with synchronous JS Argon2id. Keep verification
-// for existing rows, but do not use it for new hashes in Workers.
-const LEGACY_ARGON2ID_PARAMS = { p: 1, t: 2, m: 19456, dkLen: HASH_BYTE_LENGTH } as const;
 
 export async function hashPassword(password: string): Promise<string> {
 	const salt = crypto.getRandomValues(new Uint8Array(SALT_BYTE_LENGTH));
@@ -28,18 +22,7 @@ export async function verifyPassword(password: string, encoded: string): Promise
 		}
 	}
 
-	const [saltHex, hashHex] = encoded.split('$');
-	if (!saltHex || !hashHex) return false;
-	const salt = hexToBytes(saltHex);
-	const expected = hexToBytes(hashHex);
-	if (!salt || !expected) return false;
-
-	try {
-		const actual = argon2id(password, salt, LEGACY_ARGON2ID_PARAMS);
-		return timingSafeEqual(actual, expected);
-	} catch {
-		return false;
-	}
+	return false;
 }
 
 export function isPbkdf2PasswordHash(encoded: string): boolean {

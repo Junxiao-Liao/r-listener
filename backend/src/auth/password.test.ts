@@ -6,7 +6,7 @@ describe('password hashing', () => {
 		const encoded = await hashPassword('Stronger123!');
 
 		expect(isPbkdf2PasswordHash(encoded)).toBe(true);
-		expect(encoded).toMatch(/^pbkdf2-sha256\$100000\$[a-f0-9]{32}\$[a-f0-9]{64}$/);
+		expect(encoded).toMatch(/^pbkdf2-sha256\$50000\$[a-f0-9]{32}\$[a-f0-9]{64}$/);
 	});
 
 	it('verifies matching PBKDF2 passwords and rejects mismatches', async () => {
@@ -16,11 +16,11 @@ describe('password hashing', () => {
 		await expect(verifyPassword('Wronger123!', encoded)).resolves.toBe(false);
 	});
 
-	it('keeps verifying legacy Argon2id hashes', async () => {
+	it('rejects legacy Argon2id hashes without spending Worker CPU', async () => {
 		const legacyHash =
 			'000102030405060708090a0b0c0d0e0f$ee8ec0beb1f917833bd0d655bda6c37e299eae4c26d4ea28d6b6e71fb9aa34f2';
 
-		await expect(verifyPassword('Stronger123!', legacyHash)).resolves.toBe(true);
+		await expect(verifyPassword('Stronger123!', legacyHash)).resolves.toBe(false);
 		await expect(verifyPassword('Wronger123!', legacyHash)).resolves.toBe(false);
 	});
 
@@ -31,9 +31,9 @@ describe('password hashing', () => {
 		);
 	});
 
-	it('rejects PBKDF2 hashes above the Cloudflare Worker iteration cap', async () => {
+	it('rejects PBKDF2 hashes above the app iteration cap', async () => {
 		const unsupported =
-			'pbkdf2-sha256$100001$000102030405060708090a0b0c0d0e0f$000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f';
+			'pbkdf2-sha256$50001$000102030405060708090a0b0c0d0e0f$000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f';
 
 		await expect(verifyPassword('Stronger123!', unsupported)).resolves.toBe(false);
 	});
