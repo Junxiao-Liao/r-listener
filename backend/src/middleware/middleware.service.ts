@@ -6,7 +6,7 @@ import type { MiddlewareService } from './middleware.type';
 
 export function createMiddlewareService(db: Db, kv: KVNamespace): MiddlewareService {
 	return {
-		validateSession: (input) => validateSession(db, input),
+		validateSession: (input) => validateSession(kv, db, input),
 		resolveTenantAccess: (input) => resolveTenantAccess(db, input),
 		checkAuthRateLimit: (input) => checkAuthRateLimit(kv, input),
 		checkApiRateLimit: (input) => checkApiRateLimit(kv, input)

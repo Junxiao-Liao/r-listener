@@ -1,7 +1,6 @@
 import { and, eq, inArray, isNull } from 'drizzle-orm';
 import type { AuditTargetType } from '../audit/audit.type';
 import { auditLogs } from '../audit/audit.orm';
-import { sessions } from '../auth/auth.orm';
 import { hashPassword as defaultHashPassword } from '../auth/password';
 import { passwordMeetsPolicy } from '../auth/auth.service';
 import type { Db } from '../db';
@@ -228,7 +227,6 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 					.set({ passwordHash, updatedAt: n })
 					.where(and(eq(users.id, userId), isNull(users.deletedAt)))
 					.returning(),
-				db.delete(sessions).where(eq(sessions.userId, userId)),
 				audit(db, {
 					actor,
 					action: 'user.reset_password',
@@ -238,6 +236,7 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 					body
 				})
 			] as const);
+			await deps.adminRepository.revokeUserSessions(userId);
 			const userRows = results[0] as unknown as (typeof users.$inferSelect)[];
 			if (userRows.length === 0) throw apiError(404, 'user_not_found', 'User not found.');
 		},
@@ -262,7 +261,6 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 				db.update(memberships)
 					.set({ deletedAt: n, updatedAt: n })
 					.where(and(eq(memberships.userId, userId), isNull(memberships.deletedAt))),
-				db.delete(sessions).where(eq(sessions.userId, userId)),
 				audit(db, {
 					actor,
 					action: 'user.delete',
@@ -272,6 +270,7 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 					body: {}
 				})
 			] as const);
+			await deps.adminRepository.revokeUserSessions(userId);
 			const userRows = results[0] as unknown as (typeof users.$inferSelect)[];
 			if (userRows.length === 0) throw apiError(404, 'user_not_found', 'User not found.');
 		},
@@ -351,9 +350,6 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 			const playlistsQ = db.update(playlists)
 				.set({ deletedAt: n, updatedAt: n })
 				.where(and(eq(playlists.tenantId, tenantId), isNull(playlists.deletedAt)));
-			const sessionsQ = db.update(sessions)
-				.set({ activeTenantId: null })
-				.where(eq(sessions.activeTenantId, tenantId));
 			const auditQ = audit(db, {
 				actor,
 				action: 'tenant.delete',
@@ -372,9 +368,9 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 						.set({ deletedAt: n })
 						.where(and(inArray(playlistTracks.playlistId, playlistIds), isNull(playlistTracks.deletedAt))),
 					playlistsQ,
-					sessionsQ,
 					auditQ
 				] as const);
+				await deps.adminRepository.clearActiveTenantSessions({ tenantId });
 				const tenantRows = results[0] as unknown as (typeof tenants.$inferSelect)[];
 				if (tenantRows.length === 0) throw apiError(404, 'tenant_not_found', 'Tenant not found.');
 			} else {
@@ -383,9 +379,9 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 					membershipsQ,
 					tracksQ,
 					playlistsQ,
-					sessionsQ,
 					auditQ
 				] as const);
+				await deps.adminRepository.clearActiveTenantSessions({ tenantId });
 				const tenantRows = results[0] as unknown as (typeof tenants.$inferSelect)[];
 				if (tenantRows.length === 0) throw apiError(404, 'tenant_not_found', 'Tenant not found.');
 			}
@@ -476,9 +472,6 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 						)
 					)
 					.returning(),
-				db.update(sessions)
-					.set({ activeTenantId: null })
-					.where(and(eq(sessions.activeTenantId, tenantId), eq(sessions.userId, userId))),
 				audit(db, {
 					actor,
 					action: 'membership.delete',
@@ -488,14 +481,15 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 					body: {}
 				})
 			] as const);
+			await deps.adminRepository.clearActiveTenantSessions({ tenantId, userId });
 			const membershipRows = results[0] as unknown as (typeof memberships.$inferSelect)[];
 			if (membershipRows.length === 0) throw apiError(404, 'tenant_not_found', 'Membership not found.');
 		}
 	};
 }
 
-export function createAdminServiceForDb(db: Db): AdminService {
-	return createAdminService({ adminRepository: createAdminRepository(db) });
+export function createAdminServiceForDb(db: Db, kv: KVNamespace): AdminService {
+	return createAdminService({ adminRepository: createAdminRepository(db, kv) });
 }
 
 export function redactSecrets(value: unknown): unknown {

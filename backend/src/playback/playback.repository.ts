@@ -12,6 +12,7 @@ import {
 	type RecentTrackJoinedRow
 } from './playback.dto';
 import type { RecentTracksPage } from './playback.type';
+import { createKvCache } from '../lib/kv-cache';
 
 export type UpsertHistoryInput = {
 	userId: Id<'user'>;
@@ -46,7 +47,82 @@ export type PlaybackRepository = {
 	listContinueListening(input: ListContinueListeningInput): Promise<RecentTracksPage>;
 };
 
-export function createPlaybackRepository(db: Db): PlaybackRepository {
+type BufferedEvent = {
+	userId: string;
+	tenantId: string;
+	trackId: string;
+	lastPlayedAt: number;
+	lastPositionMs: number;
+	playlistId: string | null;
+	updatedAt: number;
+};
+
+function bufferKey(userId: Id<'user'>, tenantId: Id<'tenant'>): string {
+	return `buffer:history:${userId}:${tenantId}`;
+}
+
+async function drainBuffer(db: Db, kv: KVNamespace, userId: Id<'user'>, tenantId: Id<'tenant'>): Promise<void> {
+	const key = bufferKey(userId, tenantId);
+	try {
+		const raw = await kv.get(key, 'json');
+		if (!raw) return;
+		const events = raw as BufferedEvent[];
+		if (!Array.isArray(events) || events.length === 0) {
+			await kv.delete(key);
+			return;
+		}
+
+		const latestByTrack = new Map<string, BufferedEvent>();
+		for (const e of events) {
+			const existing = latestByTrack.get(e.trackId);
+			if (!existing || e.lastPlayedAt > existing.lastPlayedAt) {
+				latestByTrack.set(e.trackId, e);
+			}
+		}
+
+		for (const e of latestByTrack.values()) {
+			await db
+				.insert(playbackHistory)
+				.values({
+					userId: e.userId as Id<'user'>,
+					tenantId: e.tenantId as Id<'tenant'>,
+					trackId: e.trackId as Id<'track'>,
+					lastPlaylistId: e.playlistId as Id<'playlist'> | null,
+					lastPlayedAt: new Date(e.lastPlayedAt),
+					lastPositionMs: e.lastPositionMs,
+					updatedAt: new Date(e.updatedAt)
+				})
+				.onConflictDoUpdate({
+					target: [playbackHistory.userId, playbackHistory.tenantId, playbackHistory.trackId],
+					set: {
+						lastPlayedAt: sql`excluded.last_played_at`,
+						lastPositionMs: sql`excluded.last_position_ms`,
+						lastPlaylistId: sql`excluded.last_playlist_id`,
+						updatedAt: sql`excluded.updated_at`
+					},
+					setWhere: sql`excluded.last_played_at >= ${playbackHistory.lastPlayedAt}`
+				});
+		}
+
+		await kv.delete(key);
+	} catch (err) {
+		console.error('drainBuffer error:', err);
+	}
+}
+
+async function bufferEvents(kv: KVNamespace, userId: Id<'user'>, tenantId: Id<'tenant'>, event: BufferedEvent): Promise<void> {
+	const key = bufferKey(userId, tenantId);
+	try {
+		const raw = await kv.get(key, 'json');
+		const events: BufferedEvent[] = raw ? (raw as BufferedEvent[]) : [];
+		events.push(event);
+		await kv.put(key, JSON.stringify(events), { expirationTtl: 3600 });
+	} catch (err) {
+		console.error('bufferEvents error:', err);
+	}
+}
+
+export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepository {
 	return {
 		filterVisibleTrackIds: async (trackIds, tenantId) => {
 			if (trackIds.length === 0) return new Set();
@@ -65,30 +141,49 @@ export function createPlaybackRepository(db: Db): PlaybackRepository {
 		},
 
 		upsertHistory: async (input) => {
-			await db
-				.insert(playbackHistory)
-				.values({
+			if (kv) {
+				const event: BufferedEvent = {
 					userId: input.userId,
 					tenantId: input.tenantId,
 					trackId: input.trackId,
-					lastPlaylistId: input.playlistId,
-					lastPlayedAt: input.lastPlayedAt,
+					lastPlayedAt: input.lastPlayedAt.getTime(),
 					lastPositionMs: input.lastPositionMs,
-					updatedAt: input.now
-				})
-				.onConflictDoUpdate({
-					target: [playbackHistory.userId, playbackHistory.tenantId, playbackHistory.trackId],
-					set: {
-						lastPlayedAt: sql`excluded.last_played_at`,
-						lastPositionMs: sql`excluded.last_position_ms`,
-						lastPlaylistId: sql`excluded.last_playlist_id`,
-						updatedAt: sql`excluded.updated_at`
-					},
-					setWhere: sql`excluded.last_played_at >= ${playbackHistory.lastPlayedAt}`
-				});
+					playlistId: input.playlistId,
+					updatedAt: input.now.getTime()
+				};
+				const buffered = (await kv.get(bufferKey(input.userId, input.tenantId), 'json')) as BufferedEvent[] | null;
+				if (buffered && buffered.length >= 10) {
+					await drainBuffer(db, kv, input.userId, input.tenantId);
+				}
+				await bufferEvents(kv, input.userId, input.tenantId, event);
+			} else {
+				await db
+					.insert(playbackHistory)
+					.values({
+						userId: input.userId,
+						tenantId: input.tenantId,
+						trackId: input.trackId,
+						lastPlaylistId: input.playlistId,
+						lastPlayedAt: input.lastPlayedAt,
+						lastPositionMs: input.lastPositionMs,
+						updatedAt: input.now
+					})
+					.onConflictDoUpdate({
+						target: [playbackHistory.userId, playbackHistory.tenantId, playbackHistory.trackId],
+						set: {
+							lastPlayedAt: sql`excluded.last_played_at`,
+							lastPositionMs: sql`excluded.last_position_ms`,
+							lastPlaylistId: sql`excluded.last_playlist_id`,
+							updatedAt: sql`excluded.updated_at`
+						},
+						setWhere: sql`excluded.last_played_at >= ${playbackHistory.lastPlayedAt}`
+					});
+			}
 		},
 
 		listRecent: async (input) => {
+			if (kv) await drainBuffer(db, kv, input.userId, input.tenantId);
+
 			const conditions = [
 				eq(playbackHistory.userId, input.userId),
 				eq(playbackHistory.tenantId, input.tenantId),
@@ -138,6 +233,8 @@ export function createPlaybackRepository(db: Db): PlaybackRepository {
 		},
 
 		listContinueListening: async (input) => {
+			if (kv) await drainBuffer(db, kv, input.userId, input.tenantId);
+
 			const rows = await db
 				.select()
 				.from(playbackHistory)

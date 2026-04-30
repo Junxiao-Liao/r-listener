@@ -4,6 +4,7 @@ import type { Id } from '../shared/shared.type';
 import { toTrackDto } from './tracks.dto';
 import { tracks } from './tracks.orm';
 import type { LyricsStatus, TrackDto, TrackStatus } from './tracks.type';
+import { createKvCache, type KvCache } from '../lib/kv-cache';
 
 export type TrackRow = typeof tracks.$inferSelect;
 
@@ -87,7 +88,19 @@ export type SetLyricsRepoInput = {
 	now: Date;
 };
 
-export function createTracksRepository(db: Db): TracksRepository {
+export function createTracksRepository(db: Db, kv?: KVNamespace): TracksRepository {
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 300 }) : null;
+
+	function trackKey(tenantId: Id<'tenant'>, trackId: Id<'track'>): string {
+		return `cache:track:${tenantId}:${trackId}`;
+	}
+
+	async function invalidateTrackCache(tenantId: Id<'tenant'>, trackId: Id<'track'>): Promise<void> {
+		if (cache) {
+			await cache.invalidate(trackKey(tenantId, trackId));
+			await cache.invalidatePrefix(`cache:tracks:list:${tenantId}:`);
+		}
+	}
 	return {
 		listTracks: async (input) => {
 			const conditions = [eq(tracks.tenantId, input.tenantId), isNull(tracks.deletedAt)];
@@ -138,12 +151,21 @@ export function createTracksRepository(db: Db): TracksRepository {
 		},
 
 		findById: async (trackId, tenantId) => {
+			const key = trackKey(tenantId, trackId);
+			const cached = await cache?.tryGet<ReturnType<typeof toTrackDto>>(key);
+			if (cached) return cached;
+
 			const rows = await db
 				.select()
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.limit(1);
-			return rows[0] ? toTrackDto(rows[0], null) : null;
+
+			const result = rows[0] ? toTrackDto(rows[0], null) : null;
+			if (cache && result) {
+				await cache.put(key, result);
+			}
+			return result;
 		},
 
 		findRowById: async (trackId, tenantId) => {
@@ -199,7 +221,9 @@ export function createTracksRepository(db: Db): TracksRepository {
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			return toTrackDto(updated[0]!, null);
+			const dto = toTrackDto(updated[0]!, null);
+			await invalidateTrackCache(input.tenantId, input.trackId);
+			return dto;
 		},
 
 		updateTrack: async (input) => {
@@ -221,7 +245,9 @@ export function createTracksRepository(db: Db): TracksRepository {
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			return toTrackDto(updated[0]!, null);
+			const dto = toTrackDto(updated[0]!, null);
+			await invalidateTrackCache(input.tenantId, input.trackId);
+			return dto;
 		},
 
 		setLyrics: async (input) => {
@@ -238,7 +264,9 @@ export function createTracksRepository(db: Db): TracksRepository {
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			return toTrackDto(updated[0]!, null);
+			const dto = toTrackDto(updated[0]!, null);
+			await invalidateTrackCache(input.tenantId, input.trackId);
+			return dto;
 		},
 
 		clearLyrics: async (trackId, tenantId, now) => {
@@ -255,7 +283,9 @@ export function createTracksRepository(db: Db): TracksRepository {
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId)))
 				.limit(1);
-			return toTrackDto(updated[0]!, null);
+			const dto = toTrackDto(updated[0]!, null);
+			await invalidateTrackCache(tenantId, trackId);
+			return dto;
 		},
 
 		softDelete: async (trackId, tenantId, now) => {
@@ -264,6 +294,7 @@ export function createTracksRepository(db: Db): TracksRepository {
 				.set({ deletedAt: now, updatedAt: now })
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.returning();
+			await invalidateTrackCache(tenantId, trackId);
 			return rows[0] ? toTrackDto(rows[0], null) : null;
 		}
 	};

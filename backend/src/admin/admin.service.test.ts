@@ -84,9 +84,9 @@ describe('admin service', () => {
 		});
 
 		const batchArgs2 = (db.batch as any).mock.calls[0][0] as any[];
-		expect(batchArgs2.length).toBe(3);
-		// second query should be delete sessions
-		expect(batchArgs2[2].__values).toHaveProperty('action', 'user.reset_password');
+		expect(batchArgs2.length).toBe(2);
+		expect(batchArgs2[1].__values).toHaveProperty('action', 'user.reset_password');
+		expect(repository.revokeUserSessions).toHaveBeenCalledWith('usr_b');
 	});
 
 	it('rejects self demotion, self deactivation, and self deletion', async () => {

@@ -12,6 +12,7 @@ export type BackendBindings = {
 
 export type BackendVariables = {
 	db: Db;
+	kv: KVNamespace;
 	middlewareService: MiddlewareService;
 	session: SessionContext;
 };

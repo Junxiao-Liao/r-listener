@@ -16,7 +16,7 @@ import {
 import type { PlaybackEventInput } from './playback.type';
 
 export type PlaybackRouteDeps = {
-	createPlaybackService?: (db: Db) => PlaybackService;
+	createPlaybackService?: (db: Db, kv: KVNamespace) => PlaybackService;
 };
 
 export function createPlaybackRoute(deps: PlaybackRouteDeps = {}) {
@@ -25,7 +25,7 @@ export function createPlaybackRoute(deps: PlaybackRouteDeps = {}) {
 
 	route.post('/playback-events', requireSession(), requireTenant(), async (c) => {
 		const body = await parseJsonBody(c, playbackEventsBatchSchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 
 		await service.recordEvents({
 			userId: c.var.session.user.id,
@@ -38,7 +38,7 @@ export function createPlaybackRoute(deps: PlaybackRouteDeps = {}) {
 
 	route.get('/me/recent-tracks', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, recentTracksQuerySchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 
 		const page = await service.listRecent({
 			userId: c.var.session.user.id,
@@ -52,7 +52,7 @@ export function createPlaybackRoute(deps: PlaybackRouteDeps = {}) {
 
 	route.get('/me/continue-listening', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, continueListeningQuerySchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 
 		const page = await service.listContinueListening({
 			userId: c.var.session.user.id,

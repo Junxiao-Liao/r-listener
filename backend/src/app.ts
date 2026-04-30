@@ -19,7 +19,7 @@ import { searchRoute } from './search/search.route';
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
-	createAdminService?: (db: Db) => AdminService;
+	createAdminService?: (db: Db, kv: KVNamespace) => AdminService;
 	configure?: (app: Hono<BackendEnv>) => void;
 };
 

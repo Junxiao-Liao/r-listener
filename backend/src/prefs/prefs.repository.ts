@@ -4,6 +4,8 @@ import type { UserId } from '../users/users.type';
 import { userPreferences } from './prefs.orm';
 import { toPreferencesDto } from './prefs.dto';
 import type { PreferencesDto, PreferencesPatch } from './prefs.type';
+import type { KvCache } from '../lib/kv-cache';
+import { createKvCache } from '../lib/kv-cache';
 
 export type PrefsRepository = {
 	findByUserId(userId: UserId): Promise<PreferencesDto | null>;
@@ -11,15 +13,31 @@ export type PrefsRepository = {
 	update(input: { userId: UserId; patch: PreferencesPatch; now: Date }): Promise<PreferencesDto>;
 };
 
-export function createPrefsRepository(db: Db): PrefsRepository {
+function prefsKey(userId: UserId): string {
+	return `prefs:${userId}`;
+}
+
+export function createPrefsRepository(db: Db, kv?: KVNamespace): PrefsRepository {
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 600 }) : null;
+
 	return {
 		findByUserId: async (userId) => {
+			if (cache) {
+				const cached = await cache.tryGet<PreferencesDto>(prefsKey(userId));
+				if (cached) return cached;
+			}
+
 			const rows = await db
 				.select()
 				.from(userPreferences)
 				.where(eq(userPreferences.userId, userId))
 				.limit(1);
-			return rows[0] ? toPreferencesDto(rows[0]) : null;
+
+			const result = rows[0] ? toPreferencesDto(rows[0]) : null;
+			if (cache && result) {
+				await cache.put(prefsKey(userId), result);
+			}
+			return result;
 		},
 		createDefault: async ({ userId, now }) => {
 			await db
@@ -34,7 +52,9 @@ export function createPrefsRepository(db: Db): PrefsRepository {
 			if (!created[0]) {
 				throw new Error('failed to create preferences');
 			}
-			return toPreferencesDto(created[0]);
+			const dto = toPreferencesDto(created[0]);
+			if (cache) await cache.put(prefsKey(userId), dto);
+			return dto;
 		},
 		update: async ({ userId, patch, now }) => {
 			const rows = await db
@@ -43,7 +63,9 @@ export function createPrefsRepository(db: Db): PrefsRepository {
 				.where(eq(userPreferences.userId, userId))
 				.returning();
 			if (rows[0]) {
-				return toPreferencesDto(rows[0]);
+				const dto = toPreferencesDto(rows[0]);
+				if (cache) await cache.put(prefsKey(userId), dto);
+				return dto;
 			}
 			await db.insert(userPreferences).values({ userId, ...patch, updatedAt: now });
 			const created = await db
@@ -54,7 +76,9 @@ export function createPrefsRepository(db: Db): PrefsRepository {
 			if (!created[0]) {
 				throw new Error('failed to update preferences');
 			}
-			return toPreferencesDto(created[0]);
+			const dto = toPreferencesDto(created[0]);
+			if (cache) await cache.put(prefsKey(userId), dto);
+			return dto;
 		}
 	};
 }

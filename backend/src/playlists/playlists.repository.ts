@@ -23,6 +23,7 @@ import type {
 	TrackRow
 } from './playlists.dto';
 import { playlistTracks, playlists } from './playlists.orm';
+import { createKvCache, type KvCache } from '../lib/kv-cache';
 
 export type PlaylistSortField = 'name' | 'createdAt' | 'updatedAt';
 export type SortDirection = 'asc' | 'desc';
@@ -132,7 +133,19 @@ export type PlaylistsRepository = {
 
 type CursorData = { id: string; value: string | number };
 
-export function createPlaylistsRepository(db: Db): PlaylistsRepository {
+export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRepository {
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 300 }) : null;
+
+	function playlistKey(tenantId: Id<'tenant'>, playlistId: Id<'playlist'>): string {
+		return `cache:playlist:${tenantId}:${playlistId}`;
+	}
+
+	async function invalidatePlaylistCache(input: { tenantId: Id<'tenant'>; playlistId: Id<'playlist'> }): Promise<void> {
+		if (cache) {
+			await cache.invalidate(playlistKey(input.tenantId, input.playlistId));
+			await cache.invalidatePrefix(`cache:playlists:list:${input.tenantId}:`);
+		}
+	}
 	async function loadAggregate(playlistId: string): Promise<{
 		trackCount: number;
 		totalDurationMs: number;
@@ -209,6 +222,11 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 		},
 
 		findPlaylist: async ({ tenantId, playlistId }) => {
+			if (cache) {
+				const cached = await cache.tryGet<PlaylistAggregate>(playlistKey(tenantId, playlistId));
+				if (cached) return cached;
+			}
+
 			const rows = await db
 				.select()
 				.from(playlists)
@@ -222,7 +240,9 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 				.limit(1);
 			if (!rows[0]) return null;
 			const agg = await loadAggregate(rows[0].id);
-			return { row: rows[0], ...agg };
+			const result = { row: rows[0], ...agg };
+			if (cache) await cache.put(playlistKey(tenantId, playlistId), result);
+			return result;
 		},
 
 		findPlaylistByName: async ({ tenantId, name, excludeId }) => {
@@ -283,6 +303,7 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 				.limit(1);
 			if (!rows[0] || rows[0].deletedAt !== null) return null;
 			const agg = await loadAggregate(rows[0].id);
+			await invalidatePlaylistCache(input);
 			return { row: rows[0], ...agg };
 		},
 
@@ -298,6 +319,7 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 					)
 				)
 				.returning();
+			await invalidatePlaylistCache(input);
 			return rows[0] ?? null;
 		},
 
@@ -371,6 +393,12 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 				.from(playlistTracks)
 				.where(eq(playlistTracks.id, id))
 				.limit(1);
+			if (cache) {
+				const playlist = await db.select({ tenantId: playlists.tenantId }).from(playlists).where(eq(playlists.id, input.playlistId)).limit(1);
+				if (playlist[0]) {
+					await cache.invalidate(playlistKey(playlist[0].tenantId as Id<'tenant'>, input.playlistId));
+				}
+			}
 			return rows[0]!;
 		},
 
@@ -401,6 +429,12 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 					)
 				)
 				.returning();
+			if (cache && rows[0]) {
+				const playlist = await db.select({ tenantId: playlists.tenantId }).from(playlists).where(eq(playlists.id, input.playlistId)).limit(1);
+				if (playlist[0]) {
+					await cache.invalidate(playlistKey(playlist[0].tenantId as Id<'tenant'>, input.playlistId));
+				}
+			}
 			return rows[0] ?? null;
 		},
 
@@ -415,6 +449,9 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 						isNull(playlists.deletedAt)
 					)
 				);
+			if (cache) {
+				await cache.invalidate(playlistKey(input.tenantId, input.playlistId));
+			}
 		}
 	};
 }

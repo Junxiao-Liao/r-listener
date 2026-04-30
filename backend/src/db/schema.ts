@@ -1,5 +1,4 @@
 export { auditLogs } from '../audit/audit.orm';
-export { sessions } from '../auth/auth.orm';
 export { playbackHistory } from '../playback/playback.orm';
 export { playlistTracks, playlists } from '../playlists/playlists.orm';
 export { userPreferences } from '../prefs/prefs.orm';

@@ -1,9 +1,12 @@
-import { and, eq, ne } from 'drizzle-orm';
-import type { Db } from '../db';
 import type { Id } from '../shared/shared.type';
 import type { UserId } from '../users/users.type';
-import { sessions } from './auth.orm';
-import { generateSessionToken, hashSessionToken, SESSION_TTL_MS } from './session';
+import { generateSessionToken } from './session';
+import {
+	createSessionInKv,
+	deleteSession as deleteSessionFromKv,
+	deleteSiblingSessionsInKv,
+	setSessionActiveTenantInKv
+} from '../lib/session-kv';
 
 export type AuthRepository = {
 	createSession(input: {
@@ -24,37 +27,26 @@ export type AuthRepository = {
 	}): Promise<void>;
 };
 
-export function createAuthRepository(db: Db): AuthRepository {
+export function createAuthRepository(kv: KVNamespace): AuthRepository {
 	return {
-		createSession: async ({ userId, activeTenantId, now, ip, userAgent }) => {
+		createSession: async ({ userId, activeTenantId, now }) => {
 			const token = generateSessionToken();
-			const tokenHash = hashSessionToken(token);
-			const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
-			await db.insert(sessions).values({
-				tokenHash,
+			const { tokenHash, expiresAt } = await createSessionInKv(kv, {
+				token,
 				userId,
 				activeTenantId,
-				expiresAt,
-				lastRefreshedAt: now,
-				createdAt: now,
-				ip,
-				userAgent
+				now
 			});
 			return { token, tokenHash, expiresAt };
 		},
 		deleteSession: async (sessionTokenHash) => {
-			await db.delete(sessions).where(eq(sessions.tokenHash, sessionTokenHash));
+			await deleteSessionFromKv(kv, sessionTokenHash);
 		},
 		setSessionActiveTenant: async ({ sessionTokenHash, tenantId }) => {
-			await db
-				.update(sessions)
-				.set({ activeTenantId: tenantId })
-				.where(eq(sessions.tokenHash, sessionTokenHash));
+			await setSessionActiveTenantInKv(kv, { sessionTokenHash, tenantId });
 		},
 		deleteSiblingSessions: async ({ userId, currentSessionTokenHash }) => {
-			await db
-				.delete(sessions)
-				.where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentSessionTokenHash)));
+			await deleteSiblingSessionsInKv(kv, { userId, currentSessionTokenHash });
 		}
 	};
 }

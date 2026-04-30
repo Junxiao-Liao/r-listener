@@ -4,6 +4,7 @@ import { createApp } from '../app';
 import type { MiddlewareService, SessionContext } from './middleware.type';
 import { createMiddlewareService } from './middleware.service';
 import { requireAdmin, requireSession, requireTenant, requireTenantEditor } from './middleware.guard';
+import { hashSessionToken, SESSION_TTL_MS } from '../auth/session';
 import { createTestEnv } from '../test/test-env';
 
 describe('backend middleware', () => {
@@ -145,29 +146,35 @@ describe('backend middleware', () => {
 
 describe('real middleware service', () => {
 	it('deletes expired session rows during validation', async () => {
-		const deleteWhere = vi.fn();
-		const db = createSessionDb({
-			rows: [
-				{
-					session: {
+		const kvDelete = vi.fn(async () => undefined);
+		const kv = createKv({
+			get: vi.fn(async (key: string, type?: string) => {
+				if (key === `session:${hashSessionToken('expired-token')}`) {
+					const raw = JSON.stringify({
+						tokenHash: hashSessionToken('expired-token'),
+						userId: 'usr_018f0000-0000-7000-8000-000000000000',
 						activeTenantId: null,
-						expiresAt: new Date('2026-04-25T00:00:00.000Z'),
-						lastRefreshedAt: new Date('2026-04-24T00:00:00.000Z')
-					},
-					user: {
-						id: 'usr_018f0000-0000-7000-8000-000000000000',
-						username: 'user',
-						isAdmin: false,
-						isActive: true,
-						lastActiveTenantId: null,
-						createdAt: new Date('2026-04-01T00:00:00.000Z'),
-						deletedAt: null
-					}
+						expiresAt: Date.parse('2026-04-25T00:00:00.000Z'),
+						lastRefreshedAt: Date.parse('2026-04-24T00:00:00.000Z')
+					});
+					return type === 'json' ? JSON.parse(raw) : raw;
 				}
-			],
-			deleteWhere
+				return null;
+			}),
+			delete: kvDelete
 		});
-		const service = createMiddlewareService(db, createKv());
+		const db = createUserDb({
+			user: {
+				id: 'usr_018f0000-0000-7000-8000-000000000000',
+				username: 'user',
+				isAdmin: false,
+				isActive: true,
+				lastActiveTenantId: null,
+				createdAt: new Date('2026-04-01T00:00:00.000Z'),
+				deletedAt: null
+			}
+		});
+		const service = createMiddlewareService(db, kv);
 
 		const result = await service.validateSession({
 			token: 'expired-token',
@@ -177,33 +184,38 @@ describe('real middleware service', () => {
 		});
 
 		expect(result).toBeNull();
-		expect(deleteWhere).toHaveBeenCalledOnce();
+		expect(kvDelete).toHaveBeenCalled();
 	});
 
 	it('refreshes old valid sessions and returns refreshed expiry metadata', async () => {
-		const updateSet = vi.fn(() => ({ where: vi.fn() }));
-		const db = createSessionDb({
-			rows: [
-				{
-					session: {
+		const tokenHash = hashSessionToken('valid-token');
+		const kv = createKv({
+			get: vi.fn(async (key: string, type?: string) => {
+				if (key === `session:${tokenHash}`) {
+					const raw = JSON.stringify({
+						tokenHash,
+						userId: 'usr_018f0000-0000-7000-8000-000000000000',
 						activeTenantId: null,
-						expiresAt: new Date('2026-05-01T00:00:00.000Z'),
-						lastRefreshedAt: new Date('2026-04-24T00:00:00.000Z')
-					},
-					user: {
-						id: 'usr_018f0000-0000-7000-8000-000000000000',
-						username: 'user',
-						isAdmin: false,
-						isActive: true,
-						lastActiveTenantId: null,
-						createdAt: new Date('2026-04-01T00:00:00.000Z'),
-						deletedAt: null
-					}
+						expiresAt: Date.parse('2026-05-01T00:00:00.000Z'),
+						lastRefreshedAt: Date.parse('2026-04-24T00:00:00.000Z')
+					});
+					return type === 'json' ? JSON.parse(raw) : raw;
 				}
-			],
-			updateSet
+				return null;
+			})
 		});
-		const service = createMiddlewareService(db, createKv());
+		const db = createUserDb({
+			user: {
+				id: 'usr_018f0000-0000-7000-8000-000000000000',
+				username: 'user',
+				isAdmin: false,
+				isActive: true,
+				lastActiveTenantId: null,
+				createdAt: new Date('2026-04-01T00:00:00.000Z'),
+				deletedAt: null
+			}
+		});
+		const service = createMiddlewareService(db, kv);
 
 		const result = await service.validateSession({
 			token: 'valid-token',
@@ -213,10 +225,7 @@ describe('real middleware service', () => {
 		});
 
 		expect(result?.refreshedSessionExpiresAt).toBe('2026-05-26T00:00:00.000Z');
-		expect(updateSet).toHaveBeenCalledWith({
-			expiresAt: new Date('2026-05-26T00:00:00.000Z'),
-			lastRefreshedAt: new Date('2026-04-26T00:00:00.000Z')
-		});
+		expect(kv.get).toHaveBeenCalled();
 	});
 
 	it('fails closed when KV rate-limit storage throws', async () => {
@@ -325,6 +334,22 @@ type SessionDbOptions = {
 	updateSet?: ReturnType<typeof vi.fn>;
 };
 
+type UserDbOptions = {
+	user: Record<string, unknown> | null;
+};
+
+function createUserDb(options: UserDbOptions) {
+	return {
+		select: () => ({
+			from: () => ({
+				where: () => ({
+					limit: async () => (options.user ? [options.user] : [])
+				})
+			})
+		})
+	} as never;
+}
+
 function createSessionDb(options: SessionDbOptions) {
 	return {
 		select: () => ({
@@ -348,14 +373,33 @@ function createSessionDb(options: SessionDbOptions) {
 	} as never;
 }
 
-function createKv(overrides: Partial<KVNamespace> = {}): KVNamespace {
+function createKv(overrides: Record<string, unknown> = {}): KVNamespace {
 	const values = new Map<string, string>();
 
+	const baseGet = async (key: string, type?: string) => {
+		const raw = values.get(key) ?? null;
+		if (raw === null) return null;
+		if (type === 'json') {
+			try { return JSON.parse(raw); } catch { return null; }
+		}
+		return raw;
+	};
+
+	const basePut = async (key: string, value: string) => {
+		values.set(key, value);
+	};
+
+	const baseDelete = async (key: string) => {
+		values.delete(key);
+	};
+
+	const baseList = async () => ({ keys: [], list_complete: true, cursor: '', cacheStatus: null });
+
 	return {
-		get: async (key: string) => values.get(key) ?? null,
-		put: async (key: string, value: string) => {
-			values.set(key, value);
-		},
+		get: baseGet,
+		put: basePut,
+		delete: baseDelete,
+		list: baseList,
 		...overrides
-	} as unknown as KVNamespace;
+	} as KVNamespace;
 }

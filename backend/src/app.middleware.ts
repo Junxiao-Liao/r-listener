@@ -12,6 +12,7 @@ export function createAppContextMiddleware(createMiddlewareService: MiddlewareSe
 	return createMiddleware<BackendEnv>(async (c, next) => {
 		const db = createDb(c.env.DB);
 		c.set('db', db);
+		c.set('kv', c.env.KV);
 		c.set('middlewareService', createMiddlewareService({ db, kv: c.env.KV }));
 		await next();
 	});

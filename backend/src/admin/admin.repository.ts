@@ -11,8 +11,8 @@ import {
 import { alias } from 'drizzle-orm/sqlite-core';
 import type { AuditTargetType } from '../audit/audit.type';
 import { auditLogs } from '../audit/audit.orm';
-import { sessions } from '../auth/auth.orm';
 import type { Db } from '../db';
+import { deleteSiblingSessionsInKv } from '../lib/session-kv';
 import { playlistTracks, playlists } from '../playlists/playlists.orm';
 import { createId } from '../shared/id';
 import type { Id } from '../shared/shared.type';
@@ -97,7 +97,32 @@ export type AdminRepository = {
 	}): Promise<void>;
 };
 
-export function createAdminRepository(db: Db): AdminRepository {
+export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository {
+	const revokeUserSessionsKv = async (userId: Id<'user'>) => {
+		const list = await kv.list({ prefix: 'session:' });
+		for (const key of list.keys) {
+			const raw = await kv.get(key.name, 'json');
+			if (!raw) continue;
+			const data = raw as { userId: string };
+			if (data.userId === userId) {
+				await kv.delete(key.name);
+			}
+		}
+	};
+
+	const clearActiveTenantSessionsKv = async (input: { tenantId: Id<'tenant'>; userId?: Id<'user'> | undefined }) => {
+		const list = await kv.list({ prefix: 'session:' });
+		for (const key of list.keys) {
+			const raw = await kv.get(key.name, 'json');
+			if (!raw) continue;
+			const data = raw as { activeTenantId: string | null; userId: string; expiresAt: number };
+			if (data.activeTenantId !== input.tenantId) continue;
+			if (input.userId && data.userId !== input.userId) continue;
+			data.activeTenantId = null;
+			const ttlSeconds = Math.max(1, Math.ceil((data.expiresAt - Date.now()) / 1000));
+			await kv.put(key.name, JSON.stringify(data), { expirationTtl: ttlSeconds });
+		}
+	};
 	const repository: AdminRepository = {
 		db,
 		batch: (...args: any[]) => (db.batch as any)(...args),
@@ -210,7 +235,7 @@ export function createAdminRepository(db: Db): AdminRepository {
 			return rows.length > 0;
 		},
 		revokeUserSessions: async (userId) => {
-			await db.delete(sessions).where(eq(sessions.userId, userId));
+			await revokeUserSessionsKv(userId);
 		},
 		deleteUser: async ({ userId, now }) => {
 			const rows = await db
@@ -426,9 +451,7 @@ export function createAdminRepository(db: Db): AdminRepository {
 			return Number(rows[0]?.count ?? 0);
 		},
 		clearActiveTenantSessions: async ({ tenantId, userId }) => {
-			const filters = [eq(sessions.activeTenantId, tenantId)];
-			if (userId) filters.push(eq(sessions.userId, userId));
-			await db.update(sessions).set({ activeTenantId: null }).where(and(...filters));
+			await clearActiveTenantSessionsKv({ tenantId, userId });
 		},
 		insertAudit: async ({ actorId, action, targetType, targetId, tenantId, meta, now }) => {
 			await db.insert(auditLogs).values({

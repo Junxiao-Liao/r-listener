@@ -292,9 +292,9 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 	};
 }
 
-export function createTracksServiceForDb(db: Db, r2: R2Bucket): TracksService {
+export function createTracksServiceForDb(db: Db, r2: R2Bucket, kv?: KVNamespace): TracksService {
 	return createTracksService({
-		tracksRepository: createTracksRepository(db),
+		tracksRepository: createTracksRepository(db, kv),
 		r2
 	});
 }

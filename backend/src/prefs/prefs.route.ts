@@ -8,22 +8,22 @@ import { createPrefsService, type PrefsService } from './prefs.service';
 import { preferencesPatchSchema } from './prefs.dto';
 
 export type PrefsRouteDeps = {
-	createPrefsService?: (db: Db) => PrefsService;
+	createPrefsService?: (db: Db, kv: KVNamespace) => PrefsService;
 };
 
 export function createPrefsRoute(deps: PrefsRouteDeps = {}) {
 	const route = new Hono<Env>();
 	const serviceFactory =
-		deps.createPrefsService ?? ((db: Db) => createPrefsService(createPrefsRepository(db)));
+		deps.createPrefsService ?? ((db: Db, kv: KVNamespace) => createPrefsService(createPrefsRepository(db, kv)));
 
 	route.get('/me/preferences', requireSession(), async (c) => {
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 		return c.json(await service.getPreferences(c.var.session.user.id));
 	});
 
 	route.patch('/me/preferences', requireSession(), async (c) => {
 		const patch = await parseJsonBody(c, preferencesPatchSchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 		return c.json(await service.updatePreferences(c.var.session.user.id, patch));
 	});
 

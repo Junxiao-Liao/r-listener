@@ -7,7 +7,7 @@ import { searchQuerySchema } from './search.dto';
 import { createSearchServiceForDb, type SearchService } from './search.service';
 
 export type SearchRouteDeps = {
-	createSearchService?: (db: Db) => SearchService;
+	createSearchService?: (db: Db, kv: KVNamespace) => SearchService;
 };
 
 export function createSearchRoute(deps: SearchRouteDeps = {}) {
@@ -16,7 +16,7 @@ export function createSearchRoute(deps: SearchRouteDeps = {}) {
 
 	route.get('/search', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, searchQuerySchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 		return c.json(
 			await service.search({
 				tenantId: c.var.session.activeTenantId!,

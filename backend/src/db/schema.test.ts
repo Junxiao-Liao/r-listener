@@ -10,7 +10,6 @@ describe('database schema exports', () => {
 			'playlistTracks',
 			'playlists',
 			'queueItems',
-			'sessions',
 			'tenants',
 			'tracks',
 			'userPreferences',
