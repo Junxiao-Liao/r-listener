@@ -8,22 +8,19 @@ directory = "../frontend/build"
 binding = "ASSETS"
 not_found_handling = "single-page-application"
 
-# TODO: run `wrangler d1 create r-listener` and paste the returned database_id
 [[d1_databases]]
 binding = "DB"
 database_name = "r-listener"
-database_id = "<fill-me>"
+database_id = "32658b71-2f7d-4c67-aee9-c55f227267b3"
 migrations_dir = "drizzle"
 
-# TODO: run `wrangler r2 bucket create r-listener-audio`
 [[r2_buckets]]
 binding = "R2"
 bucket_name = "r-listener-audio"
 
-# TODO: run `wrangler kv namespace create r-listener-cache` and paste `id`
 [[kv_namespaces]]
 binding = "KV"
-id = "<fill-me>"
+id = "39639adacebf454e93b713d59633c4ca"
 
 # Auth secrets live in `.dev.vars` locally and `wrangler secret put` in prod:
 #   SESSION_SECRET = "<random>"
