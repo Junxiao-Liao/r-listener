@@ -6,7 +6,7 @@ describe('password hashing', () => {
 		const encoded = await hashPassword('Stronger123!');
 
 		expect(isPbkdf2PasswordHash(encoded)).toBe(true);
-		expect(encoded).toMatch(/^pbkdf2-sha256\$\d+\$[a-f0-9]{32}\$[a-f0-9]{64}$/);
+		expect(encoded).toMatch(/^pbkdf2-sha256\$100000\$[a-f0-9]{32}\$[a-f0-9]{64}$/);
 	});
 
 	it('verifies matching PBKDF2 passwords and rejects mismatches', async () => {
@@ -29,5 +29,12 @@ describe('password hashing', () => {
 		await expect(verifyPassword('Stronger123!', 'pbkdf2-sha256$nope$salt$hash')).resolves.toBe(
 			false
 		);
+	});
+
+	it('rejects PBKDF2 hashes above the Cloudflare Worker iteration cap', async () => {
+		const unsupported =
+			'pbkdf2-sha256$100001$000102030405060708090a0b0c0d0e0f$000102030405060708090a0b0c0d0e0f000102030405060708090a0b0c0d0e0f';
+
+		await expect(verifyPassword('Stronger123!', unsupported)).resolves.toBe(false);
 	});
 });

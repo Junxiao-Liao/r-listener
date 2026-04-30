@@ -22,5 +22,10 @@ bucket_name = "r-listener-audio"
 binding = "KV"
 id = "39639adacebf454e93b713d59633c4ca"
 
+[observability]
+[observability.logs]
+enabled = true
+invocation_logs = true
+
 # Auth secrets live in `.dev.vars` locally and `wrangler secret put` in prod:
 #   SESSION_SECRET = "<random>"

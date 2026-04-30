@@ -1,7 +1,8 @@
 import { argon2id } from '@noble/hashes/argon2.js';
 
 const PBKDF2_ALGORITHM = 'pbkdf2-sha256';
-const PBKDF2_ITERATIONS = 120_000;
+const PBKDF2_ITERATIONS = 100_000;
+const MAX_WORKER_PBKDF2_ITERATIONS = 100_000;
 const SALT_BYTE_LENGTH = 16;
 const HASH_BYTE_LENGTH = 32;
 
@@ -19,8 +20,12 @@ export async function verifyPassword(password: string, encoded: string): Promise
 	if (isPbkdf2PasswordHash(encoded)) {
 		const parsed = parsePbkdf2Hash(encoded);
 		if (!parsed) return false;
-		const actual = await pbkdf2Sha256(password, parsed.salt, parsed.iterations);
-		return timingSafeEqual(actual, parsed.hash);
+		try {
+			const actual = await pbkdf2Sha256(password, parsed.salt, parsed.iterations);
+			return timingSafeEqual(actual, parsed.hash);
+		} catch {
+			return false;
+		}
 	}
 
 	const [saltHex, hashHex] = encoded.split('$');
@@ -68,7 +73,13 @@ function parsePbkdf2Hash(encoded: string) {
 	if (algorithm !== PBKDF2_ALGORITHM || !iterationsText || !saltHex || !hashHex) return null;
 
 	const iterations = Number(iterationsText);
-	if (!Number.isSafeInteger(iterations) || iterations < 1) return null;
+	if (
+		!Number.isSafeInteger(iterations) ||
+		iterations < 1 ||
+		iterations > MAX_WORKER_PBKDF2_ITERATIONS
+	) {
+		return null;
+	}
 
 	const salt = hexToBytes(saltHex);
 	const hash = hexToBytes(hashHex);
