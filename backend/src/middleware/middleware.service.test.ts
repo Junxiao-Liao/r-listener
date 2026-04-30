@@ -395,11 +395,17 @@ function createKv(overrides: Record<string, unknown> = {}): KVNamespace {
 
 	const baseList = async () => ({ keys: [], list_complete: true, cursor: '', cacheStatus: null });
 
+	const baseGetWithMetadata = async <T = unknown>(_key: string, _type: string): Promise<{ value: T | null; metadata: unknown | null }> => {
+		const value = await baseGet(_key, _type) as T | null;
+		return { value, metadata: null };
+	};
+
 	return {
 		get: baseGet,
 		put: basePut,
 		delete: baseDelete,
 		list: baseList,
+		getWithMetadata: baseGetWithMetadata,
 		...overrides
-	} as KVNamespace;
+	} as unknown as KVNamespace;
 }
