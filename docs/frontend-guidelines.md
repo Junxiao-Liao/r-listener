@@ -1,47 +1,28 @@
-Create a very detailed UX/Figma-style design board for a mobile-first web app. Primary mockups are mobile; the same pages must also be at-least-basically usable at desktop widths (no dedicated desktop mockups needed, just make sure the responsive intent is obvious — e.g. constrain content column, don't stretch list rows edge-to-edge, keep touch targets sane).
+# Frontend & UI Guidelines
 
-The product is a private personal music listener web app for a small multi-tenant deployment (an operator seeds tenants and users; there is no public signup). Signed-in users upload their own music files and synced lyrics files, organize music into custom playlists, and listen to their private library on mobile browsers. Platform admins additionally manage users, tenants, memberships, and audit logs.
+This document outlines the UX and UI requirements for the private personal music listener web app.
 
-Do not design the consumer pages as an admin dashboard. The consumer pages should feel like a polished consumer music app similar in structure to NetEase Cloud Music / QQ Music, but with original visual styling. Do not force a red brand color. Choose a tasteful modern music-app visual system with strong hierarchy, album-art focus, rounded cards, clean typography, and clear touch targets. Admin pages may look more utilitarian (tables, forms) but should reuse the same type system and color palette.
+## Design Philosophy & Constraints
+- **Mobile-first:** The application is designed primarily for mobile browsers, but remains fundamentally usable at desktop widths (e.g., constrained content columns, reasonable touch targets, avoiding edge-to-edge stretching for large lists).
+- **Aesthetic:** Polished consumer music app feel (similar to NetEase Cloud Music / QQ Music), featuring strong hierarchy, album-art focus, rounded cards, clean typography, and clear touch targets. 
+- **Localization:** Bilingual UI supporting English and 中文 (Chinese Simplified).
+- **Multi-tenant:** Users may belong to multiple workspaces. "Active workspace" is chosen post-login. Users only interact with music within their active workspace.
+- **Roles:** Tenant roles are Owner, Member, and Viewer. Viewer roles can listen but cannot edit; editor controls should remain visible but disabled with a tooltip or short reason (e.g., "Viewer role can listen only").
+- **Exclusions:** No public browsing, social feeds, sharing, or public signup. Deletions are non-reversible from the user's perspective (no trash/restore UI). In-flight uploads do not appear in the library until complete.
 
-Important constraints:
-- Mobile-first design, basically usable on desktop (no separate desktop mockups required)
-- Bilingual UI: English and 中文 (Chinese Simplified). Mock key screens in English; a few representative screens should be shown in 中文 to prove typography/layout works
-- Private library only; no public browsing, no social feed, no sharing
-- No public signup. Accounts are created by platform admins
-- Multi-tenant: a user may belong to multiple workspaces (tenants). An "active workspace" is chosen post-login; platform admins may additionally enter any workspace
-- Users only listen to music uploaded into their active workspace
-- Users can upload audio files and lyrics files
-- Tenant roles are Owner, Member, and Viewer; Viewers can listen but cannot
-  edit shared workspace content
-- Bulk upload is supported
-- Custom playlists are supported
-- Lyrics are mainly synced lyrics, such as .lrc files
-- Tapping a synced lyric line should seek playback to that line
-- The design should focus on pages, flows, and UI states, not backend, database, S3, or deployment
-- Do not include unrelated pages such as storage analytics, social profiles, public discovery, friends, comments, subscriptions, payments, charts, radio, podcasts, or recommendation feeds
-- Do not show trash / restore UI. Deletions are non-reversible from the user's perspective (soft-delete is a backend concern, invisible in the app)
-- Do not show "pending upload" tracks in the Library — in-flight uploads only appear on the Upload Progress page. A track joins the Library only after it finishes uploading
-- For users whose active workspace role is Viewer, keep upload, edit, delete,
-  lyrics/cover edit, and playlist-editing controls visible but disabled with
-  a short reason such as "Viewer role can listen only"
+## Overall App Structure
+A persistent bottom navigation bar is used for primary consumer routing:
+- **Home**
+- **Library**
+- **Playlists**
+- **Settings**
 
-Design a single large, high-resolution landscape Figma-style overview board containing many mobile page mockups. Each mobile screen should be clearly labeled. Arrange the pages in a logical flow with section headers and light connector arrows where useful.
+*Note:* Upload is accessed via shortcuts on Home or Library, not as a bottom tab. Platform admins access the admin area via `Settings → Admin`.
 
-Overall mobile app structure:
-Use a bottom navigation bar with:
-- Home
-- Library
-- Playlists
-- Settings
+A persistent mini-player appears above the bottom navigation during playback, featuring a thumbnail, track title, artist, play/pause, and an expand affordance.
 
-Upload is not a bottom tab. Editors reach upload from the Home shortcut or
-Library upload action. There is no "Admin" tab. Platform admins reach the admin
-area via Settings → Admin.
+## Pages and States
 
-Show a persistent mini-player above the bottom navigation whenever appropriate. The mini-player should include tiny album art, track title, artist, play/pause button, and an expand affordance.
-
-Include the following mobile web pages and states:
 
 1. Sign In Page
 Purpose: user logs into their private music library.
@@ -526,16 +507,23 @@ Add small callout labels for important interactions:
 - "Admin-created users get credentials out-of-band"
 - "Viewers can listen but cannot edit workspace content"
 
-Visual quality:
-- High-fidelity mobile web app mockups
-- Dense but readable
-- Realistic spacing for mobile screens
-- Modern music-app aesthetic on consumer pages; utilitarian but consistent on admin pages
-- Consistent components across consumer and admin surfaces
-- Clear hierarchy
-- Touch-friendly controls
-- Avoid cluttered admin-table appearance on consumer pages
-- Use realistic placeholder album art or abstract music artwork
-- Use readable English labels (with a 中文 sample set on key screens)
-- Landscape design board, high resolution, suitable for understanding the whole product at a glance
-- Confirm the responsive intent: content columns should not stretch edge-to-edge on wide screens; the app must remain usable (not necessarily polished) at desktop widths
+## Audio Control & Playback Guidelines
+
+### 1. Persistent Audio Element
+- Use a single, long-lived HTML5 `<audio>` element. Treat it as the single source of truth for the playback state.
+- **Autoplay Policy:** Browsers (especially iOS Safari) require one explicit user gesture (e.g., a tap on a "Play" button) to start the first track. 
+- Once playback is "armed" by this initial user gesture, it is safe to programmatically change the `src` attribute and call `audio.play()` on the `ended` event to smoothly play the next track in the queue.
+
+### 2. Auto-Play & Queue Progression
+- Arm the queue progression logic on the first actual playback event (e.g., listening to the native `play` or `playing` event), rather than solely attaching it to a custom UI button. This prevents auto-play failures if playback is initiated from native browser controls (e.g., from the lock screen).
+- The upcoming track list should be loaded from the persisted backend queue (`GET /queue`). Queue mutations should route through the REST API.
+- Advancement to the next track is driven by the `<audio>` element's `ended` event.
+
+### 3. Background Play & Lock Screen Controls
+- Background playback functions correctly using the standard `<audio>` element as long as the session was properly initialized by a user gesture.
+- **Media Session API:** Register Media Session metadata (`navigator.mediaSession.metadata`) and action handlers (`play`, `pause`, `previoustrack`, `nexttrack`) whenever the active track changes. This ensures the native OS lock screen and notification controls reflect the current track and work correctly.
+- Ensure bidirectional synchronization: native media actions (like pausing from the lock screen) must update the web page's UI state, and web UI actions must update the audio element.
+
+### 4. Development & QA
+- Keep detailed event logging for audio state transitions during development, as browser media behavior is highly sensitive to platform differences and timing.
+- Final QA for audio progression and background play must be performed on physical iOS and Android devices, as emulators do not accurately reproduce background execution constraints.

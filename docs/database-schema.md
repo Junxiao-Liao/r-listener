@@ -4,10 +4,6 @@ Storage = Cloudflare D1 (SQLite). ORM = Drizzle. Audio bytes and cover art
 live in R2 and are referenced by key only; D1 holds metadata, identity,
 authorization, playback state, preferences, and audit history.
 
-This doc is the contract between the schema and the rest of the app
-(`api.md`, `ui-design.md`). It supersedes the placeholder in
-`backend/src/db/schema.ts`.
-
 ---
 
 ## 1. Conventions
@@ -476,28 +472,6 @@ because SQLite cannot express them as constraints:
 
 ---
 
-## 4. Migrations
-
-Drizzle Kit (`drizzle.config.ts` already present) emits versioned SQL
-under `backend/drizzle/`. Apply via `wrangler d1 migrations apply`.
-Initial migration creates everything in §2 in dependency order:
-
-```
-users → tenants → memberships
-                ↘ sessions (FK active_tenant_id, user_id)
-tenants → tracks → playlists → playlist_tracks
-               ↘ queue_items (FK user, tenant, track)
-                              ↘ playback_history (FK user, tenant, track, last_playlist)
-users → user_preferences
-users + tenants → audit_logs
-```
-
-`users.last_active_tenant_id` and `sessions.active_tenant_id` are added
-in a follow-up step within the same migration to break the cycle with
-`tenants`.
-
----
-
 ## 5. ER diagram
 
 ```
@@ -539,22 +513,3 @@ in a follow-up step within the same migration to break the cycle with
 ```
 
 ---
-
-## 6. API sync checklist
-
-The DB/UI-required contracts are reflected in `api.md`:
-
-- `TrackDto` exposes `trackNumber`, `genre`, `year`, `coverUrl`,
-  `lyricsLrc`, and `lyricsStatus`.
-- `UserDto` exposes `lastActiveTenantId` (sourced from
-  `users.last_active_tenant_id`) so the Tenant Picker can mark the
-  most-recent workspace.
-- `PlaylistDto` exposes `totalDurationMs`, computed at read time.
-- `QueueItemDto` and `QueueStateDto` expose persisted per-user/per-tenant queue
-  state with dense positions and a single current item.
-- Cover upload/finalize/remove is deferred; `coverUrl` is currently `null`.
-  Existing tracks support lyrics upload/replace/remove.
-- `GET/PATCH /me/preferences` exists and signin embeds `preferences`.
-- Admin list DTOs expose the summary counts needed by the mobile admin UI.
-- Admin user detail embeds memberships, and tenant creation requires an
-  initial owner.
