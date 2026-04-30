@@ -2,6 +2,7 @@
 	import { AlertDialog } from 'bits-ui';
 	import * as m from '$shared/paraglide/messages';
 	import { buttonVariants } from '$shared/components/ui/button';
+	import { formatGlobalApiError, reportGlobalApiError } from '$shared/feedback/error-toast.service';
 	import { cn } from '$shared/utils';
 
 	type Props = {
@@ -11,6 +12,7 @@
 		confirm: string;
 		disabled?: boolean;
 		class?: string;
+		onbeforeopen?: () => boolean;
 		onconfirm: () => void | Promise<void>;
 	};
 
@@ -21,14 +23,43 @@
 		confirm,
 		disabled = false,
 		class: className,
+		onbeforeopen,
 		onconfirm
 	}: Props = $props();
+
+	let open = $state(false);
+	let confirming = $state(false);
+
+	function handleTriggerClick(event: MouseEvent) {
+		if (!onbeforeopen) return;
+		if (onbeforeopen()) return;
+		event.preventDefault();
+		open = false;
+	}
+
+	async function handleConfirm() {
+		confirming = true;
+		try {
+			await onconfirm();
+			open = false;
+		} catch (error) {
+			open = false;
+			if (formatGlobalApiError(error)) {
+				reportGlobalApiError(error);
+				return;
+			}
+			throw error;
+		} finally {
+			confirming = false;
+		}
+	}
 </script>
 
-<AlertDialog.Root>
+<AlertDialog.Root bind:open>
 	<AlertDialog.Trigger
 		disabled={disabled}
 		class={cn(buttonVariants({ variant: 'destructive' }), 'w-full', className)}
+		onclick={handleTriggerClick}
 	>
 		{trigger}
 	</AlertDialog.Trigger>
@@ -47,7 +78,8 @@
 				</AlertDialog.Cancel>
 				<AlertDialog.Action
 					class={buttonVariants({ variant: 'destructive' })}
-					onclick={() => void onconfirm()}
+					disabled={confirming}
+					onclick={() => void handleConfirm()}
 				>
 					{confirm}
 				</AlertDialog.Action>

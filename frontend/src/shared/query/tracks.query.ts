@@ -5,6 +5,7 @@ import {
 	useQueryClient
 } from '@tanstack/svelte-query';
 import { api, type ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import type {
 	FinalizeTrackInput,
@@ -37,6 +38,7 @@ export function useTracksInfiniteQuery(params: () => TracksListParams) {
 				includePending: !!p.includePending
 			});
 		},
+		meta: suppressGlobalApiErrorToast,
 		initialPageParam: null,
 		queryFn: ({ pageParam }) => {
 			const p = params();
@@ -56,6 +58,7 @@ export function useTrackQuery(id: () => Id<'track'> | null) {
 		get queryKey() {
 			return queryKeys.track(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => {
 			const value = id();
 			if (!value) throw new Error('track id is required');

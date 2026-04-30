@@ -5,8 +5,11 @@
 	import { Button } from '$shared/components/ui/button';
 	import ConfirmAction from '$shared/components/ConfirmAction.svelte';
 	import { Input } from '$shared/components/ui/input';
+	import { Label } from '$shared/components/ui/label';
+	import PasswordRulesHint from '$pages/change-password/components/PasswordRulesHint.svelte';
 	import EntityCombobox from '$pages/admin/components/EntityCombobox.svelte';
 	import { createTenantSelectorSearch } from '$pages/admin/admin-selector.service';
+	import { validateAdminResetPassword } from './admin-reset-password.form';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import {
 		useCreateAdminMembershipMutation,
@@ -26,6 +29,7 @@
 	let isAdmin = $state(false);
 	let isActive = $state(true);
 	let newPassword = $state('');
+	let resetPasswordError = $state<'weak_password' | null>(null);
 	let tenantId = $state<Id<'tenant'> | ''>('');
 	let membershipRole = $state<TenantRole>('member');
 	let pendingRole = $state<Record<string, TenantRole>>({});
@@ -59,8 +63,15 @@
 	}
 
 	async function reset() {
+		resetPasswordError = null;
 		await $resetPassword.mutateAsync({ userId, newPassword });
 		newPassword = '';
+	}
+
+	function validateResetPasswordBeforeConfirm(): boolean {
+		const validation = validateAdminResetPassword(newPassword);
+		resetPasswordError = validation.ok ? null : validation.error;
+		return validation.ok;
 	}
 
 	async function remove() {
@@ -192,13 +203,29 @@
 
 		<form class="grid gap-3 rounded-md border border-border p-3" onsubmit={(e) => { e.preventDefault(); }}>
 			<h2 class="text-sm font-semibold">{m.admin_reset_password()}</h2>
-			<Input type="password" bind:value={newPassword} required />
+			<div class="grid gap-1.5">
+				<Label for="admin-new-password">{m.change_password_new()}</Label>
+				<Input
+					id="admin-new-password"
+					type="password"
+					autocomplete="new-password"
+					bind:value={newPassword}
+					aria-invalid={resetPasswordError === 'weak_password'}
+					required
+					oninput={() => (resetPasswordError = null)}
+				/>
+				<PasswordRulesHint />
+				{#if resetPasswordError === 'weak_password'}
+					<p class="text-xs text-destructive" role="alert">{m.change_password_error_weak()}</p>
+				{/if}
+			</div>
 			<ConfirmAction
 				title={m.admin_reset_password_confirm_title()}
 				description={m.admin_reset_password_confirm_description()}
 				trigger={m.admin_reset_password()}
 				confirm={m.admin_reset_password()}
 				disabled={!newPassword || $resetPassword.isPending}
+				onbeforeopen={validateResetPasswordBeforeConfirm}
 				onconfirm={reset}
 			/>
 		</form>

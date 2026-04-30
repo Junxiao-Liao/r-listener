@@ -1,5 +1,6 @@
 import { createQuery, type CreateQueryResult } from '@tanstack/svelte-query';
 import { api, type ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import type { SearchKind, SearchResponse } from '$shared/types/dto';
 
@@ -21,6 +22,7 @@ export function useSearchQuery(
 				kinds: p.kinds?.join(',')
 			});
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => {
 			const p = normalize(params());
 			return api<SearchResponse>(buildSearchPath(p));

@@ -1,5 +1,6 @@
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { api, ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import { applyTheme, setThemeCookie } from '$shared/theme/theme';
 import { setLocale } from '$shared/paraglide/runtime';
@@ -30,6 +31,7 @@ export function useSigninMutation() {
 	const qc = useQueryClient();
 	return createMutation<CurrentSessionDto, ApiError, SigninInput>({
 		mutationFn: (input) => api<CurrentSessionDto>('/auth/signin', { method: 'POST', body: input }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: (session) => {
 			qc.setQueryData(queryKeys.session, session);
 			setThemeCookie(session.preferences.theme);
@@ -66,6 +68,7 @@ export function useSwitchTenantMutation() {
 
 export function useChangePasswordMutation() {
 	return createMutation<void, ApiError, ChangePasswordInput>({
-		mutationFn: (input) => api<void>('/auth/change-password', { method: 'POST', body: input })
+		mutationFn: (input) => api<void>('/auth/change-password', { method: 'POST', body: input }),
+		meta: suppressGlobalApiErrorToast
 	});
 }

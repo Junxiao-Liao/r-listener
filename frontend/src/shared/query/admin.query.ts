@@ -1,5 +1,6 @@
 import { createMutation, createQuery, useQueryClient } from '@tanstack/svelte-query';
 import { api, type ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import type {
 	AdminCreateTenantInput,
@@ -64,6 +65,7 @@ export function useAdminTenantsQuery(enabled: () => boolean, params: () => Admin
 		get queryKey() {
 			return queryKeys.adminTenants(params());
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<ListResponse<AdminTenantListItemDto>>(buildAdminTenantsPath(params())),
 		get enabled() {
 			return enabled();
@@ -76,6 +78,7 @@ export function useAdminUsersQuery(params: () => AdminUsersParams = () => ({})) 
 		get queryKey() {
 			return queryKeys.adminUsers(params());
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<ListResponse<AdminUserListItemDto>>(buildAdminUsersPath(params()))
 	});
 }
@@ -85,6 +88,7 @@ export function useAdminUserQuery(id: () => Id<'user'> | null) {
 		get queryKey() {
 			return queryKeys.adminUser(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<AdminUserDetailDto>(`/admin/users/${id()}`),
 		get enabled() {
 			return !!id();
@@ -97,6 +101,7 @@ export function useAdminTenantQuery(id: () => Id<'tenant'> | null) {
 		get queryKey() {
 			return queryKeys.adminTenant(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<TenantDto>(`/admin/tenants/${id()}`),
 		get enabled() {
 			return !!id();
@@ -109,6 +114,7 @@ export function useAdminTenantMembersQuery(id: () => Id<'tenant'> | null) {
 		get queryKey() {
 			return queryKeys.adminTenantMembers(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<ListResponse<AdminTenantMemberDto>>(`/admin/tenants/${id()}/members`),
 		get enabled() {
 			return !!id();
@@ -120,6 +126,7 @@ export function useCreateAdminUserMutation() {
 	const qc = useQueryClient();
 	return createMutation<UserDto, ApiError, AdminCreateUserInput>({
 		mutationFn: (body) => api<UserDto>('/admin/users', { method: 'POST', body }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin'] })
 	});
 }
@@ -162,6 +169,7 @@ export function useCreateAdminTenantMutation() {
 		AdminCreateTenantInput
 	>({
 		mutationFn: (body) => api('/admin/tenants', { method: 'POST', body }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
 	});
 }
@@ -198,6 +206,7 @@ export function useCreateAdminMembershipMutation() {
 				method: 'POST',
 				body: { userId, role }
 			}),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
@@ -219,6 +228,7 @@ export function useUpdateAdminMembershipMutation() {
 				method: 'PATCH',
 				body: { role }
 			}),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
@@ -231,6 +241,7 @@ export function useDeleteAdminMembershipMutation() {
 	return createMutation<void, ApiError, { tenantId: Id<'tenant'>; userId: Id<'user'> }>({
 		mutationFn: ({ tenantId, userId }) =>
 			api<void>(`/admin/tenants/${tenantId}/members/${userId}`, { method: 'DELETE' }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });

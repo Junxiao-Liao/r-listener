@@ -5,12 +5,14 @@ import {
 	type CreateQueryResult
 } from '@tanstack/svelte-query';
 import { api, type ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import type { Id, QueueStateDto } from '$shared/types/dto';
 
 export function useQueueQuery(enabled: () => boolean = () => true): CreateQueryResult<QueueStateDto, ApiError> {
 	return createQuery<QueueStateDto, ApiError>({
 		queryKey: queryKeys.queue,
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<QueueStateDto>('/queue'),
 		get enabled() {
 			return enabled();

@@ -5,6 +5,7 @@ import {
 	type CreateQueryResult
 } from '@tanstack/svelte-query';
 import { api, type ApiError } from '$shared/api/client';
+import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
 import type {
 	AddPlaylistTrackInput,
@@ -34,6 +35,7 @@ export function usePlaylistsQuery(
 				q: p.q
 			});
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => {
 			const p = params();
 			const search = new URLSearchParams();
@@ -53,6 +55,7 @@ export function usePlaylistQuery(
 		get queryKey() {
 			return queryKeys.playlist(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<PlaylistDto>(`/playlists/${id()}`),
 		get enabled() {
 			return enabled() && id() !== null;
@@ -68,6 +71,7 @@ export function usePlaylistTracksQuery(
 		get queryKey() {
 			return queryKeys.playlistTracks(id() ?? '');
 		},
+		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<PlaylistTrackListResponse>(`/playlists/${id()}/tracks`),
 		get enabled() {
 			return enabled() && id() !== null;
@@ -80,6 +84,7 @@ export function useCreatePlaylistMutation() {
 	return createMutation<PlaylistDto, ApiError, CreatePlaylistInput>({
 		mutationFn: (input) =>
 			api<PlaylistDto>('/playlists', { method: 'POST', body: input }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: () => {
 			qc.invalidateQueries({ queryKey: queryKeys.playlists });
 		}
@@ -91,6 +96,7 @@ export function useUpdatePlaylistMutation(id: Id<'playlist'>) {
 	return createMutation<PlaylistDto, ApiError, UpdatePlaylistInput>({
 		mutationFn: (input) =>
 			api<PlaylistDto>(`/playlists/${id}`, { method: 'PATCH', body: input }),
+		meta: suppressGlobalApiErrorToast,
 		onSuccess: (data) => {
 			qc.setQueryData(queryKeys.playlist(id), data);
 			qc.invalidateQueries({ queryKey: queryKeys.playlists });

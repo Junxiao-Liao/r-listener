@@ -4,6 +4,8 @@
 	import { setLocale, getLocale } from '$shared/paraglide/runtime';
 	import { applyThemeFromCookie } from '$shared/theme/theme';
 	import { createQueryClient } from '$shared/query/client';
+	import ErrorToastHost from '$shared/feedback/ErrorToastHost.svelte';
+	import { registerGlobalApiErrorHandlers } from '$shared/feedback/error-toast.service';
 	import favicon from '$shared/assets/favicon.svg';
 	import '../app.css';
 
@@ -19,12 +21,16 @@
 	}
 
 	onMount(() => {
+		const unregisterApiErrorHandlers = registerGlobalApiErrorHandlers();
 		applyThemeFromCookie();
 		const media = window.matchMedia?.('(prefers-color-scheme: dark)');
-		if (!media) return;
+		if (!media) return unregisterApiErrorHandlers;
 		const sync = () => applyThemeFromCookie();
 		media.addEventListener('change', sync);
-		return () => media.removeEventListener('change', sync);
+		return () => {
+			unregisterApiErrorHandlers();
+			media.removeEventListener('change', sync);
+		};
 	});
 </script>
 
@@ -32,4 +38,5 @@
 
 <QueryClientProvider client={queryClient}>
 	{@render children()}
+	<ErrorToastHost />
 </QueryClientProvider>
