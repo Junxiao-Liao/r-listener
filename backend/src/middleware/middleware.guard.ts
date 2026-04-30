@@ -49,6 +49,16 @@ export const requireSession = () =>
 			setSessionCookie(c, token, refreshedSessionExpiresAt);
 		}
 
+		if (!sessionContext.user.isAdmin) {
+			const apiLimitResult = await c.var.middlewareService.checkApiRateLimit({
+				userId: sessionContext.user.id,
+				now: new Date()
+			});
+			if (!apiLimitResult.allowed) {
+				throw apiError(429, 'rate_limited', 'Too many API requests. Try again later.');
+			}
+		}
+
 		await next();
 	});
 

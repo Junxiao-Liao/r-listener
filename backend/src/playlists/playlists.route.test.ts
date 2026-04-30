@@ -370,7 +370,8 @@ function createFixtureApp(options: FixtureOptions) {
 				? { activeTenantId: session.activeTenantId, role: session.role }
 				: null
 		),
-		checkAuthRateLimit: vi.fn(async () => ({ allowed: true }))
+		checkAuthRateLimit: vi.fn(async () => ({ allowed: true })),
+		checkApiRateLimit: vi.fn(async () => ({ allowed: true }))
 	};
 
 	const app = new Hono<BackendEnv>();

@@ -80,7 +80,8 @@ function createFixtureApp(service: PrefsService) {
 			token === 'valid' ? { ...sessionFixture(), refreshedSessionExpiresAt: null } : null
 		),
 		resolveTenantAccess: vi.fn(),
-		checkAuthRateLimit: vi.fn(async () => ({ allowed: true }))
+		checkAuthRateLimit: vi.fn(async () => ({ allowed: true })),
+		checkApiRateLimit: vi.fn(async () => ({ allowed: true }))
 	};
 
 	app.use('*', async (c, next) => {

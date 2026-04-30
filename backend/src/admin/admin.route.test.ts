@@ -143,7 +143,8 @@ function createFixtureApp(options: FixtureOptions) {
 				: null
 		),
 		resolveTenantAccess: vi.fn(),
-		checkAuthRateLimit: vi.fn(async () => ({ allowed: true }))
+		checkAuthRateLimit: vi.fn(async () => ({ allowed: true })),
+		checkApiRateLimit: vi.fn(async () => ({ allowed: true }))
 	};
 
 	return createApp({

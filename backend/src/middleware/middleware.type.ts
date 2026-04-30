@@ -1,5 +1,6 @@
 import type { Id } from '../shared/shared.type';
 import type { TenantRole } from '../tenants/tenants.type';
+import type { UserId } from '../users/users.type';
 import type { UserDto } from '../users/users.type';
 
 export type SessionContext = {
@@ -40,8 +41,18 @@ export type AuthRateLimitResult = {
 	allowed: boolean;
 };
 
+export type ApiRateLimitInput = {
+	userId: UserId;
+	now: Date;
+};
+
+export type ApiRateLimitResult = {
+	allowed: boolean;
+};
+
 export type MiddlewareService = {
 	validateSession(input: SessionValidationInput): Promise<SessionValidationResult | null>;
 	resolveTenantAccess(input: TenantAccessInput): Promise<TenantAccessResult | null>;
 	checkAuthRateLimit(input: AuthRateLimitInput): Promise<AuthRateLimitResult>;
+	checkApiRateLimit(input: ApiRateLimitInput): Promise<ApiRateLimitResult>;
 };

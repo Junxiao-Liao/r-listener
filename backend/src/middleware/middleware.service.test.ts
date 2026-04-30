@@ -238,6 +238,8 @@ type FixtureOptions = {
 	tenantRole?: 'owner' | 'member' | 'viewer' | null;
 	rateLimitAllowed?: boolean;
 	rateLimitThrows?: boolean;
+	apiRateLimitAllowed?: boolean;
+	apiRateLimitThrows?: boolean;
 };
 
 function createFixtureApp(options: FixtureOptions) {
@@ -261,6 +263,10 @@ function createFixtureApp(options: FixtureOptions) {
 		checkAuthRateLimit: vi.fn(async () => {
 			if (options.rateLimitThrows) throw internalError();
 			return { allowed: options.rateLimitAllowed ?? true };
+		}),
+		checkApiRateLimit: vi.fn(async () => {
+			if (options.apiRateLimitThrows) throw internalError();
+			return { allowed: options.apiRateLimitAllowed ?? true };
 		})
 	};
 
