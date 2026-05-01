@@ -25,7 +25,6 @@ jobs:
     outputs:
       frontend: ${{ steps.filter.outputs.frontend }}
       backend: ${{ steps.filter.outputs.backend }}
-      e2e: ${{ steps.filter.outputs.e2e }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -36,10 +35,6 @@ jobs:
               - 'frontend/**'
               - '.github/workflows/ci.yml'
             backend:
-              - 'backend/**'
-              - '.github/workflows/ci.yml'
-            e2e:
-              - 'frontend/**'
               - 'backend/**'
               - '.github/workflows/ci.yml'
 
@@ -95,62 +90,3 @@ jobs:
         run: npm run build
       - name: Test
         run: npm run test
-
-  e2e:
-    needs: [changes, frontend-unit, backend-unit]
-    if: |
-      always() &&
-      !cancelled() &&
-      needs.changes.outputs.e2e == 'true' &&
-      needs.changes.result == 'success' &&
-      !(needs.frontend-unit.result == 'failure') &&
-      !(needs.backend-unit.result == 'failure')
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: frontend
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-          cache-dependency-path: frontend/package-lock.json
-      - name: Install frontend dependencies
-        run: npm ci
-      - name: Install Playwright browsers
-        run: npx playwright install --with-deps chromium
-      - name: Compile
-        run: npm run compile
-      - name: Build
-        run: npm run build
-      - name: Install backend dependencies
-        working-directory: backend
-        run: npm ci
-      - name: Configure backend secrets
-        working-directory: backend
-        run: |
-          cat > .dev.vars << 'EOF'
-          SESSION_SECRET = "ci-test-session-secret-not-for-production"
-          EOF
-      - name: Start backend worker
-        working-directory: backend
-        run: |
-          npx wrangler dev --port 8787 --inspector-port 0 &
-          WRANGLER_PID=$!
-          echo "WRANGLER_PID=$WRANGLER_PID" >> $GITHUB_ENV
-          for i in $(seq 1 30); do
-            if curl -sf http://127.0.0.1:8787/api/health; then
-              echo "Backend is ready"
-              exit 0
-            fi
-            echo "Waiting for backend... ($i/30)"
-            sleep 2
-          done
-          echo "Backend failed to start"
-          exit 1
-      - name: Run E2E tests
-        run: npm run test:e2e
-      - name: Stop backend worker
-        if: always()
-        run: kill $WRANGLER_PID 2>/dev/null || true

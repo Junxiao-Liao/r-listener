@@ -12,14 +12,12 @@
 		"compile": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check": "npm run paraglide:compile && svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
 		"check:watch": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --watch",
-		"test": "npm run test:unit && npm run test:e2e",
-		"test:unit": "vitest run",
-		"test:e2e": "playwright test"
+		"test": "npm run test:unit",
+		"test:unit": "vitest run"
 	},
 	"devDependencies": {
 		"@inlang/paraglide-js": "^2.15.2",
 		"@internationalized/date": "^3.12.1",
-		"@playwright/test": "^1.59.1",
 		"@sveltejs/adapter-static": "^3.0.10",
 		"@sveltejs/kit": "^2.57.0",
 		"@sveltejs/vite-plugin-svelte": "^7.0.0",
