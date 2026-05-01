@@ -1,20 +1,23 @@
 <script lang="ts">
+	import * as m from '$shared/paraglide/messages';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
-	import * as m from '$shared/paraglide/messages';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
 	import { usePlayListMutation } from '$shared/player/play-list';
 	import TrackActions from '$shared/player/TrackActions.svelte';
 	import type { TrackDto } from '$shared/types/dto';
 
-	type Props = { track: TrackDto; siblings?: TrackDto[] };
+	type Props = { track: TrackDto; siblings: TrackDto[] };
 	let { track, siblings = [track] }: Props = $props();
 
 	const player = getPlayer();
 	const playList = usePlayListMutation();
 
-	const subtitleArtists = $derived(
-		track.artists.length > 0 ? track.artists : null
+	const subtitle = $derived(
+		[trackArtistDisplay(track), track.album]
+			.filter((v): v is string => !!v && v.length > 0)
+			.join(' · ')
 	);
 
 	const playableSiblings = $derived(siblings.filter((t) => t.status === 'ready'));
@@ -28,7 +31,6 @@
 		player.setQueueState(state, { autoplay: true });
 	}
 </script>
-
 
 <div class="flex items-center gap-3 rounded-lg px-3 py-2 hover:bg-muted focus-within:bg-muted">
 	<CoverPlaceholder seed={track.title} class="size-12 text-lg" />
@@ -46,25 +48,8 @@
 				</span>
 			{/if}
 		</span>
-		{#if subtitleArtists || track.album}
-			<span class="truncate text-xs text-muted-foreground">
-				{#if subtitleArtists}
-					{#each subtitleArtists as artist, i (artist.id)}
-						{#if i > 0}, {/if}
-						<a
-							href="/artists/{artist.id}"
-							class="hover:underline"
-							onclick={(e: MouseEvent) => e.stopPropagation()}
-						>
-							{artist.name}
-						</a>
-					{/each}
-				{/if}
-				{#if subtitleArtists && track.album}
-					{@html ' · '}
-				{/if}
-				{track.album ?? ''}
-			</span>
+		{#if subtitle.length > 0}
+			<span class="truncate text-xs text-muted-foreground">{subtitle}</span>
 		{/if}
 	</button>
 	<span class="shrink-0 text-xs text-muted-foreground tabular-nums">

@@ -12,6 +12,8 @@ export const queryKeys = {
 	artists: ['artists'] as const,
 	artistsList: (params: { q?: string; limit: number }) =>
 		['artists', 'list', params] as const,
+	artistDetail: (id: string) => ['artists', 'detail', id] as const,
+	artistTracks: (id: string) => ['artists', 'detail', id, 'tracks'] as const,
 	queue: ['queue'] as const,
 	recentTracks: ['playback', 'recent'] as const,
 	continueListening: ['playback', 'continue'] as const,

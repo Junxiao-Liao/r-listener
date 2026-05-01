@@ -122,6 +122,8 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 			await cache.invalidatePrefix(cachePrefix('cache:tracks:list', tenantId));
 			await cache.invalidatePrefix(cachePrefix('cache:tracks:row', tenantId));
 			await cache.invalidatePrefix(cachePrefix('cache:artists:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:artist', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:artist-tracks', tenantId));
 			await cache.invalidatePrefix(cachePrefix('cache:playlist', tenantId));
 			await cache.invalidatePrefix(cachePrefix('cache:playlists:list', tenantId));
 			await cache.invalidatePrefix(cachePrefix('cache:search', tenantId));
@@ -259,6 +261,8 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				await cache.put(trackKey(input.tenantId, input.id), dto);
 				await cache.invalidatePrefix(cachePrefix('cache:tracks:list', input.tenantId));
 				await cache.invalidatePrefix(cachePrefix('cache:artists:list', input.tenantId));
+				await cache.invalidatePrefix(cachePrefix('cache:artist', input.tenantId));
+				await cache.invalidatePrefix(cachePrefix('cache:artist-tracks', input.tenantId));
 				await cache.invalidatePrefix(cachePrefix('cache:search', input.tenantId));
 			}
 			return dto;

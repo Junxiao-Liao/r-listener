@@ -33,6 +33,8 @@ All routes under `/api/*`. Session cookie (first-party). JSON bodies unless note
 | Method | Path | Purpose |
 |--------|------|---------|
 | GET | `/artists?q=&cursor=&limit=` | Tenant-scoped cursor-paginated artist autocomplete |
+| GET | `/artists/{id}` | Get artist aggregate (track count, total duration) |
+| GET | `/artists/{id}/tracks` | List tracks for an artist (sorted by title A-Z) |
 
 ## Playlists
 | Method | Path | Purpose |

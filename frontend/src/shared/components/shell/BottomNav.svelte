@@ -3,6 +3,7 @@
 	import House from '@lucide/svelte/icons/house';
 	import Library from '@lucide/svelte/icons/library';
 	import ListMusic from '@lucide/svelte/icons/list-music';
+	import Mic2 from '@lucide/svelte/icons/mic-2';
 	import Settings from '@lucide/svelte/icons/settings';
 	import * as m from '$shared/paraglide/messages';
 	import { cn } from '$shared/utils';
@@ -19,6 +20,7 @@
 		{ href: '/', label: m.nav_home, icon: House },
 		{ href: '/library', label: m.nav_library, icon: Library },
 		{ href: '/playlists', label: m.nav_playlists, icon: ListMusic },
+		{ href: '/artists', label: m.nav_artists, icon: Mic2 },
 		{ href: '/settings', label: m.nav_settings, icon: Settings }
 	];
 
@@ -35,7 +37,7 @@
 </script>
 
 <nav
-	class="grid grid-cols-4"
+	class="grid grid-cols-5"
 	style="height: var(--bottom-nav-h);"
 	aria-label={m.bottom_nav_aria_label()}
 >

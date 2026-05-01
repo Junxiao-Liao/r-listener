@@ -164,6 +164,20 @@ export type ArtistDto = {
 	name: string;
 };
 
+export type ArtistsListResponse = {
+	items: ArtistDto[];
+	nextCursor: string | null;
+};
+
+export type ArtistAggregateDto = ArtistDto & {
+	trackCount: number;
+	totalDurationMs: number;
+};
+
+export type ArtistTrackListResponse = {
+	items: TrackDto[];
+};
+
 export type TrackDto = {
 	id: Id<'track'>;
 	tenantId: Id<'tenant'>;

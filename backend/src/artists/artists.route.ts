@@ -4,6 +4,7 @@ import type { Db } from '../db';
 import { parseQuery } from '../http/validation';
 import { requireSession, requireTenant } from '../middleware/middleware.guard';
 import { artistsQuerySchema } from './artists.dto';
+import type { Id } from '../shared/shared.type';
 import { createArtistsServiceForDb, type ArtistsService } from './artists.service';
 
 export type ArtistsRouteDeps = {
@@ -21,6 +22,26 @@ export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
 			await service.listArtists({
 				tenantId: c.var.session.activeTenantId!,
 				query
+			})
+		);
+	});
+
+	route.get('/artists/:id', requireSession(), requireTenant(), async (c) => {
+		const service = serviceFactory(c.var.db, c.var.kv);
+		return c.json(
+			await service.getArtist({
+				tenantId: c.var.session.activeTenantId!,
+				artistId: c.req.param('id') as Id<'artist'>
+			})
+		);
+	});
+
+	route.get('/artists/:id/tracks', requireSession(), requireTenant(), async (c) => {
+		const service = serviceFactory(c.var.db, c.var.kv);
+		return c.json(
+			await service.listArtistTracks({
+				tenantId: c.var.session.activeTenantId!,
+				artistId: c.req.param('id') as Id<'artist'>
 			})
 		);
 	});

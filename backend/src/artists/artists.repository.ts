@@ -1,11 +1,14 @@
-import { and, asc, eq, gt, isNull, like, or } from 'drizzle-orm';
+import { and, asc, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
+import { cacheKey, cachePrefix, createKvCache, KV_TTL } from '../lib/kv-cache';
 import type { Id } from '../shared/shared.type';
-import { toArtistDto } from './artists.dto';
-import { artists } from './artists.orm';
-import type { ArtistDto, ListArtistsResult } from './artists.type';
+import { tracks } from '../tracks/tracks.orm';
+import type { TrackStatus } from '../tracks/tracks.type';
+import { toTrackDto } from '../tracks/tracks.dto';
+import { toArtistAggregateDto, toArtistDto } from './artists.dto';
+import { artists, trackArtists } from './artists.orm';
+import type { ArtistAggregateDto, ArtistDto, ArtistTrackListResult, ListArtistsResult } from './artists.type';
 import { artistNameKey } from './artists.util';
-import { cacheKey, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 type CursorData = { id: string; nameKey: string };
 
@@ -18,10 +21,20 @@ export type ListArtistsInput = {
 
 export type ArtistsRepository = {
 	listArtists(input: ListArtistsInput): Promise<ListArtistsResult>;
+	findArtist(input: { tenantId: Id<'tenant'>; artistId: Id<'artist'> }): Promise<ArtistAggregateDto | null>;
+	listArtistTracks(input: { tenantId: Id<'tenant'>; artistId: Id<'artist'> }): Promise<ArtistTrackListResult>;
 };
 
 export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsRepository {
 	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.mutable }) : null;
+
+	function artistKey(tenantId: Id<'tenant'>, artistId: Id<'artist'>): string {
+		return cacheKey('cache:artist', tenantId, artistId);
+	}
+
+	function artistTracksKey(tenantId: Id<'tenant'>, artistId: Id<'artist'>): string {
+		return cacheKey('cache:artist-tracks', tenantId, artistId);
+	}
 
 	return {
 		listArtists: async (input) => {
@@ -65,8 +78,103 @@ export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsReposi
 			};
 			await cache?.put(key, result);
 			return result;
+		},
+
+		findArtist: async ({ tenantId, artistId }) => {
+			if (cache) {
+				const cached = await cache.tryGet<ArtistAggregateDto>(artistKey(tenantId, artistId));
+				if (cached) return cached;
+			}
+
+			const artistRows = await db
+				.select()
+				.from(artists)
+				.where(
+					and(
+						eq(artists.id, artistId),
+						eq(artists.tenantId, tenantId),
+						isNull(artists.deletedAt)
+					)
+				)
+				.limit(1);
+			if (!artistRows[0]) return null;
+
+			const aggRows = await db
+				.select({
+					count: sql<number>`COUNT(${tracks.id})`,
+					total: sql<number>`COALESCE(SUM(${tracks.durationMs}), 0)`
+				})
+				.from(trackArtists)
+				.innerJoin(tracks, eq(tracks.id, trackArtists.trackId))
+				.where(
+					and(
+						eq(trackArtists.artistId, artistId),
+						eq(tracks.tenantId, tenantId),
+						eq(tracks.status, 'ready' satisfies TrackStatus),
+						isNull(tracks.deletedAt)
+					)
+				);
+			const agg = aggRows[0]!;
+			const result = toArtistAggregateDto(artistRows[0], {
+				trackCount: Number(agg.count ?? 0),
+				totalDurationMs: Number(agg.total ?? 0)
+			});
+
+			if (cache) await cache.put(artistKey(tenantId, artistId), result);
+			return result;
+		},
+
+		listArtistTracks: async ({ tenantId, artistId }) => {
+			const key = artistTracksKey(tenantId, artistId);
+			const cached = await cache?.tryGet<ArtistTrackListResult>(key);
+			if (cached) return cached;
+
+			const rows = await db
+				.select()
+				.from(trackArtists)
+				.innerJoin(tracks, eq(tracks.id, trackArtists.trackId))
+				.where(
+					and(
+						eq(trackArtists.artistId, artistId),
+						eq(tracks.tenantId, tenantId),
+						eq(tracks.status, 'ready' satisfies TrackStatus),
+						isNull(tracks.deletedAt)
+					)
+				)
+				.orderBy(asc(tracks.title), asc(tracks.id));
+
+			const artistMap = await loadArtistsByTrackId(rows.map((r) => r.tracks.id));
+
+			const result: ArtistTrackListResult = {
+				items: rows.map((r) => toTrackDto(r.tracks, null, artistMap.get(r.tracks.id) ?? []))
+			};
+
+			await cache?.put(key, result);
+			return result;
 		}
 	};
+
+	async function loadArtistsByTrackId(trackIds: string[]): Promise<Map<string, ArtistDto[]>> {
+		if (trackIds.length === 0) return new Map();
+		const rows = await db
+			.select({
+				trackId: trackArtists.trackId,
+				id: artists.id,
+				name: artists.name
+			})
+			.from(trackArtists)
+			.innerJoin(artists, eq(artists.id, trackArtists.artistId))
+			.where(and(inArray(trackArtists.trackId, trackIds), isNull(artists.deletedAt)))
+			.orderBy(asc(trackArtists.trackId), asc(trackArtists.position));
+
+		const map = new Map<string, ArtistDto[]>();
+		for (const row of rows) {
+			const list = map.get(row.trackId) ?? [];
+			list.push({ id: row.id as Id<'artist'>, name: row.name });
+			map.set(row.trackId, list);
+		}
+		return map;
+	}
 }
 
 function encodeCursor(data: CursorData): string {

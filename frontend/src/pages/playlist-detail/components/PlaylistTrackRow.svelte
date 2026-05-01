@@ -4,7 +4,6 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { formatDurationMs } from '$shared/format/duration';
-	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useRemovePlaylistTrackMutation } from '$shared/query/playlists.query';
 	import { usePlayListMutation } from '$shared/player/play-list';
@@ -26,10 +25,8 @@
 
 	let confirmingRemove = $state(false);
 
-	const subtitle = $derived(
-		[trackArtistDisplay(item.track), item.track.album]
-			.filter((v): v is string => !!v && v.length > 0)
-			.join(' · ')
+	const subtitleArtists = $derived(
+		item.track.artists.length > 0 ? item.track.artists : null
 	);
 
 	async function play() {
@@ -53,8 +50,25 @@
 		onclick={play}
 	>
 		<span class="truncate text-sm font-medium">{item.track.title}</span>
-		{#if subtitle.length > 0}
-			<span class="truncate text-xs text-muted-foreground">{subtitle}</span>
+		{#if subtitleArtists || item.track.album}
+			<span class="truncate text-xs text-muted-foreground">
+				{#if subtitleArtists}
+					{#each subtitleArtists as artist, i (artist.id)}
+						{#if i > 0}, {/if}
+						<a
+							href="/artists/{artist.id}"
+							class="hover:underline"
+							onclick={(e: MouseEvent) => e.stopPropagation()}
+						>
+							{artist.name}
+						</a>
+					{/each}
+				{/if}
+				{#if subtitleArtists && item.track.album}
+					{@html ' · '}
+				{/if}
+				{item.track.album ?? ''}
+			</span>
 		{/if}
 	</button>
 	<span class="shrink-0 text-xs text-muted-foreground tabular-nums">

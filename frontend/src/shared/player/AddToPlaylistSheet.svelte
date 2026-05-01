@@ -10,10 +10,11 @@
 
 	type Props = {
 		trackId: Id<'track'>;
+		trackIds?: Id<'track'>[];
 		onclose: () => void;
 	};
 
-	let { trackId, onclose }: Props = $props();
+	let { trackId, trackIds = [trackId], onclose }: Props = $props();
 
 	const qc = useQueryClient();
 	const playlists = usePlaylistsQuery(() => ({ sort: 'updatedAt:desc' }));
@@ -26,10 +27,12 @@
 	async function addTo(playlist: PlaylistDto) {
 		pendingId = playlist.id;
 		try {
-			await api<PlaylistTrackDto>(`/playlists/${playlist.id}/tracks`, {
-				method: 'POST',
-				body: { trackId, position: null }
-			});
+			for (const tid of trackIds) {
+				await api<PlaylistTrackDto>(`/playlists/${playlist.id}/tracks`, {
+					method: 'POST',
+					body: { trackId: tid, position: null }
+				});
+			}
 			addedIds = new Set([...addedIds, playlist.id]);
 			void qc.invalidateQueries({ queryKey: queryKeys.playlist(playlist.id) });
 			void qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(playlist.id) });
