@@ -6,6 +6,7 @@
 	import { usePlayListMutation } from '$shared/player/play-list';
 	import TrackActions from '$shared/player/TrackActions.svelte';
 	import type { TrackDto } from '$shared/types/dto';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 
 	type Props = { track: TrackDto; siblings?: TrackDto[] };
 	let { track, siblings = [track] }: Props = $props();
@@ -14,7 +15,9 @@
 	const playList = usePlayListMutation();
 
 	const subtitle = $derived(
-		[track.artist, track.album].filter((v): v is string => !!v && v.length > 0).join(' · ')
+		[trackArtistDisplay(track), track.album]
+			.filter((v): v is string => !!v && v.length > 0)
+			.join(' · ')
 	);
 
 	const playableSiblings = $derived(siblings.filter((t) => t.status === 'ready'));

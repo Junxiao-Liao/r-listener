@@ -5,7 +5,6 @@ export const themeSchema = z.enum(['system', 'light', 'dark']);
 export const librarySortSchema = z.enum([
 	'createdAt:desc',
 	'title:asc',
-	'artist:asc',
 	'album:asc'
 ]);
 

@@ -1,10 +1,9 @@
 // Browser-side metadata extraction. Wraps music-metadata-browser with a small
-// shape that matches what Upload Review needs. Falls back to filename-derived
-// title when the audio has no embedded metadata.
+// shape that matches what Upload Review needs.
 
 import { parseBlob } from 'music-metadata-browser';
 import { syltFramesToLrc, type SyltFrame } from '$shared/lyrics/lyrics';
-import { stripExt } from './pairing';
+import { parseFilenameMetadata, splitArtistNames } from './filename-metadata';
 
 export type EmbeddedCover = {
 	bytes: Uint8Array;
@@ -13,7 +12,7 @@ export type EmbeddedCover = {
 
 export type ExtractedMetadata = {
 	title: string;
-	artist: string | null;
+	artistNames: string[];
 	album: string | null;
 	trackNumber: number | null;
 	genre: string | null;
@@ -24,7 +23,7 @@ export type ExtractedMetadata = {
 };
 
 export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
-	const fallbackTitle = stripExt(file.name);
+	const filenameMetadata = parseFilenameMetadata(file.name);
 	let parsed: Awaited<ReturnType<typeof parseBlob>> | null = null;
 	try {
 		parsed = await parseBlob(file);
@@ -34,10 +33,16 @@ export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
 
 	const common = parsed?.common ?? null;
 	const format = parsed?.format ?? null;
+	const embeddedArtistNames = splitArtistNames(
+		[common?.artist, ...(common?.artists ?? [])].filter(
+			(value): value is string => !!value && value.trim().length > 0
+		)
+	);
 
 	return {
-		title: common?.title?.trim() || fallbackTitle,
-		artist: pickFirstString(common?.artist, common?.artists),
+		title: common?.title?.trim() || filenameMetadata.title || filenameMetadata.baseTitle,
+		artistNames:
+			embeddedArtistNames.length > 0 ? embeddedArtistNames : filenameMetadata.artistNames,
 		album: stringOrNull(common?.album),
 		trackNumber: typeof common?.track?.no === 'number' ? common.track.no : null,
 		genre: pickFirstString(undefined, common?.genre),

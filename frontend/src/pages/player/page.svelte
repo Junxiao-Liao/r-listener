@@ -9,6 +9,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
 
 	const player = getPlayer();
@@ -50,14 +51,15 @@
 		</div>
 	{:else}
 		{@const t = player.currentTrack}
+		{@const artists = trackArtistDisplay(t)}
 		<div class="flex flex-col items-center gap-6 px-4">
 			<CoverPlaceholder seed={t.title} class="aspect-square w-full max-w-[18rem] text-5xl" />
 
 			<div class="flex w-full flex-col items-center gap-1 text-center">
 				<h2 class="line-clamp-2 text-xl font-semibold">{t.title}</h2>
-				{#if t.artist || t.album}
+				{#if artists || t.album}
 					<p class="line-clamp-1 text-sm text-muted-foreground">
-						{[t.artist, t.album].filter(Boolean).join(' · ')}
+						{[artists, t.album].filter(Boolean).join(' · ')}
 					</p>
 				{/if}
 			</div>

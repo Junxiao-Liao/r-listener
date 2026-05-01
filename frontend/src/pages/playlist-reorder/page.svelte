@@ -4,6 +4,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { formatDurationMs } from '$shared/format/duration';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import {
 		useMovePlaylistTrackMutation,
 		usePlaylistTracksQuery
@@ -90,7 +91,7 @@
 					<span class="flex min-w-0 flex-1 flex-col">
 						<span class="truncate text-sm font-medium">{item.track.title}</span>
 						<span class="truncate text-xs text-muted-foreground">
-							{[item.track.artist, item.track.album].filter(Boolean).join(' · ')}
+							{[trackArtistDisplay(item.track), item.track.album].filter(Boolean).join(' · ')}
 						</span>
 					</span>
 					<span class="shrink-0 text-xs text-muted-foreground tabular-nums">

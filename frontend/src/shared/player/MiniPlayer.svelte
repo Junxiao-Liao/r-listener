@@ -4,6 +4,7 @@
 	import SkipForward from '@lucide/svelte/icons/skip-forward';
 	import * as m from '$shared/paraglide/messages';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from './player.context';
 
 	const player = getPlayer();
@@ -30,7 +31,7 @@
 			<span class="flex min-w-0 flex-1 flex-col">
 				<span class="truncate text-sm font-medium">{t.title}</span>
 				<span class="truncate text-xs text-muted-foreground">
-					{t.artist ?? ''}
+					{trackArtistDisplay(t)}
 				</span>
 			</span>
 			<button

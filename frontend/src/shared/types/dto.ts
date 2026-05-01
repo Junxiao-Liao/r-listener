@@ -38,7 +38,7 @@ export type ApiErrorBody = {
 };
 
 export type Language = 'en' | 'zh';
-export type LibrarySort = 'createdAt:desc' | 'title:asc' | 'artist:asc' | 'album:asc';
+export type LibrarySort = 'createdAt:desc' | 'title:asc' | 'album:asc';
 export type Theme = 'system' | 'light' | 'dark';
 export type TenantRole = 'owner' | 'member' | 'viewer';
 
@@ -151,7 +151,6 @@ export type LyricsStatus = 'none' | 'synced' | 'plain' | 'invalid';
 
 export type TrackSortField =
 	| 'title'
-	| 'artist'
 	| 'album'
 	| 'year'
 	| 'durationMs'
@@ -160,11 +159,16 @@ export type TrackSortField =
 export type TrackSortDirection = 'asc' | 'desc';
 export type TrackSort = `${TrackSortField}:${TrackSortDirection}`;
 
+export type ArtistDto = {
+	id: Id<'artist'>;
+	name: string;
+};
+
 export type TrackDto = {
 	id: Id<'track'>;
 	tenantId: Id<'tenant'>;
 	title: string;
-	artist: string | null;
+	artists: ArtistDto[];
 	album: string | null;
 	trackNumber: number | null;
 	genre: string | null;
@@ -187,7 +191,7 @@ export type TrackListResponse = {
 
 export type TrackPatch = {
 	title?: string;
-	artist?: string | null;
+	artistNames?: string[];
 	album?: string | null;
 	trackNumber?: number | null;
 	genre?: string | null;

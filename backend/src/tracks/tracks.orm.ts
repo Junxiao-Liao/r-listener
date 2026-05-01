@@ -13,7 +13,6 @@ export const tracks = sqliteTable(
 			.notNull()
 			.references(() => users.id),
 		title: text('title').notNull(),
-		artist: text('artist'),
 		album: text('album'),
 		durationMs: integer('duration_ms'),
 		contentType: text('content_type').notNull(),
@@ -36,7 +35,6 @@ export const tracks = sqliteTable(
 		index('tracks_tenant_idx').on(t.tenantId, t.deletedAt, t.status),
 		index('tracks_tenant_created_idx').on(t.tenantId, t.createdAt),
 		index('tracks_tenant_title_idx').on(t.tenantId, t.title),
-		index('tracks_tenant_artist_idx').on(t.tenantId, t.artist),
 		index('tracks_tenant_album_idx').on(t.tenantId, t.album),
 		index('tracks_pending_cleanup_idx').on(t.status, t.createdAt)
 	]

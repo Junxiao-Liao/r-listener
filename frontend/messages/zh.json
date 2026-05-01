@@ -43,6 +43,7 @@
 	"action_cancel": "取消",
 	"action_remove": "移除",
 	"action_delete": "删除",
+	"action_swap": "交换",
 
 	"admin_eyebrow": "管理员",
 	"admin_settings_eyebrow": "设置",

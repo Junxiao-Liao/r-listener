@@ -13,6 +13,7 @@
 		useTrackQuery
 	} from '$shared/query/tracks.query';
 	import { isEditor } from '$shared/auth/role';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import type { Id } from '$shared/types/dto';
 
 	type Props = { trackId: Id<'track'> };
@@ -49,7 +50,9 @@
 	}
 
 	const subtitle = $derived(
-		($track.data?.artist || '').trim() + ($track.data?.album ? ` · ${$track.data.album}` : '')
+		[$track.data ? trackArtistDisplay($track.data) : '', $track.data?.album]
+			.filter(Boolean)
+			.join(' · ')
 	);
 </script>
 

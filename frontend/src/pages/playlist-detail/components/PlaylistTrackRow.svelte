@@ -4,6 +4,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { formatDurationMs } from '$shared/format/duration';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useRemovePlaylistTrackMutation } from '$shared/query/playlists.query';
 	import { usePlayListMutation } from '$shared/player/play-list';
@@ -26,7 +27,7 @@
 	let confirmingRemove = $state(false);
 
 	const subtitle = $derived(
-		[item.track.artist, item.track.album]
+		[trackArtistDisplay(item.track), item.track.album]
 			.filter((v): v is string => !!v && v.length > 0)
 			.join(' · ')
 	);

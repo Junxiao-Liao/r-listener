@@ -1,3 +1,4 @@
+export { artists, trackArtists } from '../artists/artists.orm';
 export { auditLogs } from '../audit/audit.orm';
 export { playbackHistory } from '../playback/playback.orm';
 export { playlistTracks, playlists } from '../playlists/playlists.orm';

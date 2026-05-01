@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import { fromUnixTimestampSeconds } from '../shared/time';
+import { artistDtoSchema } from '../artists/artists.dto';
 import type { TrackDto } from './tracks.type';
 import type { tracks } from './tracks.orm';
+import type { ArtistDto } from '../artists/artists.type';
 
 export const trackStatusSchema = z.enum(['pending', 'ready']);
 export const lyricsStatusSchema = z.enum(['none', 'synced', 'plain', 'invalid']);
@@ -10,7 +12,7 @@ export const trackDtoSchema = z.object({
 	id: z.string(),
 	tenantId: z.string(),
 	title: z.string(),
-	artist: z.string().nullable(),
+	artists: z.array(artistDtoSchema),
 	album: z.string().nullable(),
 	trackNumber: z.number().nullable(),
 	genre: z.string().nullable(),
@@ -28,7 +30,7 @@ export const trackDtoSchema = z.object({
 
 export const createTrackInputSchema = z.object({
 	title: z.string().min(1).optional(),
-	artist: z.string().min(1).optional(),
+	artistNames: z.array(z.string().trim().min(1)).optional().default([]),
 	album: z.string().min(1).optional()
 });
 
@@ -37,7 +39,7 @@ export type CreateTrackInput = z.infer<typeof createTrackInputSchema>;
 export const trackSortSchema = z
 	.string()
 	.regex(
-		/^(title|artist|album|year|durationMs|createdAt|updatedAt):(asc|desc)$/,
+		/^(title|album|year|durationMs|createdAt|updatedAt):(asc|desc)$/,
 		'Sort must be field:asc or field:desc'
 	);
 
@@ -67,7 +69,7 @@ export type FinalizeTrackInput = z.infer<typeof finalizeTrackInputSchema>;
 
 export const updateTrackInputSchema = z.object({
 	title: z.string().min(1).optional(),
-	artist: z.string().nullable().optional(),
+	artistNames: z.array(z.string().trim().min(1)).optional(),
 	album: z.string().nullable().optional(),
 	trackNumber: z.number().int().positive().nullable().optional(),
 	genre: z.string().nullable().optional(),
@@ -83,12 +85,16 @@ export const lyricsInputSchema = z.object({
 
 export type LyricsInput = z.infer<typeof lyricsInputSchema>;
 
-export function toTrackDto(track: typeof tracks.$inferSelect, coverUrl: string | null): TrackDto {
+export function toTrackDto(
+	track: typeof tracks.$inferSelect,
+	coverUrl: string | null,
+	artists: ArtistDto[] = []
+): TrackDto {
 	return {
 		id: track.id as TrackDto['id'],
 		tenantId: track.tenantId as TrackDto['tenantId'],
 		title: track.title,
-		artist: track.artist,
+		artists,
 		album: track.album,
 		trackNumber: track.trackNumber,
 		genre: track.genre,

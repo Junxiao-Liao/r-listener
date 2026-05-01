@@ -73,7 +73,7 @@ export function useTrackQuery(id: () => Id<'track'> | null) {
 export type CreateTrackInput = {
 	file: File;
 	title?: string;
-	artist?: string | null;
+	artistNames?: string[];
 	album?: string | null;
 };
 
@@ -83,7 +83,7 @@ export function useCreateTrackMutation() {
 			const fd = new FormData();
 			fd.set('file', input.file, input.file.name);
 			if (input.title) fd.set('title', input.title);
-			if (input.artist) fd.set('artist', input.artist);
+			for (const artistName of input.artistNames ?? []) fd.append('artistNames', artistName);
 			if (input.album) fd.set('album', input.album);
 			return api<TrackDto>('/tracks', { method: 'POST', body: fd });
 		}

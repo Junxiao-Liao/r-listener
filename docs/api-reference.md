@@ -19,15 +19,20 @@ All routes under `/api/*`. Session cookie (first-party). JSON bodies unless note
 ## Tracks
 | Method | Path | Purpose |
 |--------|------|---------|
-| GET | `/tracks` | List tracks (cursor, sort, filter) |
-| GET | `/tracks/{id}` | Get track |
-| POST | `/tracks` | Upload audio (multipart, step 1 of 2) |
+| GET | `/tracks` | List tracks (cursor, sort by `title`, `album`, `year`, `durationMs`, `createdAt`, or `updatedAt`; search includes linked artists) |
+| GET | `/tracks/{id}` | Get track with ordered `artists: { id, name }[]` |
+| POST | `/tracks` | Upload audio (multipart, step 1 of 2; repeat `artistNames` for artists) |
 | POST | `/tracks/{id}/finalize` | Finalize upload (step 2 of 2) |
-| PATCH | `/tracks/{id}` | Edit metadata |
+| PATCH | `/tracks/{id}` | Edit metadata (`artistNames: string[]` replaces links when present) |
 | PUT | `/tracks/{id}/lyrics` | Upload/replace lyrics |
 | DELETE | `/tracks/{id}/lyrics` | Remove lyrics |
 | DELETE | `/tracks/{id}` | Soft delete |
 | GET | `/tracks/{id}/stream` | Stream audio (supports Range) |
+
+## Artists
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/artists?q=&cursor=&limit=` | Tenant-scoped cursor-paginated artist autocomplete |
 
 ## Playlists
 | Method | Path | Purpose |

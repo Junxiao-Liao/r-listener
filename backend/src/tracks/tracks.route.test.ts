@@ -182,6 +182,31 @@ describe('tracks route', () => {
 		expect(service.finalizeTrack).toHaveBeenCalled();
 	});
 
+	it('POST /tracks passes repeated artistNames metadata for editor', async () => {
+		const service = createService();
+		const app = createFixtureApp({ service, session: memberSession() });
+		const formData = new FormData();
+		formData.set('file', new File(['audio'], 'test.mp3', { type: 'audio/mpeg' }));
+		formData.set('title', 'Title');
+		formData.append('artistNames', 'A');
+		formData.append('artistNames', 'B');
+
+		const res = await app.request(
+			'/tracks',
+			{
+				method: 'POST',
+				headers: { cookie: 'session=valid' },
+				body: formData
+			},
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(201);
+		expect(service.createTrack).toHaveBeenCalledWith(
+			expect.objectContaining({ metadata: { title: 'Title', artistNames: ['A', 'B'] } })
+		);
+	});
+
 	it('PATCH /tracks/:id updates metadata for editor', async () => {
 		const service = createService();
 		const app = createFixtureApp({ service, session: memberSession() });
@@ -378,7 +403,7 @@ function trackFixture(): TrackDto {
 		id: 'trk_a' as Id<'track'>,
 		tenantId: 'tnt_a' as Id<'tenant'>,
 		title: 'Test Song',
-		artist: 'Test Artist',
+		artists: [{ id: 'art_a' as Id<'artist'>, name: 'Test Artist' }],
 		album: 'Test Album',
 		trackNumber: null,
 		genre: null,

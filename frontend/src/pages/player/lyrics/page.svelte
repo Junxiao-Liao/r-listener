@@ -4,6 +4,7 @@
 	import { Button } from '$shared/components/ui/button';
 	import { parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
 	import { cn } from '$shared/utils';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
 
 	const player = getPlayer();
@@ -48,11 +49,12 @@
 		</p>
 	{:else}
 		{@const t = player.currentTrack}
+		{@const artists = trackArtistDisplay(t)}
 		<div class="flex items-center gap-3">
 			<span class="flex flex-1 flex-col">
 				<span class="text-sm font-medium">{t.title}</span>
-				{#if t.artist}
-					<span class="text-xs text-muted-foreground">{t.artist}</span>
+				{#if artists}
+					<span class="text-xs text-muted-foreground">{artists}</span>
 				{/if}
 			</span>
 		</div>

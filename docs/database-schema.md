@@ -2,7 +2,7 @@
 
 ## Conventions
 
-- **IDs:** Prefixed UUIDv7 (`usr_`, `tnt_`, `trk_`, `pls_`, `mbr_`, `qi_`, `plt_`, `aud_`)
+- **IDs:** Prefixed UUIDv7 (`usr_`, `tnt_`, `trk_`, `art_`, `pls_`, `mbr_`, `qi_`, `plt_`, `aud_`)
 - **Time:** `INTEGER` unix seconds in D1 → ISO-8601 on the wire
 - **Soft delete:** `deleted_at INTEGER NULL` on domain rows; reads filter `WHERE deleted_at IS NULL`
 - **Tenant scoping:** Tenant-scoped rows carry `tenant_id` FK; no cross-tenant visibility
@@ -24,6 +24,8 @@
 | `tenants` | Multi-tenant workspaces | — |
 | `memberships` | User↔Tenant join with role | `user_id → users`, `tenant_id → tenants` |
 | `tracks` | Audio metadata + R2 keys | `tenant_id → tenants`, `uploader_id → users` |
+| `artists` | Tenant-scoped artist names with unique `name_key` | `tenant_id → tenants` |
+| `track_artists` | Ordered Track↔Artist links | `track_id → tracks`, `artist_id → artists` |
 | `playlists` | Named collections | `tenant_id → tenants`, `owner_id → users` |
 | `playlist_tracks` | Track ordering (real `position_frac`) | `playlist_id → playlists`, `track_id → tracks` |
 | `playback_history` | Per-user play history (upsert by user+tenant+track) | `user_id → users`, `tenant_id → tenants`, `track_id → tracks` |
@@ -45,4 +47,3 @@
 | `cache:playlist:<tenantId>:<playlistId>` | Playlist aggregate | 5 min | Read-through cache for playlist lookups |
 | `cache:search:<tenantId>:<hash>` | Search results DTO | 60s | Search result caching |
 | `buffer:history:<userId>:<tenantId>` | Buffered playback events array | 1 hour | Playback history buffering (drained inline on reads)</td> |
-

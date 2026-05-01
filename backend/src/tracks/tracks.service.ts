@@ -168,7 +168,7 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 				tenantId: input.tenantId,
 				uploaderId: input.uploaderId,
 				title,
-				artist: input.metadata.artist ?? null,
+				artistNames: input.metadata.artistNames,
 				album: input.metadata.album ?? null,
 				contentType,
 				sizeBytes: input.file.size,

@@ -2,7 +2,6 @@ import { z } from 'zod';
 
 export const trackMetadataSchema = z.object({
 	title: z.string().trim().min(1, 'Title is required.'),
-	artist: z.string().trim().optional(),
 	album: z.string().trim().optional(),
 	trackNumber: z
 		.string()

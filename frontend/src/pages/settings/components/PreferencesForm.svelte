@@ -29,7 +29,6 @@
 	const sortOptions = [
 		{ value: 'createdAt:desc', label: m.settings_sort_recent },
 		{ value: 'title:asc', label: m.settings_sort_title },
-		{ value: 'artist:asc', label: m.settings_sort_artist },
 		{ value: 'album:asc', label: m.settings_sort_album }
 	] as const;
 

@@ -1,4 +1,5 @@
 import type { Id, Iso8601 } from '../shared/shared.type';
+import type { ArtistDto } from '../artists/artists.type';
 
 export type TrackStatus = 'pending' | 'ready';
 export type LyricsStatus = 'none' | 'synced' | 'plain' | 'invalid';
@@ -7,7 +8,7 @@ export type TrackDto = {
 	id: Id<'track'>;
 	tenantId: Id<'tenant'>;
 	title: string;
-	artist: string | null;
+	artists: ArtistDto[];
 	album: string | null;
 	trackNumber: number | null;
 	genre: string | null;

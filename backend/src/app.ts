@@ -12,6 +12,7 @@ import { prefsRoute } from './prefs/prefs.route';
 import { createAdminRoute } from './admin/admin.route';
 import type { AdminService } from './admin/admin.service';
 import { tracksRoute } from './tracks/tracks.route';
+import { artistsRoute } from './artists/artists.route';
 import { playbackRoute } from './playback/playback.route';
 import { queueRoute } from './queue/queue.route';
 import { playlistsRoute } from './playlists/playlists.route';
@@ -38,6 +39,7 @@ export function createApp(options: AppOptions = {}) {
 	api.route('/', authRoute);
 	api.route('/', prefsRoute);
 	api.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
+	api.route('/', artistsRoute);
 	api.route('/', tracksRoute);
 	api.route('/', playbackRoute);
 	api.route('/', queueRoute);

@@ -835,7 +835,6 @@ function makeTrackRow(
 		tenantId,
 		uploaderId: 'usr_a',
 		title: id,
-		artist: null,
 		album: null,
 		durationMs,
 		contentType: 'audio/mpeg',

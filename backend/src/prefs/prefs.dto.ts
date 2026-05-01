@@ -9,7 +9,7 @@ export const preferencesDtoSchema = z.object({
 	autoPlayNext: z.boolean(),
 	showMiniPlayer: z.boolean(),
 	preferSyncedLyrics: z.boolean(),
-	defaultLibrarySort: z.enum(['createdAt:desc', 'title:asc', 'artist:asc', 'album:asc']),
+	defaultLibrarySort: z.enum(['createdAt:desc', 'title:asc', 'album:asc']),
 	updatedAt: z.string()
 });
 

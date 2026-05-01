@@ -35,7 +35,7 @@ function makePlaylistTrackDto(): PlaylistTrackDto {
 			id: 'trk_a' as Id<'track'>,
 			tenantId: 'tnt_a' as Id<'tenant'>,
 			title: 'a',
-			artist: null,
+			artists: [],
 			album: null,
 			trackNumber: null,
 			genre: null,

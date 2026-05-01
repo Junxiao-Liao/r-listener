@@ -1,6 +1,7 @@
-import { and, eq, isNull, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import type { Id } from '../shared/shared.type';
+import { artists, trackArtists } from '../artists/artists.orm';
 import { toPlaylistDto } from '../playlists/playlists.dto';
 import { playlistTracks, playlists } from '../playlists/playlists.orm';
 import type { PlaylistDto } from '../playlists/playlists.type';
@@ -82,14 +83,21 @@ export function createSearchRepository(db: Db): SearchRepository {
 					isNull(tracks.deletedAt),
 					sql`(
 						lower(${tracks.title}) LIKE ${pattern} ESCAPE '\\'
-						OR lower(${tracks.artist}) LIKE ${pattern} ESCAPE '\\'
 						OR lower(${tracks.album}) LIKE ${pattern} ESCAPE '\\'
+						OR EXISTS (
+							SELECT 1 FROM ${trackArtists}
+							INNER JOIN ${artists} ON ${artists.id} = ${trackArtists.artistId}
+							WHERE ${trackArtists.trackId} = ${tracks.id}
+								AND ${artists.deletedAt} IS NULL
+								AND lower(${artists.name}) LIKE ${pattern} ESCAPE '\\'
+						)
 					)`
 				)
 			);
 
+		const artistMap = await loadArtistsByTrackId(rows.map((track) => track.id));
 		return rows.map((track) => {
-			const dto = toTrackDto(track, null);
+			const dto = toTrackDto(track, null, artistMap.get(track.id) ?? []);
 			return {
 				kind: 'track',
 				tenantId: dto.tenantId,
@@ -97,10 +105,32 @@ export function createSearchRepository(db: Db): SearchRepository {
 				deletedAt: track.deletedAt,
 				updatedAt: toDate(track.updatedAt),
 				primaryText: dto.title,
-				texts: [dto.title, dto.artist, dto.album],
+				texts: [dto.title, ...dto.artists.map((artist) => artist.name), dto.album],
 				hit: { kind: 'track', track: dto }
 			};
 		});
+	}
+
+	async function loadArtistsByTrackId(trackIds: string[]): Promise<Map<string, TrackDto['artists']>> {
+		if (trackIds.length === 0) return new Map();
+		const rows = await db
+			.select({
+				trackId: trackArtists.trackId,
+				id: artists.id,
+				name: artists.name
+			})
+			.from(trackArtists)
+			.innerJoin(artists, eq(artists.id, trackArtists.artistId))
+			.where(and(inArray(trackArtists.trackId, trackIds), isNull(artists.deletedAt)))
+			.orderBy(asc(trackArtists.trackId), asc(trackArtists.position));
+
+		const map = new Map<string, TrackDto['artists']>();
+		for (const row of rows) {
+			const list = map.get(row.trackId) ?? [];
+			list.push({ id: row.id as Id<'artist'>, name: row.name });
+			map.set(row.trackId, list);
+		}
+		return map;
 	}
 
 	async function searchPlaylists(input: SearchRepositoryInput): Promise<SearchCandidate[]> {

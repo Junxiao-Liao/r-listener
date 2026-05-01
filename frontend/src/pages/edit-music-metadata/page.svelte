@@ -4,6 +4,7 @@
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
 	import { Label } from '$shared/components/ui/label';
+	import ArtistChipsInput from '$shared/artists/ArtistChipsInput.svelte';
 	import { ApiError } from '$shared/api/client';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import {
@@ -29,7 +30,7 @@
 	const clearLyrics = useClearLyricsMutation();
 
 	let title = $state('');
-	let artist = $state('');
+	let artistNames = $state<string[]>([]);
 	let album = $state('');
 	let trackNumber = $state('');
 	let genre = $state('');
@@ -45,7 +46,7 @@
 		if (initialised || !$track.data) return;
 		const t = $track.data;
 		title = t.title;
-		artist = t.artist ?? '';
+		artistNames = t.artists.map((artist) => artist.name);
 		album = t.album ?? '';
 		trackNumber = t.trackNumber != null ? String(t.trackNumber) : '';
 		genre = t.genre ?? '';
@@ -73,7 +74,6 @@
 		if (!submitted) return {};
 		const parsed = trackMetadataSchema.safeParse({
 			title,
-			artist,
 			album,
 			trackNumber,
 			genre,
@@ -95,8 +95,10 @@
 		if (!t) return out;
 
 		if (form.title !== t.title) out.title = form.title;
-		const artistVal = (artist.trim().length === 0 ? null : artist.trim());
-		if (artistVal !== t.artist) out.artist = artistVal;
+		const originalArtistNames = t.artists.map((artist) => artist.name);
+		if (JSON.stringify(artistNames) !== JSON.stringify(originalArtistNames)) {
+			out.artistNames = artistNames;
+		}
 		const albumVal = (album.trim().length === 0 ? null : album.trim());
 		if (albumVal !== t.album) out.album = albumVal;
 		if (form.trackNumber !== t.trackNumber) out.trackNumber = form.trackNumber;
@@ -116,7 +118,6 @@
 
 		const parsed = trackMetadataSchema.safeParse({
 			title,
-			artist,
 			album,
 			trackNumber,
 			genre,
@@ -198,7 +199,7 @@
 
 			<div class="flex flex-col gap-1.5">
 				<Label for="artist">{m.track_field_artist()}</Label>
-				<Input id="artist" bind:value={artist} />
+				<ArtistChipsInput id="artist" bind:value={artistNames} />
 			</div>
 
 			<div class="flex flex-col gap-1.5">

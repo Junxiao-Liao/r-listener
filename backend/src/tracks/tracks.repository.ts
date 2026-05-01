@@ -1,16 +1,20 @@
-import { and, asc, desc, eq, gt, gte, isNull, like, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
 import type { Id } from '../shared/shared.type';
+import { createId } from '../shared/id';
+import { artists, trackArtists } from '../artists/artists.orm';
+import { artistNameKey, dedupeArtistNames } from '../artists/artists.util';
+import type { ArtistDto } from '../artists/artists.type';
 import { toTrackDto } from './tracks.dto';
 import { tracks } from './tracks.orm';
 import type { LyricsStatus, TrackDto, TrackStatus } from './tracks.type';
-import { createKvCache, type KvCache } from '../lib/kv-cache';
+import { createKvCache } from '../lib/kv-cache';
 
 export type TrackRow = typeof tracks.$inferSelect;
 
 type CursorData = { id: string; value: string | number };
 
-export type TrackSortField = 'title' | 'artist' | 'album' | 'year' | 'durationMs' | 'createdAt' | 'updatedAt';
+export type TrackSortField = 'title' | 'album' | 'year' | 'durationMs' | 'createdAt' | 'updatedAt';
 export type SortDirection = 'asc' | 'desc';
 
 export type ListTracksInput = {
@@ -45,7 +49,7 @@ export type CreateTrackInput = {
 	tenantId: Id<'tenant'>;
 	uploaderId: Id<'user'>;
 	title: string;
-	artist: string | null;
+	artistNames: string[];
 	album: string | null;
 	contentType: string;
 	sizeBytes: number;
@@ -70,7 +74,7 @@ export type UpdateTrackRepoInput = {
 	tenantId: Id<'tenant'>;
 	patch: {
 		title?: string;
-		artist?: string | null;
+		artistNames?: string[];
 		album?: string | null;
 		trackNumber?: number | null;
 		genre?: string | null;
@@ -111,9 +115,13 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 
 			if (input.q) {
 				const pattern = `%${input.q}%`;
-				conditions.push(
-					or(like(tracks.title, pattern), like(tracks.artist, pattern), like(tracks.album, pattern))!
-				);
+				conditions.push(or(like(tracks.title, pattern), like(tracks.album, pattern), sql`EXISTS (
+					SELECT 1 FROM ${trackArtists}
+					INNER JOIN ${artists} ON ${artists.id} = ${trackArtists.artistId}
+					WHERE ${trackArtists.trackId} = ${tracks.id}
+						AND ${artists.deletedAt} IS NULL
+						AND ${artists.name} LIKE ${pattern}
+				)`)!);
 			}
 
 			const cursorCondition = buildCursorCondition(input);
@@ -144,10 +152,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				});
 			}
 
-			return {
-				items: items.map((r) => toTrackDto(r, null)),
-				nextCursor
-			};
+			return { items: await toDtos(items), nextCursor };
 		},
 
 		findById: async (trackId, tenantId) => {
@@ -161,7 +166,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.limit(1);
 
-			const result = rows[0] ? toTrackDto(rows[0], null) : null;
+			const result = rows[0] ? (await toDtos([rows[0]]))[0]! : null;
 			if (cache && result) {
 				await cache.put(key, result);
 			}
@@ -183,7 +188,6 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				tenantId: input.tenantId,
 				uploaderId: input.uploaderId,
 				title: input.title,
-				artist: input.artist,
 				album: input.album,
 				contentType: input.contentType,
 				sizeBytes: input.sizeBytes,
@@ -194,12 +198,13 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				updatedAt: input.now
 			};
 			await db.insert(tracks).values(row);
+			await replaceTrackArtists(input.id, input.tenantId, input.artistNames, input.now);
 			const created = await db
 				.select()
 				.from(tracks)
 				.where(eq(tracks.id, input.id))
 				.limit(1);
-			return toTrackDto(created[0]!, null);
+			return (await toDtos(created))[0]!;
 		},
 
 		finalizeTrack: async (input) => {
@@ -221,7 +226,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			const dto = toTrackDto(updated[0]!, null);
+			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
 			return dto;
 		},
@@ -229,7 +234,6 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 		updateTrack: async (input) => {
 			const set: Record<string, unknown> = { updatedAt: input.now };
 			if (input.patch.title !== undefined) set.title = input.patch.title;
-			if (input.patch.artist !== undefined) set.artist = input.patch.artist;
 			if (input.patch.album !== undefined) set.album = input.patch.album;
 			if (input.patch.trackNumber !== undefined) set.trackNumber = input.patch.trackNumber;
 			if (input.patch.genre !== undefined) set.genre = input.patch.genre;
@@ -240,12 +244,20 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.update(tracks)
 				.set(set as never)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)));
+			if (input.patch.artistNames !== undefined) {
+				await replaceTrackArtists(
+					input.trackId,
+					input.tenantId,
+					input.patch.artistNames,
+					input.now
+				);
+			}
 			const updated = await db
 				.select()
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			const dto = toTrackDto(updated[0]!, null);
+			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
 			return dto;
 		},
@@ -264,7 +276,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.from(tracks)
 				.where(and(eq(tracks.id, input.trackId), eq(tracks.tenantId, input.tenantId)))
 				.limit(1);
-			const dto = toTrackDto(updated[0]!, null);
+			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
 			return dto;
 		},
@@ -283,7 +295,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId)))
 				.limit(1);
-			const dto = toTrackDto(updated[0]!, null);
+			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(tenantId, trackId);
 			return dto;
 		},
@@ -295,9 +307,104 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.returning();
 			await invalidateTrackCache(tenantId, trackId);
-			return rows[0] ? toTrackDto(rows[0], null) : null;
+			return rows[0] ? (await toDtos([rows[0]]))[0]! : null;
 		}
 	};
+
+	async function toDtos(rows: TrackRow[]): Promise<TrackDto[]> {
+		const artistMap = await loadArtistsByTrackId(rows.map((row) => row.id));
+		return rows.map((row) => toTrackDto(row, null, artistMap.get(row.id) ?? []));
+	}
+
+	async function loadArtistsByTrackId(trackIds: string[]): Promise<Map<string, ArtistDto[]>> {
+		if (trackIds.length === 0) return new Map();
+		const rows = await db
+			.select({
+				trackId: trackArtists.trackId,
+				id: artists.id,
+				name: artists.name
+			})
+			.from(trackArtists)
+			.innerJoin(artists, eq(artists.id, trackArtists.artistId))
+			.where(and(inArray(trackArtists.trackId, trackIds), isNull(artists.deletedAt)))
+			.orderBy(asc(trackArtists.trackId), asc(trackArtists.position));
+
+		const map = new Map<string, ArtistDto[]>();
+		for (const row of rows) {
+			const list = map.get(row.trackId) ?? [];
+			list.push({ id: row.id as Id<'artist'>, name: row.name });
+			map.set(row.trackId, list);
+		}
+		return map;
+	}
+
+	async function replaceTrackArtists(
+		trackId: Id<'track'>,
+		tenantId: Id<'tenant'>,
+		names: readonly string[],
+		now: Date
+	): Promise<void> {
+		await db.delete(trackArtists).where(eq(trackArtists.trackId, trackId));
+		const artistRows = await upsertArtists(tenantId, names, now);
+		if (artistRows.length === 0) return;
+		await db.insert(trackArtists).values(
+			artistRows.map((artist, position) => ({
+				trackId,
+				artistId: artist.id,
+				position,
+				createdAt: now
+			}))
+		);
+	}
+
+	async function upsertArtists(
+		tenantId: Id<'tenant'>,
+		names: readonly string[],
+		now: Date
+	): Promise<Array<typeof artists.$inferSelect>> {
+		const normalized = dedupeArtistNames(names);
+		const rows: Array<typeof artists.$inferSelect> = [];
+
+		for (const name of normalized) {
+			const nameKey = artistNameKey(name);
+			const existing = await db
+				.select()
+				.from(artists)
+				.where(and(eq(artists.tenantId, tenantId), eq(artists.nameKey, nameKey)))
+				.limit(1);
+			if (existing[0]) {
+				if (existing[0].deletedAt !== null) {
+					const restored = await db
+						.update(artists)
+						.set({ deletedAt: null, updatedAt: now })
+						.where(eq(artists.id, existing[0].id))
+						.returning();
+					rows.push(restored[0] ?? existing[0]);
+				} else {
+					rows.push(existing[0]);
+				}
+				continue;
+			}
+
+			const row: typeof artists.$inferInsert = {
+				id: createId('art_'),
+				tenantId,
+				name,
+				nameKey,
+				createdAt: now,
+				updatedAt: now
+			};
+			await db.insert(artists).values(row);
+			const created = await db
+				.select()
+				.from(artists)
+				.where(eq(artists.id, row.id))
+				.limit(1);
+			rows.push(created[0]!);
+		}
+
+		return rows;
+	}
 }
 
 function encodeCursor(data: CursorData): string {
@@ -312,8 +419,6 @@ function columnForSortField(field: TrackSortField) {
 	switch (field) {
 		case 'title':
 			return tracks.title;
-		case 'artist':
-			return tracks.artist;
 		case 'album':
 			return tracks.album;
 		case 'year':
@@ -331,8 +436,6 @@ function cursorSortValue(row: TrackRow, field: TrackSortField): string | number 
 	switch (field) {
 		case 'title':
 			return row.title;
-		case 'artist':
-			return row.artist ?? '';
 		case 'album':
 			return row.album ?? '';
 		case 'year':

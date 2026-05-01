@@ -61,7 +61,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 
 		const metadata = createTrackInputSchema.parse({
 			title: formData.get('title')?.toString() || undefined,
-			artist: formData.get('artist')?.toString() || undefined,
+			artistNames: formData.getAll('artistNames').map((value) => value.toString()),
 			album: formData.get('album')?.toString() || undefined
 		});
 

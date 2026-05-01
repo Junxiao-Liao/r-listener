@@ -5,6 +5,7 @@
 	import { Input } from '$shared/components/ui/input';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
 	import {
 		useAddPlaylistTrackMutation,
@@ -98,7 +99,7 @@
 						<span class="flex min-w-0 flex-1 flex-col">
 							<span class="truncate text-sm font-medium">{track.title}</span>
 							<span class="truncate text-xs text-muted-foreground">
-								{[track.artist, track.album].filter(Boolean).join(' · ')}
+								{[trackArtistDisplay(track), track.album].filter(Boolean).join(' · ')}
 							</span>
 						</span>
 						<span class="shrink-0 text-xs text-muted-foreground tabular-nums">

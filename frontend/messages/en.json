@@ -43,6 +43,7 @@
 	"action_cancel": "Cancel",
 	"action_remove": "Remove",
 	"action_delete": "Delete",
+	"action_swap": "Swap",
 
 	"admin_eyebrow": "Admin",
 	"admin_settings_eyebrow": "Settings",

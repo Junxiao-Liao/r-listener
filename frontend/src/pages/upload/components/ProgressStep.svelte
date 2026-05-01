@@ -78,7 +78,7 @@
 		const fd = new FormData();
 		fd.set('file', item.audio, item.audio.name);
 		fd.set('title', item.title);
-		if (item.artist) fd.set('artist', item.artist);
+		for (const artistName of item.artistNames) fd.append('artistNames', artistName);
 		if (item.album) fd.set('album', item.album);
 
 		progress[idx] = { ...entry, status: 'uploading', progress: 0, error: null };

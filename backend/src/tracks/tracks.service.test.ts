@@ -72,7 +72,7 @@ describe('tracks service', () => {
 					tenantId: tid('tnt_a'),
 					uploaderId: uid('usr_a'),
 					file: uploadFile({ type: 'video/mp4' }),
-					metadata: {}
+					metadata: { artistNames: [] }
 				})
 			).rejects.toMatchObject({ status: 415, code: 'unsupported_media_type' });
 		});
@@ -87,7 +87,7 @@ describe('tracks service', () => {
 					tenantId: tid('tnt_a'),
 					uploaderId: uid('usr_a'),
 					file: uploadFile({ size: 101 * 1024 * 1024 }),
-					metadata: {}
+					metadata: { artistNames: [] }
 				})
 			).rejects.toMatchObject({ status: 413, code: 'payload_too_large' });
 		});
@@ -102,7 +102,7 @@ describe('tracks service', () => {
 					tenantId: tid('tnt_a'),
 					uploaderId: uid('usr_a'),
 					file: uploadFile({ size: 0 }),
-					metadata: {}
+					metadata: { artistNames: [] }
 				})
 			).rejects.toMatchObject({ status: 400, code: 'upload_missing' });
 		});
@@ -116,7 +116,7 @@ describe('tracks service', () => {
 				tenantId: tid('tnt_a'),
 				uploaderId: uid('usr_a'),
 				file: uploadFile({ name: 'my-song.mp3' }),
-				metadata: { title: 'Custom Title', artist: 'Artist' }
+				metadata: { title: 'Custom Title', artistNames: ['Artist'] }
 			});
 
 			expect(repo.createTrack).toHaveBeenCalledWith(
@@ -124,7 +124,7 @@ describe('tracks service', () => {
 					tenantId: 'tnt_a',
 					uploaderId: 'usr_a',
 					title: 'Custom Title',
-					artist: 'Artist',
+					artistNames: ['Artist'],
 					contentType: 'audio/mpeg'
 				})
 			);
@@ -140,7 +140,7 @@ describe('tracks service', () => {
 				tenantId: tid('tnt_a'),
 				uploaderId: uid('usr_a'),
 				file: uploadFile({ name: 'awesome-track.flac' }),
-				metadata: {}
+				metadata: { artistNames: [] }
 			});
 
 			expect(repo.createTrack).toHaveBeenCalledWith(
@@ -325,14 +325,14 @@ describe('tracks service', () => {
 			await service.updateTrack({
 				trackId: tkid('trk_a'),
 				tenantId: tid('tnt_a'),
-				input: { title: 'Updated', artist: null }
+				input: { title: 'Updated', artistNames: [] }
 			});
 
 			expect(repo.updateTrack).toHaveBeenCalledWith(
 				expect.objectContaining({
 					trackId: 'trk_a',
 					tenantId: 'tnt_a',
-					patch: { title: 'Updated', artist: null }
+					patch: { title: 'Updated', artistNames: [] }
 				})
 			);
 		});
@@ -463,7 +463,6 @@ function trackRowFixture(overrides: { status?: string } = {}): TrackRow {
 		tenantId: 'tnt_a' as Id<'tenant'>,
 		uploaderId: 'usr_a' as Id<'user'>,
 		title: 'Test Song',
-		artist: 'Test Artist',
 		album: 'Test Album',
 		durationMs: null,
 		contentType: 'audio/mpeg',
@@ -487,7 +486,7 @@ function trackDto(): TrackDto {
 		id: 'trk_a' as Id<'track'>,
 		tenantId: 'tnt_a' as Id<'tenant'>,
 		title: 'Test Song',
-		artist: 'Test Artist',
+		artists: [{ id: 'art_a' as Id<'artist'>, name: 'Test Artist' }],
 		album: 'Test Album',
 		trackNumber: null,
 		genre: null,

@@ -1,10 +1,12 @@
 <script lang="ts">
+	import ArrowLeftRight from '@lucide/svelte/icons/arrow-left-right';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
+	import ArtistChipsInput from '$shared/artists/ArtistChipsInput.svelte';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs, formatBytes } from '$shared/format/duration';
-	import type { UploadItem } from '../upload.types';
+	import { swapUploadItemTitleAndArtists, type UploadItem } from '../upload.types';
 
 	type Props = {
 		items: UploadItem[];
@@ -18,6 +20,12 @@
 		const idx = items.findIndex((i) => i.id === id);
 		if (idx < 0) return;
 		items[idx] = { ...items[idx]!, [key]: value };
+	}
+
+	function swapTitleAndArtists(id: string) {
+		const idx = items.findIndex((i) => i.id === id);
+		if (idx < 0) return;
+		items[idx] = swapUploadItemTitleAndArtists(items[idx]!);
 	}
 </script>
 
@@ -69,13 +77,7 @@
 					</label>
 					<label class="flex flex-col gap-1 text-xs">
 						<span class="text-muted-foreground">{m.track_field_artist()}</span>
-						<Input
-							value={item.artist ?? ''}
-							oninput={(e: Event) => {
-								const v = (e.currentTarget as HTMLInputElement).value;
-								setField(item.id, 'artist', v.length > 0 ? v : null);
-							}}
-						/>
+						<ArtistChipsInput bind:value={item.artistNames} />
 					</label>
 					<label class="flex flex-col gap-1 text-xs">
 						<span class="text-muted-foreground">{m.track_field_album()}</span>
@@ -88,6 +90,16 @@
 						/>
 					</label>
 				</div>
+				<Button
+					type="button"
+					variant="outline"
+					size="sm"
+					class="self-start"
+					onclick={() => swapTitleAndArtists(item.id)}
+				>
+					<ArrowLeftRight class="size-4" />
+					{m.action_swap()}
+				</Button>
 			</li>
 		{/each}
 	</ul>

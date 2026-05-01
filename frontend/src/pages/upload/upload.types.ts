@@ -1,5 +1,6 @@
 import type { EmbeddedCover, ExtractedMetadata } from '$shared/upload/metadata';
 import type { Id } from '$shared/types/dto';
+import { artistDisplayName } from '$shared/artists/artists';
 
 export type UploadItem = {
 	id: string;
@@ -9,7 +10,7 @@ export type UploadItem = {
 	lyricsSource: 'external' | 'embedded' | 'none';
 	embeddedCover: EmbeddedCover | null;
 	title: string;
-	artist: string | null;
+	artistNames: string[];
 	album: string | null;
 	trackNumber: number | null;
 	genre: string | null;
@@ -58,11 +59,20 @@ export function metadataToItem(
 		lyricsSource,
 		embeddedCover: parsed.embeddedCover,
 		title: parsed.title,
-		artist: parsed.artist,
+		artistNames: parsed.artistNames,
 		album: parsed.album,
 		trackNumber: parsed.trackNumber,
 		genre: parsed.genre,
 		year: parsed.year,
 		durationMs: parsed.durationMs
+	};
+}
+
+export function swapUploadItemTitleAndArtists(item: UploadItem): UploadItem {
+	const oldTitle = item.title.trim();
+	return {
+		...item,
+		title: artistDisplayName(item.artistNames.map((name) => ({ name }))) || item.title,
+		artistNames: oldTitle.length > 0 ? [oldTitle] : []
 	};
 }

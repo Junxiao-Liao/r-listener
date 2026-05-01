@@ -479,7 +479,6 @@ function makeTrackRow(id: string, tenantId: string, status: TrackStatus): TrackR
 		tenantId,
 		uploaderId: 'usr_a',
 		title: id,
-		artist: null,
 		album: null,
 		durationMs: 180000,
 		contentType: 'audio/mpeg',

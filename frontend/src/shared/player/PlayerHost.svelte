@@ -8,6 +8,7 @@
 	import { usePlaybackEventsMutation } from '$shared/query/playback.query';
 	import { createPlayer, type Player } from './player.svelte';
 	import { setPlayerContext } from './player.context';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 
 	type Props = {
 		children: import('svelte').Snippet;
@@ -61,7 +62,7 @@
 		if (track) {
 			navigator.mediaSession.metadata = new MediaMetadata({
 				title: track.title,
-				artist: track.artist ?? '',
+				artist: trackArtistDisplay(track),
 				album: track.album ?? ''
 			});
 		} else {

@@ -72,7 +72,7 @@ function trackCandidate(track: TrackDto, deletedAt: Date | null = null): SearchC
 		deletedAt,
 		updatedAt: new Date(track.updatedAt),
 		primaryText: track.title,
-		texts: [track.title, track.artist, track.album],
+		texts: [track.title, ...track.artists.map((artist) => artist.name), track.album],
 		hit: { kind: 'track', track }
 	};
 }
@@ -94,7 +94,7 @@ function track(overrides: Partial<TrackDto> = {}): TrackDto {
 		id: 'trk_a' as Id<'track'>,
 		tenantId: tid('tnt_a'),
 		title: 'Track',
-		artist: null,
+		artists: [],
 		album: null,
 		trackNumber: null,
 		genre: null,

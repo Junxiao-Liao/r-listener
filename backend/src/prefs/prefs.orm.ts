@@ -11,7 +11,7 @@ export const userPreferences = sqliteTable('user_preferences', {
 	showMiniPlayer: integer('show_mini_player', { mode: 'boolean' }).notNull().default(true),
 	preferSyncedLyrics: integer('prefer_synced_lyrics', { mode: 'boolean' }).notNull().default(true),
 	defaultLibrarySort: text('default_library_sort', {
-		enum: ['createdAt:desc', 'title:asc', 'artist:asc', 'album:asc']
+		enum: ['createdAt:desc', 'title:asc', 'album:asc']
 	})
 		.notNull()
 		.default('createdAt:desc'),

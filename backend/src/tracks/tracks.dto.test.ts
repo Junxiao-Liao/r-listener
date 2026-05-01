@@ -12,19 +12,19 @@ describe('track DTO schemas', () => {
 		it('accepts optional metadata fields', () => {
 			const result = createTrackInputSchema.parse({
 				title: 'My Song',
-				artist: 'Artist Name',
+				artistNames: ['Artist Name'],
 				album: 'Album Name'
 			});
-			expect(result).toEqual({ title: 'My Song', artist: 'Artist Name', album: 'Album Name' });
+			expect(result).toEqual({ title: 'My Song', artistNames: ['Artist Name'], album: 'Album Name' });
 		});
 
 		it('accepts empty object', () => {
-			expect(createTrackInputSchema.parse({})).toEqual({});
+			expect(createTrackInputSchema.parse({})).toEqual({ artistNames: [] });
 		});
 
 		it('rejects empty strings for optional fields', () => {
 			expect(() => createTrackInputSchema.parse({ title: '' })).toThrow();
-			expect(() => createTrackInputSchema.parse({ artist: '' })).toThrow();
+			expect(() => createTrackInputSchema.parse({ artistNames: [''] })).toThrow();
 		});
 	});
 
@@ -51,7 +51,7 @@ describe('track DTO schemas', () => {
 			expect(() => trackQuerySchema.parse({ sort: 'invalid' })).toThrow();
 			expect(() => trackQuerySchema.parse({ sort: 'title:up' })).toThrow();
 			expect(trackQuerySchema.parse({ sort: 'title:asc' }).sort).toBe('title:asc');
-			expect(trackQuerySchema.parse({ sort: 'artist:desc' }).sort).toBe('artist:desc');
+			expect(() => trackQuerySchema.parse({ sort: 'artist:desc' })).toThrow();
 			expect(trackQuerySchema.parse({ sort: 'album:asc' }).sort).toBe('album:asc');
 			expect(trackQuerySchema.parse({ sort: 'year:desc' }).sort).toBe('year:desc');
 			expect(trackQuerySchema.parse({ sort: 'durationMs:asc' }).sort).toBe('durationMs:asc');
@@ -119,14 +119,14 @@ describe('track DTO schemas', () => {
 		});
 
 		it('accepts setting fields to null', () => {
-			const result = updateTrackInputSchema.parse({ artist: null, album: null });
-			expect(result).toEqual({ artist: null, album: null });
+			const result = updateTrackInputSchema.parse({ artistNames: [], album: null });
+			expect(result).toEqual({ artistNames: [], album: null });
 		});
 
 		it('accepts full metadata patch', () => {
 			const result = updateTrackInputSchema.parse({
 				title: 'T',
-				artist: null,
+				artistNames: ['A', 'B'],
 				album: 'A',
 				trackNumber: null,
 				genre: 'G',
@@ -135,7 +135,7 @@ describe('track DTO schemas', () => {
 			});
 			expect(result).toEqual({
 				title: 'T',
-				artist: null,
+				artistNames: ['A', 'B'],
 				album: 'A',
 				trackNumber: null,
 				genre: 'G',

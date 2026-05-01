@@ -7,6 +7,7 @@
 	import { Button } from '$shared/components/ui/button';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
+	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
 	import {
 		useClearQueueMutation,
@@ -168,8 +169,8 @@
 								</span>
 							{/if}
 						</span>
-						{#if item.track.artist}
-							<span class="truncate text-xs text-muted-foreground">{item.track.artist}</span>
+						{#if trackArtistDisplay(item.track)}
+							<span class="truncate text-xs text-muted-foreground">{trackArtistDisplay(item.track)}</span>
 						{/if}
 					</button>
 					<span class="shrink-0 text-xs tabular-nums text-muted-foreground">
