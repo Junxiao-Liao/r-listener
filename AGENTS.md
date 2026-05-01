@@ -1,22 +1,20 @@
-# Styles
-
-## Coding
+# Coding Rules
 
 - Elegant FP style.
     - Type system, domained types.
     - HOFs.
-    - Split large into small typed modules/functions with one responsibility
-      and explicit dependencies.
-- Test driven dev. Write tests first, as complete as possible.
-- Make modules self-contained and orthogonal as much as possible
-
-# Files
-
-@FILE_TREE.md
+    - Make modules self-contained and orthogonal. Split into small pieces with one responsibility.
+- TDD (Test driven dev). Write tests first, as complete as possible.
 
 # Docs
 
-When you add or change a route, update `docs/api-reference.md`.
-When you add or change a table, update `docs/database-schema.md`.
-When you add or change a script, update `docs/scripts.md`.
-When the architecture or stack changes, update `docs/overview.md`.
+See `./docs/`
+
+When you add or change a route, update `./docs/api-reference.md`.
+When you add or change a table, update `./docs/database-schema.md`.
+When you add or change a script, update `./docs/scripts.md`.
+When the architecture or stack changes, update `./docs/overview.md`.
+
+# Files
+
+See `./FILE_TREE.md`
