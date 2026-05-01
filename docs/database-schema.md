@@ -43,7 +43,21 @@
 | `prefs:<userId>` | User preferences JSON | 10 min | Read-through cache for preferences |
 | `cache:user:<userId>` | User record | 10 min | Read-through cache for user lookups |
 | `cache:user:username:<name>` | User record | 10 min | Read-through cache for user lookups |
-| `cache:track:<tenantId>:<trackId>` | Track DTO | 5 min | Read-through cache for track lookups |
-| `cache:playlist:<tenantId>:<playlistId>` | Playlist aggregate | 5 min | Read-through cache for playlist lookups |
-| `cache:search:<tenantId>:<hash>` | Search results DTO | 60s | Search result caching |
-| `buffer:history:<userId>:<tenantId>` | Buffered playback events array | 1 hour | Playback history buffering (drained inline on reads)</td> |
+| `cache:session:user:<userId>` | Active user session projection | 10 min | Read-through cache for session validation user reads |
+| `cache:authz:*` | Tenant membership and role lookups | 60s-10 min | Read-through cache for tenant authorization and auth session tenant lists |
+| `cache:tenant:<tenantId>` | Tenant DTO | 10 min | Read-through cache for active tenant lookups |
+| `cache:admin:*` | Admin list/detail/count pages | 60s-10 min | Read-through cache for admin user, tenant, membership, and aggregate reads |
+| `cache:track:<tenantId>:<trackId>` | Track DTO | 5 min | Read-through cache for track detail lookups |
+| `cache:tracks:list:<tenantId>:<query>` | Track page DTO | 5 min | Read-through cache for tenant-scoped track list/search pages |
+| `cache:tracks:row:<tenantId>:<trackId>` | Track row | 5 min | Read-through cache for service-level track row checks |
+| `cache:artists:list:<tenantId>:<query>` | Artist page DTO | 5 min | Read-through cache for artist autocomplete/list pages |
+| `cache:playlist:<tenantId>:<playlistId>` | Playlist aggregate | 5 min | Read-through cache for playlist detail lookups |
+| `cache:playlists:list:<tenantId>:<query>` | Playlist aggregate page | 5 min | Read-through cache for playlist list pages |
+| `cache:playlist-by-name:<tenantId>:<query>` | Playlist row | 5 min | Read-through cache for playlist name uniqueness reads |
+| `cache:playlist-tracks:*` | Playlist track rows | 5 min | Read-through cache for playlist track list/order reads |
+| `cache:queue:*` | Queue item rows and queue state rows | 5 min | Read-through cache for per-user tenant queue reads |
+| `cache:playback:*` | Recent/continue/visible playback pages | 60s | Read-through cache for playback history views and visibility filters |
+| `cache:search:<tenantId>:<query>` | Search results DTO | 60s | Search result caching |
+| `buffer:history:<userId>:<tenantId>` | Buffered playback events array | 1 hour | Playback history buffering (drained inline on reads) |
+
+KV is a performance layer only. Read-through cache misses and KV failures fall back to D1, not-found DB results are not cached, entity/detail entries are refreshed after successful writes when fresh data is available, and list/search/admin aggregate pages are invalidated by prefix after related mutations.

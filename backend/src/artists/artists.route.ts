@@ -7,7 +7,7 @@ import { artistsQuerySchema } from './artists.dto';
 import { createArtistsServiceForDb, type ArtistsService } from './artists.service';
 
 export type ArtistsRouteDeps = {
-	createArtistsService?: (db: Db) => ArtistsService;
+	createArtistsService?: (db: Db, kv: KVNamespace) => ArtistsService;
 };
 
 export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
@@ -16,7 +16,7 @@ export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
 
 	route.get('/artists', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, artistsQuerySchema);
-		const service = serviceFactory(c.var.db);
+		const service = serviceFactory(c.var.db, c.var.kv);
 		return c.json(
 			await service.listArtists({
 				tenantId: c.var.session.activeTenantId!,

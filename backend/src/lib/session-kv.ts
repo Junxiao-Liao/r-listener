@@ -17,12 +17,16 @@ function sessionKey(tokenHash: string): string {
 	return `session:${tokenHash}`;
 }
 
-export async function getSessionFromKv(kv: KVNamespace, token: string): Promise<SessionKvData | null> {
+export async function getSessionFromKv(
+	kv: KVNamespace,
+	token: string,
+	now: Date = new Date()
+): Promise<SessionKvData | null> {
 	const tokenHash = hashSessionToken(token);
 	const raw = await kv.get(sessionKey(tokenHash), 'json');
 	if (!raw) return null;
 	const data = raw as SessionKvData;
-	if (data.expiresAt <= Date.now()) {
+	if (data.expiresAt <= now.getTime()) {
 		await kv.delete(sessionKey(tokenHash));
 		return null;
 	}

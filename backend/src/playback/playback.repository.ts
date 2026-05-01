@@ -12,7 +12,7 @@ import {
 	type RecentTrackJoinedRow
 } from './playback.dto';
 import type { RecentTracksPage } from './playback.type';
-import { createKvCache } from '../lib/kv-cache';
+import { cacheKey, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type UpsertHistoryInput = {
 	userId: Id<'user'>;
@@ -123,9 +123,31 @@ async function bufferEvents(kv: KVNamespace, userId: Id<'user'>, tenantId: Id<'t
 }
 
 export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepository {
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.highChurn }) : null;
+
+	function recentKey(input: ListRecentInput): string {
+		return cacheKey('cache:playback:recent', input.tenantId, input.userId, {
+			cursor: input.cursor,
+			limit: input.limit
+		});
+	}
+
+	function continueKey(input: ListContinueListeningInput): string {
+		return cacheKey('cache:playback:continue', input.tenantId, input.userId, input.limit);
+	}
+
+	async function invalidatePlayback(input: { userId: Id<'user'>; tenantId: Id<'tenant'> }): Promise<void> {
+		await cache?.invalidatePrefix(cacheKey('cache:playback:recent', input.tenantId, input.userId));
+		await cache?.invalidatePrefix(cacheKey('cache:playback:continue', input.tenantId, input.userId));
+	}
+
 	return {
 		filterVisibleTrackIds: async (trackIds, tenantId) => {
 			if (trackIds.length === 0) return new Set();
+			const key = cacheKey('cache:playback:visible-tracks', tenantId, [...trackIds].sort());
+			const cached = await cache?.tryGet<Id<'track'>[]>(key);
+			if (cached) return new Set(cached);
+
 			const rows = await db
 				.select({ id: tracks.id })
 				.from(tracks)
@@ -137,7 +159,9 @@ export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepo
 					)
 				);
 			const ready = new Set(rows.map((r) => r.id as Id<'track'>));
-			return new Set(trackIds.filter((id) => ready.has(id)));
+			const result = trackIds.filter((id) => ready.has(id));
+			await cache?.put(key, result, KV_TTL.highChurn);
+			return new Set(result);
 		},
 
 		upsertHistory: async (input) => {
@@ -151,9 +175,12 @@ export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepo
 					playlistId: input.playlistId,
 					updatedAt: input.now.getTime()
 				};
-				const buffered = (await kv.get(bufferKey(input.userId, input.tenantId), 'json')) as BufferedEvent[] | null;
-				if (buffered && buffered.length >= 10) {
-					await drainBuffer(db, kv, input.userId, input.tenantId);
+				try {
+					const buffered = (await kv.get(bufferKey(input.userId, input.tenantId), 'json')) as BufferedEvent[] | null;
+					if (buffered && buffered.length >= 10) {
+						await drainBuffer(db, kv, input.userId, input.tenantId);
+					}
+				} catch {
 				}
 				await bufferEvents(kv, input.userId, input.tenantId, event);
 			} else {
@@ -179,10 +206,14 @@ export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepo
 						setWhere: sql`excluded.last_played_at >= ${playbackHistory.lastPlayedAt}`
 					});
 			}
+			await invalidatePlayback(input);
 		},
 
 		listRecent: async (input) => {
 			if (kv) await drainBuffer(db, kv, input.userId, input.tenantId);
+			const key = recentKey(input);
+			const cached = await cache?.tryGet<RecentTracksPage>(key);
+			if (cached) return cached;
 
 			const conditions = [
 				eq(playbackHistory.userId, input.userId),
@@ -229,11 +260,16 @@ export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepo
 				nextCursor = encodeRecentCursor(lastPlayedAtIso, last.trackId as Id<'track'>);
 			}
 
-			return { items, nextCursor };
+			const result = { items, nextCursor };
+			await cache?.put(key, result, KV_TTL.highChurn);
+			return result;
 		},
 
 		listContinueListening: async (input) => {
 			if (kv) await drainBuffer(db, kv, input.userId, input.tenantId);
+			const key = continueKey(input);
+			const cached = await cache?.tryGet<RecentTracksPage>(key);
+			if (cached) return cached;
 
 			const rows = await db
 				.select()
@@ -258,7 +294,9 @@ export function createPlaybackRepository(db: Db, kv?: KVNamespace): PlaybackRepo
 				})
 			);
 
-			return { items, nextCursor: null };
+			const result = { items, nextCursor: null };
+			await cache?.put(key, result, KV_TTL.highChurn);
+			return result;
 		}
 	};
 }

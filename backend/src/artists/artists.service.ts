@@ -20,6 +20,6 @@ export function createArtistsService(deps: { artistsRepository: ArtistsRepositor
 	};
 }
 
-export function createArtistsServiceForDb(db: Db): ArtistsService {
-	return createArtistsService({ artistsRepository: createArtistsRepository(db) });
+export function createArtistsServiceForDb(db: Db, kv?: KVNamespace): ArtistsService {
+	return createArtistsService({ artistsRepository: createArtistsRepository(db, kv) });
 }

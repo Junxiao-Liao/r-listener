@@ -20,7 +20,7 @@
 | i18n     | Paraglide JS (en, zh) |
 | DB       | Cloudflare D1 (SQLite) |
 | Storage  | Cloudflare R2 (audio, cover art) |
-| Cache    | Cloudflare KV (rate limiting) |
+| Cache    | Cloudflare KV (DB read-through caching, sessions, rate limiting, playback buffering) |
 | Auth     | HttpOnly session cookie (PBKDF2-SHA256 via Web Crypto) |
 | Tests    | Vitest (unit/service), Playwright (e2e) |
 | Deploy   | GitHub Actions → `wrangler deploy` |

@@ -5,6 +5,7 @@ import { tracks } from '../tracks/tracks.orm';
 import type { TrackStatus } from '../tracks/tracks.type';
 import { queueItems } from './queue.orm';
 import type { QueueItemRow, QueueItemWithTrack, TrackRow } from './queue.dto';
+import { cacheKey, cachePrefix, createKvCache, KV_TTL, reviveDateFields } from '../lib/kv-cache';
 
 export type ListItemsInput = {
 	userId: Id<'user'>;
@@ -77,9 +78,24 @@ export type QueueRepository = {
 	softDeleteAll(input: SoftDeleteAllInput): Promise<void>;
 };
 
-export function createQueueRepository(db: Db): QueueRepository {
+export function createQueueRepository(db: Db, kv?: KVNamespace): QueueRepository {
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.mutable }) : null;
+
+	function queueListKey(input: ListItemsInput): string {
+		return cacheKey('cache:queue:items', input.tenantId, input.userId);
+	}
+
+	async function invalidateQueue(input: { userId: Id<'user'>; tenantId: Id<'tenant'> }): Promise<void> {
+		await cache?.invalidatePrefix(cachePrefix('cache:queue:item', input.tenantId, input.userId));
+		await cache?.invalidate(queueListKey(input));
+	}
+
 	return {
 		listItemsWithTracks: async (input) => {
+			const key = queueListKey(input);
+			const cached = await cache?.tryGet<QueueItemWithTrack[]>(key);
+			if (cached) return cached.map(reviveQueueItemWithTrack);
+
 			const rows = await db
 				.select()
 				.from(queueItems)
@@ -95,13 +111,19 @@ export function createQueueRepository(db: Db): QueueRepository {
 				)
 				.orderBy(asc(queueItems.positionFrac), asc(queueItems.id));
 
-			return rows.map((r) => ({
+			const result = rows.map((r) => ({
 				row: r.queue_items as QueueItemRow,
 				track: r.tracks as TrackRow
 			}));
+			await cache?.put(key, result);
+			return result;
 		},
 
 		findItem: async (input) => {
+			const key = cacheKey('cache:queue:item', input.tenantId, input.userId, input.itemId);
+			const cached = await cache?.tryGet<QueueItemRow>(key);
+			if (cached) return reviveQueueItem(cached);
+
 			const rows = await db
 				.select()
 				.from(queueItems)
@@ -114,16 +136,24 @@ export function createQueueRepository(db: Db): QueueRepository {
 					)
 				)
 				.limit(1);
-			return rows[0] ?? null;
+			const result = rows[0] ?? null;
+			if (result) await cache?.put(key, result);
+			return result;
 		},
 
 		findTrack: async (trackId, tenantId) => {
+			const key = cacheKey('cache:queue:track', tenantId, trackId);
+			const cached = await cache?.tryGet<TrackRow>(key);
+			if (cached) return reviveTrack(cached);
+
 			const rows = await db
 				.select()
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.limit(1);
-			return rows[0] ?? null;
+			const result = rows[0] ?? null;
+			if (result) await cache?.put(key, result);
+			return result;
 		},
 
 		insertManyItems: async (input) => {
@@ -139,6 +169,9 @@ export function createQueueRepository(db: Db): QueueRepository {
 					addedAt: i.addedAt,
 					updatedAt: i.updatedAt
 				}))
+			);
+			await Promise.all(
+				input.items.map((item) => invalidateQueue({ userId: item.userId, tenantId: item.tenantId }))
 			);
 		},
 
@@ -157,6 +190,7 @@ export function createQueueRepository(db: Db): QueueRepository {
 						)
 					);
 			}
+			await invalidateQueue(input);
 		},
 
 		updateItem: async (input) => {
@@ -181,7 +215,12 @@ export function createQueueRepository(db: Db): QueueRepository {
 				.from(queueItems)
 				.where(eq(queueItems.id, input.itemId))
 				.limit(1);
-			return rows[0] ?? null;
+			const result = rows[0] ?? null;
+			await invalidateQueue(input);
+			if (result) {
+				await cache?.put(cacheKey('cache:queue:item', input.tenantId, input.userId, input.itemId), result);
+			}
+			return result;
 		},
 
 		clearCurrent: async (input) => {
@@ -199,6 +238,7 @@ export function createQueueRepository(db: Db): QueueRepository {
 				.update(queueItems)
 				.set({ isCurrent: false, updatedAt: input.now })
 				.where(and(...conditions));
+			await invalidateQueue(input);
 		},
 
 		softDeleteItem: async (input) => {
@@ -214,7 +254,10 @@ export function createQueueRepository(db: Db): QueueRepository {
 					)
 				)
 				.returning();
-			return rows[0] ?? null;
+			const result = rows[0] ?? null;
+			await invalidateQueue(input);
+			if (result) await cache?.invalidate(cacheKey('cache:queue:item', input.tenantId, input.userId, input.itemId));
+			return result;
 		},
 
 		softDeleteAll: async (input) => {
@@ -228,9 +271,25 @@ export function createQueueRepository(db: Db): QueueRepository {
 						isNull(queueItems.deletedAt)
 					)
 				);
+			await invalidateQueue(input);
 		}
 	};
 }
 
 // re-export so other files don't have to dig into orm imports
 export { queueItems, tracks, inArray, sql };
+
+function reviveQueueItem(row: QueueItemRow): QueueItemRow {
+	return reviveDateFields(row, ['addedAt', 'updatedAt', 'deletedAt']);
+}
+
+function reviveTrack(row: TrackRow): TrackRow {
+	return reviveDateFields(row, ['createdAt', 'updatedAt', 'deletedAt']);
+}
+
+function reviveQueueItemWithTrack(value: QueueItemWithTrack): QueueItemWithTrack {
+	return {
+		row: reviveQueueItem(value.row),
+		track: reviveTrack(value.track)
+	};
+}

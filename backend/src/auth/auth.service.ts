@@ -155,8 +155,8 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
 export function createAuthServiceForDb(db: Db, kv: KVNamespace): AuthService {
 	return createAuthService({
 		authRepository: createAuthRepository(kv),
-		usersRepository: createUsersRepository(db),
-		tenantsRepository: createTenantsRepository(db),
+		usersRepository: createUsersRepository(db, kv),
+		tenantsRepository: createTenantsRepository(db, kv),
 		prefsService: createPrefsService(createPrefsRepository(db, kv)),
 		auditRepository: createAuditRepository(db)
 	});

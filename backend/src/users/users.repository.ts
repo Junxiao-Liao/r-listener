@@ -3,7 +3,7 @@ import type { Db } from '../db';
 import { users } from './users.orm';
 import { toUserDto } from './users.dto';
 import type { UserDto, UserId } from './users.type';
-import { createKvCache } from '../lib/kv-cache';
+import { cacheKey, cachePrefix, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type UserPasswordRecord = UserDto & {
 	readonly passwordHash: string;
@@ -22,7 +22,7 @@ export type UsersRepository = {
 };
 
 export function createUsersRepository(db: Db, kv?: KVNamespace): UsersRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 600 }) : null;
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.authz }) : null;
 
 	const toPasswordRecord = (user: typeof users.$inferSelect): UserPasswordRecord => ({
 		...toUserDto(user),
@@ -49,6 +49,10 @@ export function createUsersRepository(db: Db, kv?: KVNamespace): UsersRepository
 		if (cache) {
 			await cache.invalidate(userKey(userId));
 			await cache.invalidate(usernameKey(username));
+			await cache.invalidate(cacheKey('cache:session:user', userId));
+			await cache.invalidate(cacheKey('cache:authz:user-memberships', userId));
+			await cache.invalidatePrefix(cachePrefix('cache:authz:membership'));
+			await cache.invalidatePrefix('cache:admin:users:');
 		}
 	}
 
@@ -93,7 +97,10 @@ export function createUsersRepository(db: Db, kv?: KVNamespace): UsersRepository
 				throw new Error('failed to update user active tenant');
 			}
 			const dto = toUserDto(rows[0]);
-			if (cache) await cache.put(userKey(userId), toPasswordRecord(rows[0]));
+			if (cache) {
+				await cacheUserRecord(toPasswordRecord(rows[0]));
+				await cache.invalidate(cacheKey('cache:session:user', userId));
+			}
 			return dto;
 		},
 		updatePasswordHash: async ({ userId, passwordHash, now }) => {

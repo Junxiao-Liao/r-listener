@@ -12,6 +12,7 @@ import { alias } from 'drizzle-orm/sqlite-core';
 import type { AuditTargetType } from '../audit/audit.type';
 import { auditLogs } from '../audit/audit.orm';
 import type { Db } from '../db';
+import { cacheKey, cachePrefix, createKvCache, KV_TTL } from '../lib/kv-cache';
 import { deleteSiblingSessionsInKv } from '../lib/session-kv';
 import { playlistTracks, playlists } from '../playlists/playlists.orm';
 import { createId } from '../shared/id';
@@ -98,6 +99,35 @@ export type AdminRepository = {
 };
 
 export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository {
+	const cache = createKvCache(kv, { defaultTtlSeconds: KV_TTL.authz });
+
+	async function invalidateUsers(): Promise<void> {
+		await cache.invalidatePrefix('cache:admin:users:');
+		await cache.invalidatePrefix('cache:user:');
+		await cache.invalidatePrefix('prefs:');
+		await cache.invalidatePrefix('cache:session:user:');
+		await cache.invalidatePrefix('cache:authz:');
+	}
+
+	async function invalidateTenants(tenantId?: Id<'tenant'>): Promise<void> {
+		await cache.invalidatePrefix('cache:admin:tenants:');
+		await cache.invalidatePrefix('cache:admin:tenant-owner-count:');
+		await cache.invalidatePrefix('cache:tenant:');
+		await cache.invalidatePrefix('cache:authz:');
+		if (tenantId) {
+			await cache.invalidatePrefix(cachePrefix('cache:tracks:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:artists:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playlist', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playlists:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:queue:items', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:queue:track', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:recent', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:continue', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:visible-tracks', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:search', tenantId));
+		}
+	}
+
 	const revokeUserSessionsKv = async (userId: Id<'user'>) => {
 		const list = await kv.list({ prefix: 'session:' });
 		for (const key of list.keys) {
@@ -127,6 +157,16 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 		db,
 		batch: (...args: any[]) => (db.batch as any)(...args),
 		listUsers: async (query) => {
+			const cacheKeyValue = cacheKey('cache:admin:users:list', {
+				cursor: query.cursor,
+				excludeTenantId: query.excludeTenantId,
+				includeInactive: query.includeInactive,
+				limit: query.limit,
+				q: query.q
+			});
+			const cached = await cache.tryGet<AdminListResponse<AdminUserListItemDto>>(cacheKeyValue);
+			if (cached) return cached;
+
 			const offset = decodeCursor(query.cursor);
 			const filters = [isNull(users.deletedAt)];
 			if (!query.includeInactive) filters.push(eq(users.isActive, true));
@@ -159,28 +199,46 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 			const page = rows.slice(0, query.limit);
 			const counts = await workspaceCounts(page.map((user) => user.id));
 
-			return {
+			const result = {
 				items: page.map((user) => ({ ...toUserDto(user), workspaceCount: counts.get(user.id) ?? 0 })),
 				nextCursor: rows.length > query.limit ? encodeCursor(offset + query.limit) : null
 			};
+			await cache.put(cacheKeyValue, result, KV_TTL.highChurn);
+			return result;
 		},
 		findUserById: async (userId) => {
+			const key = cacheKey('cache:admin:users:detail', userId);
+			const cached = await cache.tryGet<UserDto>(key);
+			if (cached) return cached;
+
 			const rows = await db
 				.select()
 				.from(users)
 				.where(and(eq(users.id, userId), isNull(users.deletedAt)))
 				.limit(1);
-			return rows[0] ? toUserDto(rows[0]) : null;
+			const result = rows[0] ? toUserDto(rows[0]) : null;
+			if (result) await cache.put(key, result);
+			return result;
 		},
 		findUserByUsername: async (username) => {
+			const key = cacheKey('cache:admin:users:username', username);
+			const cached = await cache.tryGet<UserDto>(key);
+			if (cached) return cached;
+
 			const rows = await db
 				.select()
 				.from(users)
 				.where(and(eq(users.username, username), isNull(users.deletedAt)))
 				.limit(1);
-			return rows[0] ? toUserDto(rows[0]) : null;
+			const result = rows[0] ? toUserDto(rows[0]) : null;
+			if (result) await cache.put(key, result);
+			return result;
 		},
 		getUserDetail: async (userId) => {
+			const key = cacheKey('cache:admin:users:full', userId);
+			const cached = await cache.tryGet<UserDto & { memberships: TenantMembershipDto[] }>(key);
+			if (cached) return cached;
+
 			const user = await repository.findUserById(userId);
 			if (!user) return null;
 			const membershipRows = await db
@@ -195,12 +253,14 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 					)
 				)
 				.orderBy(asc(tenants.name));
-			return {
+			const result = {
 				...user,
 				memberships: membershipRows.map(({ membership, tenant }) =>
 					toTenantMembershipDto(membership, tenant)
 				)
 			};
+			await cache.put(key, result);
+			return result;
 		},
 		createUser: async ({ username, passwordHash, isAdmin, now }) => {
 			const rows = await db
@@ -216,7 +276,11 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 					updatedAt: now
 				})
 				.returning();
-			return toUserDto(rows[0]!);
+			const dto = toUserDto(rows[0]!);
+			await invalidateUsers();
+			await cache.put(cacheKey('cache:admin:users:detail', dto.id), dto);
+			await cache.put(cacheKey('cache:admin:users:username', dto.username), dto);
+			return dto;
 		},
 		updateUser: async ({ userId, patch, now }) => {
 			const rows = await db
@@ -224,7 +288,13 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.set({ ...patch, updatedAt: now })
 				.where(and(eq(users.id, userId), isNull(users.deletedAt)))
 				.returning();
-			return rows[0] ? toUserDto(rows[0]) : null;
+			const result = rows[0] ? toUserDto(rows[0]) : null;
+			await invalidateUsers();
+			if (result) {
+				await cache.put(cacheKey('cache:admin:users:detail', result.id), result);
+				await cache.put(cacheKey('cache:admin:users:username', result.username), result);
+			}
+			return result;
 		},
 		resetUserPassword: async ({ userId, passwordHash, now }) => {
 			const rows = await db
@@ -232,10 +302,13 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.set({ passwordHash, updatedAt: now })
 				.where(and(eq(users.id, userId), isNull(users.deletedAt)))
 				.returning();
-			return rows.length > 0;
+			const ok = rows.length > 0;
+			if (ok) await invalidateUsers();
+			return ok;
 		},
 		revokeUserSessions: async (userId) => {
 			await revokeUserSessionsKv(userId);
+			await invalidateUsers();
 		},
 		deleteUser: async ({ userId, now }) => {
 			const rows = await db
@@ -249,9 +322,19 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.set({ deletedAt: now, updatedAt: now })
 				.where(and(eq(memberships.userId, userId), isNull(memberships.deletedAt)));
 			await repository.revokeUserSessions(userId);
+			await invalidateUsers();
 			return true;
 		},
 		listTenants: async (query) => {
+			const cacheKeyValue = cacheKey('cache:admin:tenants:list', {
+				cursor: query.cursor,
+				excludeUserId: query.excludeUserId,
+				limit: query.limit,
+				q: query.q
+			});
+			const cached = await cache.tryGet<AdminListResponse<AdminTenantListItemDto>>(cacheKeyValue);
+			if (cached) return cached;
+
 			const offset = decodeCursor(query.cursor);
 			const filters = [isNull(tenants.deletedAt)];
 			if (query.q) filters.push(like(tenants.name, `%${escapeLike(query.q)}%`));
@@ -283,7 +366,7 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 			const tenantIds = page.map((tenant) => tenant.id);
 			const memberCounts = await membershipCounts(tenantIds);
 			const trackCounts = await trackCountsForTenants(tenantIds);
-			return {
+			const result = {
 				items: page.map((tenant) => ({
 					...toTenantDto(tenant),
 					memberCount: memberCounts.get(tenant.id) ?? 0,
@@ -291,21 +374,32 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				})),
 				nextCursor: rows.length > query.limit ? encodeCursor(offset + query.limit) : null
 			};
+			await cache.put(cacheKeyValue, result, KV_TTL.highChurn);
+			return result;
 		},
 		findTenantById: async (tenantId) => {
+			const key = cacheKey('cache:admin:tenants:detail', tenantId);
+			const cached = await cache.tryGet<TenantDto>(key);
+			if (cached) return cached;
+
 			const rows = await db
 				.select()
 				.from(tenants)
 				.where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
 				.limit(1);
-			return rows[0] ? toTenantDto(rows[0]) : null;
+			const result = rows[0] ? toTenantDto(rows[0]) : null;
+			if (result) await cache.put(key, result);
+			return result;
 		},
 		createTenant: async ({ name, now }) => {
 			const rows = await db
 				.insert(tenants)
 				.values({ id: createId('tnt_'), name, createdAt: now, updatedAt: now })
 				.returning();
-			return toTenantDto(rows[0]!);
+			const dto = toTenantDto(rows[0]!);
+			await invalidateTenants(dto.id);
+			await cache.put(cacheKey('cache:admin:tenants:detail', dto.id), dto);
+			return dto;
 		},
 		updateTenant: async ({ tenantId, name, now }) => {
 			const rows = await db
@@ -313,7 +407,10 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.set({ name, updatedAt: now })
 				.where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
 				.returning();
-			return rows[0] ? toTenantDto(rows[0]) : null;
+			const result = rows[0] ? toTenantDto(rows[0]) : null;
+			await invalidateTenants(tenantId);
+			if (result) await cache.put(cacheKey('cache:admin:tenants:detail', result.id), result);
+			return result;
 		},
 		deleteTenant: async ({ tenantId, now }) => {
 			const rows = await db
@@ -346,9 +443,14 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.set({ deletedAt: now, updatedAt: now })
 				.where(and(eq(playlists.tenantId, tenantId), isNull(playlists.deletedAt)));
 			await repository.clearActiveTenantSessions({ tenantId });
+			await invalidateTenants(tenantId);
 			return true;
 		},
 		listTenantMembers: async ({ tenantId, limit, cursor }) => {
+			const key = cacheKey('cache:admin:tenants:members', tenantId, { cursor, limit });
+			const cached = await cache.tryGet<AdminListResponse<AdminTenantMemberDto>>(key);
+			if (cached) return cached;
+
 			const offset = decodeCursor(cursor);
 			const rows = await db
 				.select({ membership: memberships, tenant: tenants, user: users })
@@ -367,15 +469,21 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.limit(limit + 1)
 				.offset(offset);
 			const page = rows.slice(0, limit);
-			return {
+			const result = {
 				items: page.map(({ membership, tenant, user }) => ({
 					...toTenantMembershipDto(membership, tenant),
 					user: toUserDto(user)
 				})),
 				nextCursor: rows.length > limit ? encodeCursor(offset + limit) : null
 			};
+			await cache.put(key, result, KV_TTL.highChurn);
+			return result;
 		},
 		findActiveMembership: async ({ tenantId, userId }) => {
+			const key = cacheKey('cache:admin:membership', tenantId, userId);
+			const cached = await cache.tryGet<TenantMembershipDto>(key);
+			if (cached) return cached;
+
 			const rows = await db
 				.select({ membership: memberships, tenant: tenants })
 				.from(memberships)
@@ -389,7 +497,9 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 					)
 				)
 				.limit(1);
-			return rows[0] ? toTenantMembershipDto(rows[0].membership, rows[0].tenant) : null;
+			const result = rows[0] ? toTenantMembershipDto(rows[0].membership, rows[0].tenant) : null;
+			if (result) await cache.put(key, result);
+			return result;
 		},
 		createMembership: async ({ tenantId, userId, role, now }) => {
 			const tenantRows = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
@@ -404,7 +514,11 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 					updatedAt: now
 				})
 				.returning();
-			return toTenantMembershipDto(rows[0]!, tenantRows[0]!);
+			const dto = toTenantMembershipDto(rows[0]!, tenantRows[0]!);
+			await invalidateUsers();
+			await invalidateTenants(tenantId);
+			await cache.put(cacheKey('cache:admin:membership', tenantId, userId), dto);
+			return dto;
 		},
 		updateMembership: async ({ tenantId, userId, role, now }) => {
 			const tenantRows = await db.select().from(tenants).where(eq(tenants.id, tenantId)).limit(1);
@@ -419,7 +533,11 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 					)
 				)
 				.returning();
-			return rows[0] && tenantRows[0] ? toTenantMembershipDto(rows[0], tenantRows[0]) : null;
+			const result = rows[0] && tenantRows[0] ? toTenantMembershipDto(rows[0], tenantRows[0]) : null;
+			await invalidateUsers();
+			await invalidateTenants(tenantId);
+			if (result) await cache.put(cacheKey('cache:admin:membership', tenantId, userId), result);
+			return result;
 		},
 		deleteMembership: async ({ tenantId, userId, now }) => {
 			const rows = await db
@@ -435,9 +553,15 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 				.returning();
 			if (rows.length === 0) return false;
 			await repository.clearActiveTenantSessions({ tenantId, userId });
+			await invalidateUsers();
+			await invalidateTenants(tenantId);
 			return true;
 		},
 		countTenantOwners: async (tenantId) => {
+			const key = cacheKey('cache:admin:tenant-owner-count', tenantId);
+			const cached = await cache.tryGet<number>(key);
+			if (cached !== null) return cached;
+
 			const rows = await db
 				.select({ count: sql<number>`count(*)` })
 				.from(memberships)
@@ -448,7 +572,9 @@ export function createAdminRepository(db: Db, kv: KVNamespace): AdminRepository 
 						isNull(memberships.deletedAt)
 					)
 				);
-			return Number(rows[0]?.count ?? 0);
+			const result = Number(rows[0]?.count ?? 0);
+			await cache.put(key, result, KV_TTL.highChurn);
+			return result;
 		},
 		clearActiveTenantSessions: async ({ tenantId, userId }) => {
 			await clearActiveTenantSessionsKv({ tenantId, userId });

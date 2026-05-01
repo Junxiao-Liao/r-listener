@@ -4,6 +4,38 @@ export type KvCacheOptions = {
 
 const DEFAULT_TTL = 300;
 
+export const KV_TTL = {
+	mutable: 300,
+	authz: 600,
+	highChurn: 60
+} as const;
+
+type CacheKeyPart = string | number | boolean | null | undefined | readonly CacheKeyPart[] | {
+	readonly [key: string]: CacheKeyPart;
+};
+
+export function cacheKey(prefix: string, ...parts: CacheKeyPart[]): string {
+	return [prefix, ...parts.map(encodeCacheKeyPart)].join(':');
+}
+
+export function cachePrefix(prefix: string, ...parts: Array<string | number | boolean>): string {
+	return [prefix, ...parts.map((part) => encodeCacheKeyPart(part))].join(':') + ':';
+}
+
+export function reviveDateFields<T extends Record<string, unknown>>(
+	value: T,
+	fields: readonly (keyof T)[]
+): T {
+	const next = { ...value };
+	for (const field of fields) {
+		const current = next[field];
+		if (typeof current === 'string' || typeof current === 'number') {
+			next[field] = new Date(current) as T[keyof T];
+		}
+	}
+	return next;
+}
+
 export function createKvCache(kv: KVNamespace, options: Partial<KvCacheOptions> = {}) {
 	const defaultTtl = options.defaultTtlSeconds ?? DEFAULT_TTL;
 
@@ -60,3 +92,20 @@ export function createKvCache(kv: KVNamespace, options: Partial<KvCacheOptions> 
 }
 
 export type KvCache = ReturnType<typeof createKvCache>;
+
+function encodeCacheKeyPart(part: CacheKeyPart): string {
+	return encodeURIComponent(stableStringify(part));
+}
+
+function stableStringify(value: CacheKeyPart): string {
+	if (Array.isArray(value)) {
+		return `[${value.map(stableStringify).join(',')}]`;
+	}
+	if (value && typeof value === 'object') {
+		return `{${Object.entries(value)
+			.sort(([a], [b]) => a.localeCompare(b))
+			.map(([key, child]) => `${JSON.stringify(key)}:${stableStringify(child)}`)
+			.join(',')}}`;
+	}
+	return JSON.stringify(value);
+}

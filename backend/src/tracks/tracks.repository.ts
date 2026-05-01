@@ -5,10 +5,11 @@ import { createId } from '../shared/id';
 import { artists, trackArtists } from '../artists/artists.orm';
 import { artistNameKey, dedupeArtistNames } from '../artists/artists.util';
 import type { ArtistDto } from '../artists/artists.type';
+import { playlistTracks, playlists } from '../playlists/playlists.orm';
 import { toTrackDto } from './tracks.dto';
 import { tracks } from './tracks.orm';
 import type { LyricsStatus, TrackDto, TrackStatus } from './tracks.type';
-import { createKvCache } from '../lib/kv-cache';
+import { cacheKey, cachePrefix, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type TrackRow = typeof tracks.$inferSelect;
 
@@ -93,7 +94,7 @@ export type SetLyricsRepoInput = {
 };
 
 export function createTracksRepository(db: Db, kv?: KVNamespace): TracksRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 300 }) : null;
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.mutable }) : null;
 
 	function trackKey(tenantId: Id<'tenant'>, trackId: Id<'track'>): string {
 		return `cache:track:${tenantId}:${trackId}`;
@@ -101,12 +102,54 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 
 	async function invalidateTrackCache(tenantId: Id<'tenant'>, trackId: Id<'track'>): Promise<void> {
 		if (cache) {
+			let playlistRows: Array<{ id: string }> = [];
+			try {
+				playlistRows = await db
+					.select({ id: playlistTracks.playlistId })
+					.from(playlistTracks)
+					.innerJoin(playlists, eq(playlists.id, playlistTracks.playlistId))
+					.where(
+						and(
+							eq(playlistTracks.trackId, trackId),
+							eq(playlists.tenantId, tenantId),
+							isNull(playlistTracks.deletedAt),
+							isNull(playlists.deletedAt)
+						)
+					);
+			} catch {
+			}
 			await cache.invalidate(trackKey(tenantId, trackId));
-			await cache.invalidatePrefix(`cache:tracks:list:${tenantId}:`);
+			await cache.invalidatePrefix(cachePrefix('cache:tracks:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:tracks:row', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:artists:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playlist', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playlists:list', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:search', tenantId));
+			await cache.invalidate(cacheKey('cache:queue:track', tenantId, trackId));
+			await cache.invalidatePrefix(cachePrefix('cache:queue:items', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:visible-tracks', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:recent', tenantId));
+			await cache.invalidatePrefix(cachePrefix('cache:playback:continue', tenantId));
+			for (const row of playlistRows) {
+				await cache.invalidate(cacheKey('cache:playlist-tracks', row.id));
+				await cache.invalidate(cacheKey('cache:playlist-tracks:all', row.id));
+				await cache.invalidatePrefix(cachePrefix('cache:playlist-track-row', row.id));
+			}
 		}
 	}
 	return {
 		listTracks: async (input) => {
+			const key = cacheKey('cache:tracks:list', input.tenantId, {
+				cursor: input.cursor,
+				includePending: input.includePending,
+				limit: input.limit,
+				q: input.q,
+				sortDir: input.sortDir,
+				sortField: input.sortField
+			});
+			const cached = await cache?.tryGet<ListTracksResult>(key);
+			if (cached) return cached;
+
 			const conditions = [eq(tracks.tenantId, input.tenantId), isNull(tracks.deletedAt)];
 
 			if (!input.includePending) {
@@ -152,7 +195,9 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				});
 			}
 
-			return { items: await toDtos(items), nextCursor };
+			const result = { items: await toDtos(items), nextCursor };
+			await cache?.put(key, result);
+			return result;
 		},
 
 		findById: async (trackId, tenantId) => {
@@ -174,12 +219,17 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 		},
 
 		findRowById: async (trackId, tenantId) => {
+			const key = cacheKey('cache:tracks:row', tenantId, trackId);
+			const cached = await cache?.tryGet<TrackRow>(key);
+			if (cached) return cached;
 			const rows = await db
 				.select()
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.limit(1);
-			return rows[0] ?? null;
+			const result = rows[0] ?? null;
+			if (result) await cache?.put(key, result);
+			return result;
 		},
 
 		createTrack: async (input) => {
@@ -204,7 +254,14 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.from(tracks)
 				.where(eq(tracks.id, input.id))
 				.limit(1);
-			return (await toDtos(created))[0]!;
+			const dto = (await toDtos(created))[0]!;
+			if (cache) {
+				await cache.put(trackKey(input.tenantId, input.id), dto);
+				await cache.invalidatePrefix(cachePrefix('cache:tracks:list', input.tenantId));
+				await cache.invalidatePrefix(cachePrefix('cache:artists:list', input.tenantId));
+				await cache.invalidatePrefix(cachePrefix('cache:search', input.tenantId));
+			}
+			return dto;
 		},
 
 		finalizeTrack: async (input) => {
@@ -228,6 +285,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.limit(1);
 			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
+			await cache?.put(trackKey(input.tenantId, input.trackId), dto);
 			return dto;
 		},
 
@@ -259,6 +317,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.limit(1);
 			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
+			await cache?.put(trackKey(input.tenantId, input.trackId), dto);
 			return dto;
 		},
 
@@ -278,6 +337,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.limit(1);
 			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(input.tenantId, input.trackId);
+			await cache?.put(trackKey(input.tenantId, input.trackId), dto);
 			return dto;
 		},
 
@@ -297,6 +357,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				.limit(1);
 			const dto = (await toDtos(updated))[0]!;
 			await invalidateTrackCache(tenantId, trackId);
+			await cache?.put(trackKey(tenantId, trackId), dto);
 			return dto;
 		},
 

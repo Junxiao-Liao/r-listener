@@ -5,7 +5,7 @@ import type { SearchRepository } from './search.repository';
 import { createSearchRepository } from './search.repository';
 import type { SearchQuery } from './search.dto';
 import type { SearchResultDto } from './search.type';
-import { createKvCache } from '../lib/kv-cache';
+import { cacheKey, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type SearchService = {
 	search(input: SearchServiceInput): Promise<SearchResultDto>;
@@ -16,11 +16,10 @@ export type SearchServiceInput = SearchQuery & {
 };
 
 export function createSearchService(searchRepository: SearchRepository, kv?: KVNamespace): SearchService {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 60 }) : null;
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.highChurn }) : null;
 
 	function searchCacheKey(tenantId: Id<'tenant'>, q: string, kinds: string[], limit: number, cursor?: string): string {
-		const hash = `${q}:${kinds.sort().join(',')}:${limit}:${cursor ?? ''}`;
-		return `cache:search:${tenantId}:${hash}`;
+		return cacheKey('cache:search', tenantId, { cursor, kinds: [...kinds].sort(), limit, q });
 	}
 
 	return {

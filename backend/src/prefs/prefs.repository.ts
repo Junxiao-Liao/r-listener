@@ -5,7 +5,7 @@ import { userPreferences } from './prefs.orm';
 import { toPreferencesDto } from './prefs.dto';
 import type { PreferencesDto, PreferencesPatch } from './prefs.type';
 import type { KvCache } from '../lib/kv-cache';
-import { createKvCache } from '../lib/kv-cache';
+import { createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type PrefsRepository = {
 	findByUserId(userId: UserId): Promise<PreferencesDto | null>;
@@ -18,7 +18,7 @@ function prefsKey(userId: UserId): string {
 }
 
 export function createPrefsRepository(db: Db, kv?: KVNamespace): PrefsRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: 600 }) : null;
+	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.authz }) : null;
 
 	return {
 		findByUserId: async (userId) => {
