@@ -4,7 +4,6 @@ export function createTestEnv(overrides: Partial<Env['Bindings']> = {}): Env['Bi
 	return {
 		DB: createMockD1(),
 		R2: createMockR2(),
-		KV: createMockKV(),
 		ASSETS: createMockAssets(),
 		SESSION_SECRET: 'test-session-secret',
 		...overrides
@@ -29,16 +28,6 @@ function createMockD1(): D1Database {
 
 function createMockR2(): R2Bucket {
 	return {} as R2Bucket;
-}
-
-function createMockKV(): KVNamespace {
-	const values = new Map<string, string>();
-	return {
-		get: async (key: string) => values.get(key) ?? null,
-		put: async (key: string, value: string) => {
-			values.set(key, value);
-		}
-	} as unknown as KVNamespace;
 }
 
 function createMockAssets(): Fetcher {

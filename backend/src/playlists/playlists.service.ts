@@ -366,6 +366,6 @@ async function maybeRenormalize(
 	}
 }
 
-export function createPlaylistsServiceForDb(db: Db, kv?: KVNamespace): PlaylistsService {
-	return createPlaylistsService({ playlistsRepository: createPlaylistsRepository(db, kv) });
+export function createPlaylistsServiceForDb(db: Db): PlaylistsService {
+	return createPlaylistsService({ playlistsRepository: createPlaylistsRepository(db) });
 }

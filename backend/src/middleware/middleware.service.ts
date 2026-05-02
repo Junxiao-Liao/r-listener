@@ -4,11 +4,11 @@ import { validateSession } from './session.service';
 import { resolveTenantAccess } from './tenant.service';
 import type { MiddlewareService } from './middleware.type';
 
-export function createMiddlewareService(db: Db, kv: KVNamespace): MiddlewareService {
+export function createMiddlewareService(db: Db): MiddlewareService {
 	return {
-		validateSession: (input) => validateSession(kv, db, input),
-		resolveTenantAccess: (input) => resolveTenantAccess(db, kv, input),
-		checkAuthRateLimit: (input) => checkAuthRateLimit(kv, input),
-		checkApiRateLimit: (input) => checkApiRateLimit(kv, input)
+		validateSession: (input) => validateSession(db, input),
+		resolveTenantAccess: (input) => resolveTenantAccess(db, input),
+		checkAuthRateLimit: (input) => checkAuthRateLimit(db, input),
+		checkApiRateLimit: (input) => checkApiRateLimit(db, input)
 	};
 }

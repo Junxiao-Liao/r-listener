@@ -22,7 +22,7 @@ import {
 } from './playlists.service';
 
 export type PlaylistsRouteDeps = {
-	createPlaylistsService?: (db: Db, kv: KVNamespace) => PlaylistsService;
+	createPlaylistsService?: (db: Db) => PlaylistsService;
 };
 
 export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
@@ -31,7 +31,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 
 	route.get('/playlists', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, playlistQuerySchema);
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.listPlaylists({
 				tenantId: c.var.session.activeTenantId!,
@@ -41,7 +41,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 	});
 
 	route.get('/playlists/:id', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.getPlaylist({
 				tenantId: c.var.session.activeTenantId!,
@@ -57,7 +57,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, createPlaylistInputSchema);
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			const created = await service.createPlaylist({
 				tenantId: c.var.session.activeTenantId!,
 				ownerId: c.var.session.user.id,
@@ -74,7 +74,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, updatePlaylistInputSchema);
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			const updated = await service.updatePlaylist({
 				tenantId: c.var.session.activeTenantId!,
 				playlistId: c.req.param('id') as Id<'playlist'>,
@@ -90,7 +90,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenant(),
 		requireTenantEditor(),
 		async (c) => {
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			await service.deletePlaylist({
 				tenantId: c.var.session.activeTenantId!,
 				playlistId: c.req.param('id') as Id<'playlist'>
@@ -101,7 +101,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 
 	route.get('/playlists/:id/tracks', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, playlistTracksQuerySchema);
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.listTracks({
 				tenantId: c.var.session.activeTenantId!,
@@ -118,7 +118,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, addPlaylistTrackInputSchema);
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			const item = await service.addTrack({
 				tenantId: c.var.session.activeTenantId!,
 				playlistId: c.req.param('id') as Id<'playlist'>,
@@ -135,7 +135,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, movePlaylistTrackInputSchema);
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			const item = await service.moveTrack({
 				tenantId: c.var.session.activeTenantId!,
 				playlistId: c.req.param('id') as Id<'playlist'>,
@@ -152,7 +152,7 @@ export function createPlaylistsRoute(deps: PlaylistsRouteDeps = {}) {
 		requireTenant(),
 		requireTenantEditor(),
 		async (c) => {
-			const service = serviceFactory(c.var.db, c.var.kv);
+			const service = serviceFactory(c.var.db);
 			await service.removeTrack({
 				tenantId: c.var.session.activeTenantId!,
 				playlistId: c.req.param('id') as Id<'playlist'>,

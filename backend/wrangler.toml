@@ -18,10 +18,6 @@ migrations_dir = "drizzle"
 binding = "R2"
 bucket_name = "r-listener-audio"
 
-[[kv_namespaces]]
-binding = "KV"
-id = "39639adacebf454e93b713d59633c4ca"
-
 [observability]
 [observability.logs]
 enabled = true

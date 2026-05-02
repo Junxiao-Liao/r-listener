@@ -14,13 +14,14 @@
 	const session = useSessionQuery();
 	const switchTenant = useSwitchTenantMutation();
 
-	const isAdminWithNoMemberships = $derived(
-		!!$session.data?.user.isAdmin && ($session.data?.tenants.length ?? 0) === 0
-	);
+	const isAdmin = $derived(!!$session.data?.user.isAdmin);
 
-	const adminTenants = useAdminTenantsQuery(() => isAdminWithNoMemberships);
+	const adminTenants = useAdminTenantsQuery(() => isAdmin);
 
 	const memberships = $derived<TenantMembershipDto[]>($session.data?.tenants ?? []);
+	const membershipByTenantId = $derived(
+		new Map(memberships.map((membership) => [membership.tenantId, membership]))
+	);
 	const adminList = $derived<AdminTenantListItemDto[]>($adminTenants.data?.items ?? []);
 	const lastActiveTenantId = $derived($session.data?.user.lastActiveTenantId ?? null);
 
@@ -55,33 +56,36 @@
 			<h1 class="text-2xl font-semibold">{m.tenants_title()}</h1>
 		</header>
 
-		{#if memberships.length === 0 && isAdminWithNoMemberships}
+		{#if memberships.length === 0 && isAdmin}
 			<p class="rounded-md bg-secondary px-3 py-2 text-sm text-secondary-foreground">
 				{m.tenants_admin_no_memberships_hint()}
 			</p>
 		{/if}
 
 		<ul class="flex flex-col gap-2">
-			{#each memberships as membership (membership.tenantId)}
-				<li>
-					<TenantCard
-						tenant={membership}
-						lastUsed={membership.tenantId === lastActiveTenantId && memberships.length === 1}
-						disabled={$switchTenant.isPending}
-						onpick={() => pick(membership.tenantId)}
-					/>
-				</li>
-			{/each}
-			{#each adminList as tenant (tenant.id)}
-				<li>
-					<TenantCard
-						tenant={{ tenantId: tenant.id, tenantName: tenant.name }}
-						lastUsed={tenant.id === lastActiveTenantId}
-						disabled={$switchTenant.isPending}
-						onpick={() => pick(tenant.id)}
-					/>
-				</li>
-			{/each}
+			{#if isAdmin}
+				{#each adminList as tenant (tenant.id)}
+					<li>
+						<TenantCard
+							tenant={membershipByTenantId.get(tenant.id) ?? { tenantId: tenant.id, tenantName: tenant.name }}
+							lastUsed={tenant.id === lastActiveTenantId}
+							disabled={$switchTenant.isPending}
+							onpick={() => pick(tenant.id)}
+						/>
+					</li>
+				{/each}
+			{:else}
+				{#each memberships as membership (membership.tenantId)}
+					<li>
+						<TenantCard
+							tenant={membership}
+							lastUsed={membership.tenantId === lastActiveTenantId && memberships.length === 1}
+							disabled={$switchTenant.isPending}
+							onpick={() => pick(membership.tenantId)}
+						/>
+					</li>
+				{/each}
+			{/if}
 		</ul>
 	</section>
 {/if}

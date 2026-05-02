@@ -5,15 +5,13 @@ import type { MiddlewareService } from './middleware/middleware.type';
 
 export type MiddlewareServiceFactory = (input: {
 	db: Db;
-	kv: KVNamespace;
 }) => MiddlewareService;
 
 export function createAppContextMiddleware(createMiddlewareService: MiddlewareServiceFactory) {
 	return createMiddleware<BackendEnv>(async (c, next) => {
 		const db = createDb(c.env.DB);
 		c.set('db', db);
-		c.set('kv', c.env.KV);
-		c.set('middlewareService', createMiddlewareService({ db, kv: c.env.KV }));
+		c.set('middlewareService', createMiddlewareService({ db }));
 		await next();
 	});
 }

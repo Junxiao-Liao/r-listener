@@ -18,7 +18,7 @@ import {
 import { createAdminServiceForDb, type AdminService } from './admin.service';
 
 export type AdminRouteDeps = {
-	createAdminService?: (db: Db, kv: KVNamespace) => AdminService;
+	createAdminService?: (db: Db) => AdminService;
 };
 
 export function createAdminRoute(deps: AdminRouteDeps = {}) {
@@ -27,7 +27,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	const guards = [requireSession(), requireAdmin()] as const;
 
 	route.get('/admin/users', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const query = parseQuery(c, adminUserListQuerySchema);
 		return c.json(
 			await service.listUsers({
@@ -39,7 +39,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.post('/admin/users', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminCreateUserSchema);
 		return c.json(
 			await service.createUser({
@@ -59,12 +59,12 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.get('/admin/users/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(await service.getUser(c.req.param('id') as Id<'user'>));
 	});
 
 	route.patch('/admin/users/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminUpdateUserSchema);
 		return c.json(
 			await service.updateUser({
@@ -76,7 +76,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.post('/admin/users/:id/reset-password', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminResetPasswordSchema);
 		await service.resetPassword({
 			actor: c.var.session.user,
@@ -87,7 +87,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.delete('/admin/users/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		await service.deleteUser({
 			actor: c.var.session.user,
 			userId: c.req.param('id') as Id<'user'>
@@ -96,7 +96,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.get('/admin/tenants', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const query = parseQuery(c, adminListQuerySchema);
 		return c.json(
 			await service.listTenants({
@@ -107,7 +107,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.post('/admin/tenants', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminCreateTenantSchema);
 		return c.json(
 			await service.createTenant({
@@ -119,12 +119,12 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.get('/admin/tenants/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(await service.getTenant(c.req.param('id') as Id<'tenant'>));
 	});
 
 	route.patch('/admin/tenants/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminUpdateTenantSchema);
 		return c.json(
 			await service.updateTenant({
@@ -136,7 +136,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.delete('/admin/tenants/:id', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		await service.deleteTenant({
 			actor: c.var.session.user,
 			tenantId: c.req.param('id') as Id<'tenant'>
@@ -145,7 +145,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.get('/admin/tenants/:id/members', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const query = parseQuery(c, adminListQuerySchema);
 		return c.json(
 			await service.listTenantMembers({
@@ -157,7 +157,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.post('/admin/tenants/:id/members', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminCreateMembershipSchema);
 		return c.json(
 			await service.createMembership({
@@ -170,7 +170,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.patch('/admin/tenants/:id/members/:userId', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const body = await parseJsonBody(c, adminUpdateMembershipSchema);
 		return c.json(
 			await service.updateMembership({
@@ -183,7 +183,7 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	});
 
 	route.delete('/admin/tenants/:id/members/:userId', ...guards, async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		await service.deleteMembership({
 			actor: c.var.session.user,
 			tenantId: c.req.param('id') as Id<'tenant'>,

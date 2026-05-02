@@ -1,12 +1,9 @@
+import { and, eq, ne } from 'drizzle-orm';
 import type { Id } from '../shared/shared.type';
 import type { UserId } from '../users/users.type';
-import { generateSessionToken } from './session';
-import {
-	createSessionInKv,
-	deleteSession as deleteSessionFromKv,
-	deleteSiblingSessionsInKv,
-	setSessionActiveTenantInKv
-} from '../lib/session-kv';
+import type { Db } from '../db';
+import { generateSessionToken, hashSessionToken, SESSION_TTL_MS } from './session';
+import { sessions } from './auth.orm';
 
 export type AuthRepository = {
 	createSession(input: {
@@ -27,26 +24,37 @@ export type AuthRepository = {
 	}): Promise<void>;
 };
 
-export function createAuthRepository(kv: KVNamespace): AuthRepository {
+export function createAuthRepository(db: Db): AuthRepository {
 	return {
-		createSession: async ({ userId, activeTenantId, now }) => {
+		createSession: async ({ userId, activeTenantId, now, ip, userAgent }) => {
 			const token = generateSessionToken();
-			const { tokenHash, expiresAt } = await createSessionInKv(kv, {
-				token,
+			const tokenHash = hashSessionToken(token);
+			const expiresAt = new Date(now.getTime() + SESSION_TTL_MS);
+			await db.insert(sessions).values({
+				tokenHash,
 				userId,
 				activeTenantId,
-				now
+				expiresAt,
+				lastRefreshedAt: now,
+				createdAt: now,
+				ip,
+				userAgent
 			});
 			return { token, tokenHash, expiresAt };
 		},
 		deleteSession: async (sessionTokenHash) => {
-			await deleteSessionFromKv(kv, sessionTokenHash);
+			await db.delete(sessions).where(eq(sessions.tokenHash, sessionTokenHash));
 		},
 		setSessionActiveTenant: async ({ sessionTokenHash, tenantId }) => {
-			await setSessionActiveTenantInKv(kv, { sessionTokenHash, tenantId });
+			await db
+				.update(sessions)
+				.set({ activeTenantId: tenantId })
+				.where(eq(sessions.tokenHash, sessionTokenHash));
 		},
 		deleteSiblingSessions: async ({ userId, currentSessionTokenHash }) => {
-			await deleteSiblingSessionsInKv(kv, { userId, currentSessionTokenHash });
+			await db
+				.delete(sessions)
+				.where(and(eq(sessions.userId, userId), ne(sessions.tokenHash, currentSessionTokenHash)));
 		}
 	};
 }

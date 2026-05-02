@@ -3,7 +3,7 @@
 ## Architecture
 
 - **Single Cloudflare Worker** hosts the entire app.
-  - Hono routes under `/api/*` own all D1 / R2 / KV bindings.
+  - Hono routes under `/api/*` own D1 and R2 bindings.
   - Same Worker serves the SvelteKit static SPA via `[assets]` binding.
   - One origin → first-party session cookie, no CORS.
 - **Pure SPA.** No SSR, no BFF, no `+page.server.ts` files.
@@ -20,8 +20,7 @@
 | i18n     | Paraglide JS (en, zh) |
 | DB       | Cloudflare D1 (SQLite) |
 | Storage  | Cloudflare R2 (audio, cover art) |
-| Cache    | Cloudflare KV (DB read-through caching, sessions, rate limiting, playback buffering) |
-| Auth     | HttpOnly session cookie (PBKDF2-SHA256 via Web Crypto) |
+| Auth     | HttpOnly session cookie with hashed tokens stored in D1 |
 | Tests    | Vitest (unit/service) |
 | Deploy   | GitHub Actions → `wrangler deploy` |
 

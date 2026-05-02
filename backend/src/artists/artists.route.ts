@@ -8,7 +8,7 @@ import type { Id } from '../shared/shared.type';
 import { createArtistsServiceForDb, type ArtistsService } from './artists.service';
 
 export type ArtistsRouteDeps = {
-	createArtistsService?: (db: Db, kv: KVNamespace) => ArtistsService;
+	createArtistsService?: (db: Db) => ArtistsService;
 };
 
 export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
@@ -17,7 +17,7 @@ export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
 
 	route.get('/artists', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, artistsQuerySchema);
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.listArtists({
 				tenantId: c.var.session.activeTenantId!,
@@ -27,7 +27,7 @@ export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
 	});
 
 	route.get('/artists/:id', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.getArtist({
 				tenantId: c.var.session.activeTenantId!,
@@ -37,7 +37,7 @@ export function createArtistsRoute(deps: ArtistsRouteDeps = {}) {
 	});
 
 	route.get('/artists/:id/tracks', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		return c.json(
 			await service.listArtistTracks({
 				tenantId: c.var.session.activeTenantId!,

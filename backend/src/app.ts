@@ -19,15 +19,15 @@ import { playlistsRoute } from './playlists/playlists.route';
 
 
 export type AppOptions = {
-	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
-	createAdminService?: (db: Db, kv: KVNamespace) => AdminService;
+	createMiddlewareService?: (input: { db: Db }) => MiddlewareService;
+	createAdminService?: (db: Db) => AdminService;
 	configure?: (app: Hono<BackendEnv>) => void;
 };
 
 export function createApp(options: AppOptions = {}) {
 	const app = new Hono<BackendEnv>();
 	const middlewareServiceFactory =
-		options.createMiddlewareService ?? (({ db, kv }) => createMiddlewareService(db, kv));
+		options.createMiddlewareService ?? (({ db }) => createMiddlewareService(db));
 
 	registerErrorHandlers(app);
 

@@ -127,7 +127,7 @@ export function useCreateAdminUserMutation() {
 	return createMutation<UserDto, ApiError, AdminCreateUserInput>({
 		mutationFn: (body) => api<UserDto>('/admin/users', { method: 'POST', body }),
 		meta: suppressGlobalApiErrorToast,
-		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin'] })
+		onSuccess: () => invalidateAdminAndSession(qc)
 	});
 }
 
@@ -138,7 +138,7 @@ export function useUpdateAdminUserMutation() {
 			api<UserDto>(`/admin/users/${userId}`, { method: 'PATCH', body: patch }),
 		onSuccess: (_, { userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
-			void qc.invalidateQueries({ queryKey: ['admin'] });
+			invalidateAdminAndSession(qc);
 		}
 	});
 }
@@ -157,7 +157,7 @@ export function useDeleteAdminUserMutation() {
 	const qc = useQueryClient();
 	return createMutation<void, ApiError, { userId: Id<'user'> }>({
 		mutationFn: ({ userId }) => api<void>(`/admin/users/${userId}`, { method: 'DELETE' }),
-		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin'] })
+		onSuccess: () => invalidateAdminAndSession(qc)
 	});
 }
 
@@ -170,7 +170,7 @@ export function useCreateAdminTenantMutation() {
 	>({
 		mutationFn: (body) => api('/admin/tenants', { method: 'POST', body }),
 		meta: suppressGlobalApiErrorToast,
-		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] })
+		onSuccess: () => invalidateAdminAndSession(qc)
 	});
 }
 
@@ -181,7 +181,7 @@ export function useUpdateAdminTenantMutation() {
 			api<TenantDto>(`/admin/tenants/${tenantId}`, { method: 'PATCH', body: patch }),
 		onSuccess: (_, { tenantId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenant(tenantId) });
-			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+			invalidateAdminAndSession(qc);
 		}
 	});
 }
@@ -190,7 +190,7 @@ export function useDeleteAdminTenantMutation() {
 	const qc = useQueryClient();
 	return createMutation<void, ApiError, { tenantId: Id<'tenant'> }>({
 		mutationFn: ({ tenantId }) => api<void>(`/admin/tenants/${tenantId}`, { method: 'DELETE' }),
-		onSuccess: () => void qc.invalidateQueries({ queryKey: ['admin'] })
+		onSuccess: () => invalidateAdminAndSession(qc)
 	});
 }
 
@@ -210,8 +210,7 @@ export function useCreateAdminMembershipMutation() {
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
-			void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
-			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+			invalidateAdminAndSession(qc);
 		}
 	});
 }
@@ -232,6 +231,7 @@ export function useUpdateAdminMembershipMutation() {
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
+			invalidateAdminAndSession(qc);
 		}
 	});
 }
@@ -245,8 +245,12 @@ export function useDeleteAdminMembershipMutation() {
 		onSuccess: (_, { tenantId, userId }) => {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
-			void qc.invalidateQueries({ queryKey: ['admin', 'users'] });
-			void qc.invalidateQueries({ queryKey: ['admin', 'tenants'] });
+			invalidateAdminAndSession(qc);
 		}
 	});
+}
+
+function invalidateAdminAndSession(qc: ReturnType<typeof useQueryClient>) {
+	void qc.invalidateQueries({ queryKey: ['admin'] });
+	void qc.invalidateQueries({ queryKey: queryKeys.session });
 }

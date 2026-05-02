@@ -220,6 +220,6 @@ export function createQueueService(deps: QueueServiceDependencies): QueueService
 	};
 }
 
-export function createQueueServiceForDb(db: Db, kv?: KVNamespace): QueueService {
-	return createQueueService({ queueRepository: createQueueRepository(db, kv) });
+export function createQueueServiceForDb(db: Db): QueueService {
+	return createQueueService({ queueRepository: createQueueRepository(db) });
 }

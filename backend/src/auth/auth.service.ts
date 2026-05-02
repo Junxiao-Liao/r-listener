@@ -152,12 +152,12 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
 	};
 }
 
-export function createAuthServiceForDb(db: Db, kv: KVNamespace): AuthService {
+export function createAuthServiceForDb(db: Db): AuthService {
 	return createAuthService({
-		authRepository: createAuthRepository(kv),
-		usersRepository: createUsersRepository(db, kv),
-		tenantsRepository: createTenantsRepository(db, kv),
-		prefsService: createPrefsService(createPrefsRepository(db, kv)),
+		authRepository: createAuthRepository(db),
+		usersRepository: createUsersRepository(db),
+		tenantsRepository: createTenantsRepository(db),
+		prefsService: createPrefsService(createPrefsRepository(db)),
 		auditRepository: createAuditRepository(db)
 	});
 }

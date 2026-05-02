@@ -1,11 +1,7 @@
 import { eq } from 'drizzle-orm';
 import type { Db } from '../db';
-import {
-	getSessionFromKv,
-	refreshSessionInKv,
-	toSessionContext
-} from '../lib/session-kv';
-import { cacheKey, createKvCache, KV_TTL } from '../lib/kv-cache';
+import { sessions } from '../auth/auth.orm';
+import { hashSessionToken, SESSION_TTL_MS } from '../auth/session';
 import { toIso8601 } from '../shared/time';
 import { users } from '../users/users.orm';
 import type { SessionValidationInput, SessionValidationResult } from './middleware.type';
@@ -13,25 +9,30 @@ import type { SessionValidationInput, SessionValidationResult } from './middlewa
 type CachedSessionUser = SessionValidationResult['user'] & { deletedAt: string | null };
 
 export async function validateSession(
-	kv: KVNamespace,
 	db: Db,
 	input: SessionValidationInput
 ): Promise<SessionValidationResult | null> {
-	const sessionData = await getSessionFromKv(kv, input.token, input.now);
-	if (!sessionData) return null;
-	const cache = createKvCache(kv, { defaultTtlSeconds: KV_TTL.authz });
+	const sessionTokenHash = hashSessionToken(input.token);
+	const sessionRows = await db
+		.select()
+		.from(sessions)
+		.where(eq(sessions.tokenHash, sessionTokenHash))
+		.limit(1);
+	const session = sessionRows[0];
+	if (!session) return null;
+	if (session.expiresAt <= input.now) {
+		await db.delete(sessions).where(eq(sessions.tokenHash, sessionTokenHash));
+		return null;
+	}
 
-	const user = await cache.get<CachedSessionUser>(
-		cacheKey('cache:session:user', sessionData.userId),
-		async () => {
-			const userRows = await db
-				.select()
-				.from(users)
-				.where(eq(users.id, sessionData.userId))
-				.limit(1);
-			const row = userRows[0];
-			if (!row) return null;
-			return {
+	const userRows = await db
+		.select()
+		.from(users)
+		.where(eq(users.id, session.userId))
+		.limit(1);
+	const row = userRows[0];
+	const user: CachedSessionUser | null = row
+		? {
 				id: row.id as SessionValidationResult['user']['id'],
 				username: row.username,
 				isAdmin: row.isAdmin,
@@ -39,26 +40,35 @@ export async function validateSession(
 				lastActiveTenantId: row.lastActiveTenantId as SessionValidationResult['user']['lastActiveTenantId'],
 				createdAt: toIso8601(row.createdAt),
 				deletedAt: row.deletedAt ? row.deletedAt.toISOString() : null
-			};
-		}
-	);
+			}
+		: null;
 
 	if (!user || !user.isActive || user.deletedAt) return null;
 
-	const { sessionExpiresAt, refreshedSessionExpiresAt } = await refreshSessionInKv(kv, {
-		session: sessionData,
-		now: input.now
-	});
+	const shouldRefresh =
+		input.now.getTime() - session.lastRefreshedAt.getTime() >= SESSION_REFRESH_INTERVAL_MS;
+	const sessionExpiresAt = shouldRefresh
+		? new Date(input.now.getTime() + SESSION_TTL_MS)
+		: session.expiresAt;
+	const refreshedSessionExpiresAt = shouldRefresh ? sessionExpiresAt : null;
 
-	const result = toSessionContext(
-		sessionData,
-		user,
-		toIso8601(sessionExpiresAt),
-		refreshedSessionExpiresAt ? toIso8601(refreshedSessionExpiresAt) : null
-	);
+	if (shouldRefresh) {
+		await db
+			.update(sessions)
+			.set({ expiresAt: sessionExpiresAt, lastRefreshedAt: input.now })
+			.where(eq(sessions.tokenHash, sessionTokenHash));
+	}
 
 	return {
-		...result.session,
-		refreshedSessionExpiresAt: result.refreshedSessionExpiresAt
-	} as SessionValidationResult;
+		user,
+		sessionTokenHash,
+		activeTenantId: session.activeTenantId as SessionValidationResult['activeTenantId'],
+		role: null,
+		sessionExpiresAt: toIso8601(sessionExpiresAt) as SessionValidationResult['sessionExpiresAt'],
+		refreshedSessionExpiresAt: refreshedSessionExpiresAt
+			? toIso8601(refreshedSessionExpiresAt)
+			: null
+	};
 }
+
+const SESSION_REFRESH_INTERVAL_MS = 1000 * 60 * 60 * 24;

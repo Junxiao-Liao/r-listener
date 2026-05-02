@@ -15,7 +15,7 @@ import { createTracksServiceForDb, type TracksService, type UploadFile } from '.
 import type { Id } from '../shared/shared.type';
 
 export type TracksRouteDeps = {
-	createTracksService?: (db: Db, r2: R2Bucket, kv: KVNamespace) => TracksService;
+	createTracksService?: (db: Db, r2: R2Bucket) => TracksService;
 };
 
 export function createTracksRoute(deps: TracksRouteDeps = {}) {
@@ -24,7 +24,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 
 	route.get('/tracks', requireSession(), requireTenant(), async (c) => {
 		const query = parseQuery(c, trackQuerySchema);
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 		const isEditor =
 			c.var.session.user.isAdmin || c.var.session.role === 'owner' || c.var.session.role === 'member';
 
@@ -38,7 +38,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 	});
 
 	route.get('/tracks/:id', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 		const track = await service.getTrack(
 			c.req.param('id') as Id<'track'>,
 			c.var.session.activeTenantId!
@@ -65,7 +65,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 			album: formData.get('album')?.toString() || undefined
 		});
 
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 		const track = await service.createTrack({
 			tenantId: c.var.session.activeTenantId!,
 			uploaderId: c.var.session.user.id,
@@ -83,7 +83,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, finalizeTrackInputSchema);
-			const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+			const service = serviceFactory(c.var.db, c.env.R2);
 
 			const track = await service.finalizeTrack({
 				trackId: c.req.param('id') as Id<'track'>,
@@ -97,7 +97,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 
 	route.patch('/tracks/:id', requireSession(), requireTenant(), requireTenantEditor(), async (c) => {
 		const body = await parseJsonBody(c, updateTrackInputSchema);
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 
 		const track = await service.updateTrack({
 			trackId: c.req.param('id') as Id<'track'>,
@@ -115,7 +115,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 		requireTenantEditor(),
 		async (c) => {
 			const body = await parseJsonBody(c, lyricsInputSchema);
-			const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+			const service = serviceFactory(c.var.db, c.env.R2);
 
 			const track = await service.setLyrics({
 				trackId: c.req.param('id') as Id<'track'>,
@@ -133,7 +133,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 		requireTenant(),
 		requireTenantEditor(),
 		async (c) => {
-			const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+			const service = serviceFactory(c.var.db, c.env.R2);
 
 			await service.clearLyrics(
 				c.req.param('id') as Id<'track'>,
@@ -145,7 +145,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 	);
 
 	route.delete('/tracks/:id', requireSession(), requireTenant(), requireTenantEditor(), async (c) => {
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 
 		const deleted = await service.softDeleteTrack(
 			c.req.param('id') as Id<'track'>,
@@ -160,7 +160,7 @@ export function createTracksRoute(deps: TracksRouteDeps = {}) {
 	});
 
 	route.get('/tracks/:id/stream', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.env.R2, c.var.kv);
+		const service = serviceFactory(c.var.db, c.env.R2);
 		const rangeHeader = c.req.header('Range');
 
 		const object = await service.getStream({

@@ -1,6 +1,5 @@
 import { and, asc, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
-import { cacheKey, cachePrefix, createKvCache, KV_TTL } from '../lib/kv-cache';
 import type { Id } from '../shared/shared.type';
 import { tracks } from '../tracks/tracks.orm';
 import type { TrackStatus } from '../tracks/tracks.type';
@@ -25,27 +24,9 @@ export type ArtistsRepository = {
 	listArtistTracks(input: { tenantId: Id<'tenant'>; artistId: Id<'artist'> }): Promise<ArtistTrackListResult>;
 };
 
-export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.mutable }) : null;
-
-	function artistKey(tenantId: Id<'tenant'>, artistId: Id<'artist'>): string {
-		return cacheKey('cache:artist', tenantId, artistId);
-	}
-
-	function artistTracksKey(tenantId: Id<'tenant'>, artistId: Id<'artist'>): string {
-		return cacheKey('cache:artist-tracks', tenantId, artistId);
-	}
-
+export function createArtistsRepository(db: Db): ArtistsRepository {
 	return {
 		listArtists: async (input) => {
-			const key = cacheKey('cache:artists:list', input.tenantId, {
-				cursor: input.cursor,
-				limit: input.limit,
-				q: input.q
-			});
-			const cached = await cache?.tryGet<ListArtistsResult>(key);
-			if (cached) return cached;
-
 			const conditions = [eq(artists.tenantId, input.tenantId), isNull(artists.deletedAt)];
 
 			if (input.q && input.q.trim().length > 0) {
@@ -76,16 +57,10 @@ export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsReposi
 				items: items.map(toArtistDto),
 				nextCursor: nextItem ? encodeCursor({ id: nextItem.id, nameKey: nextItem.nameKey }) : null
 			};
-			await cache?.put(key, result);
 			return result;
 		},
 
 		findArtist: async ({ tenantId, artistId }) => {
-			if (cache) {
-				const cached = await cache.tryGet<ArtistAggregateDto>(artistKey(tenantId, artistId));
-				if (cached) return cached;
-			}
-
 			const artistRows = await db
 				.select()
 				.from(artists)
@@ -120,15 +95,10 @@ export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsReposi
 				totalDurationMs: Number(agg.total ?? 0)
 			});
 
-			if (cache) await cache.put(artistKey(tenantId, artistId), result);
 			return result;
 		},
 
 		listArtistTracks: async ({ tenantId, artistId }) => {
-			const key = artistTracksKey(tenantId, artistId);
-			const cached = await cache?.tryGet<ArtistTrackListResult>(key);
-			if (cached) return cached;
-
 			const rows = await db
 				.select()
 				.from(trackArtists)
@@ -149,7 +119,6 @@ export function createArtistsRepository(db: Db, kv?: KVNamespace): ArtistsReposi
 				items: rows.map((r) => toTrackDto(r.tracks, null, artistMap.get(r.tracks.id) ?? []))
 			};
 
-			await cache?.put(key, result);
 			return result;
 		}
 	};

@@ -23,7 +23,6 @@ import type {
 	TrackRow
 } from './playlists.dto';
 import { playlistTracks, playlists } from './playlists.orm';
-import { cacheKey, cachePrefix, createKvCache, KV_TTL, reviveDateFields } from '../lib/kv-cache';
 
 export type PlaylistSortField = 'name' | 'createdAt' | 'updatedAt';
 export type SortDirection = 'asc' | 'desc';
@@ -133,24 +132,7 @@ export type PlaylistsRepository = {
 
 type CursorData = { id: string; value: string | number };
 
-export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.mutable }) : null;
-
-	function playlistKey(tenantId: Id<'tenant'>, playlistId: Id<'playlist'>): string {
-		return cacheKey('cache:playlist', tenantId, playlistId);
-	}
-
-	async function invalidatePlaylistCache(input: { tenantId: Id<'tenant'>; playlistId: Id<'playlist'> }): Promise<void> {
-		if (cache) {
-			await cache.invalidate(playlistKey(input.tenantId, input.playlistId));
-			await cache.invalidatePrefix(cachePrefix('cache:playlists:list', input.tenantId));
-			await cache.invalidate(cacheKey('cache:playlist-tracks', input.playlistId));
-			await cache.invalidate(cacheKey('cache:playlist-tracks:all', input.playlistId));
-			await cache.invalidatePrefix(cachePrefix('cache:playlist-track-row', input.playlistId));
-			await cache.invalidatePrefix(cachePrefix('cache:playlist-by-name', input.tenantId));
-			await cache.invalidatePrefix(cachePrefix('cache:search', input.tenantId));
-		}
-	}
+export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 	async function loadAggregate(playlistId: string): Promise<{
 		trackCount: number;
 		totalDurationMs: number;
@@ -188,16 +170,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 
 	return {
 		listPlaylists: async (input) => {
-			const key = cacheKey('cache:playlists:list', input.tenantId, {
-				cursor: input.cursor,
-				limit: input.limit,
-				q: input.q,
-				sortDir: input.sortDir,
-				sortField: input.sortField
-			});
-			const cached = await cache?.tryGet<ListPlaylistsResult>(key);
-			if (cached) return { ...cached, items: cached.items.map(revivePlaylistAggregate) };
-
 			const conditions = [eq(playlists.tenantId, input.tenantId), isNull(playlists.deletedAt)];
 
 			if (input.q) {
@@ -234,16 +206,10 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				items: await attachAggregates(items),
 				nextCursor
 			};
-			await cache?.put(key, result);
 			return result;
 		},
 
 		findPlaylist: async ({ tenantId, playlistId }) => {
-			if (cache) {
-				const cached = await cache.tryGet<PlaylistAggregate>(playlistKey(tenantId, playlistId));
-				if (cached) return revivePlaylistAggregate(cached);
-			}
-
 			const rows = await db
 				.select()
 				.from(playlists)
@@ -257,16 +223,10 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				.limit(1);
 			if (!rows[0]) return null;
 			const agg = await loadAggregate(rows[0].id);
-			const result = { row: rows[0], ...agg };
-			if (cache) await cache.put(playlistKey(tenantId, playlistId), result);
-			return result;
+			return { row: rows[0], ...agg };
 		},
 
 		findPlaylistByName: async ({ tenantId, name, excludeId }) => {
-			const key = cacheKey('cache:playlist-by-name', tenantId, { excludeId, name });
-			const cached = await cache?.tryGet<PlaylistRow>(key);
-			if (cached) return revivePlaylistRow(cached);
-
 			const conditions = [
 				eq(playlists.tenantId, tenantId),
 				eq(playlists.name, name),
@@ -278,7 +238,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				.where(and(...conditions))
 				.limit(2);
 			const match = rows.find((r) => (excludeId ? r.id !== excludeId : true));
-			if (match) await cache?.put(key, match);
 			return match ?? null;
 		},
 
@@ -299,12 +258,7 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				.from(playlists)
 				.where(eq(playlists.id, input.id))
 				.limit(1);
-			const result = { row: created[0]!, trackCount: 0, totalDurationMs: 0 };
-			await cache?.put(playlistKey(input.tenantId, input.id), result);
-			await cache?.invalidatePrefix(cachePrefix('cache:playlists:list', input.tenantId));
-			await cache?.invalidatePrefix(cachePrefix('cache:playlist-by-name', input.tenantId));
-			await cache?.invalidatePrefix(cachePrefix('cache:search', input.tenantId));
-			return result;
+			return { row: created[0]!, trackCount: 0, totalDurationMs: 0 };
 		},
 
 		updatePlaylist: async (input) => {
@@ -330,10 +284,7 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				.limit(1);
 			if (!rows[0] || rows[0].deletedAt !== null) return null;
 			const agg = await loadAggregate(rows[0].id);
-			await invalidatePlaylistCache(input);
-			const result = { row: rows[0], ...agg };
-			await cache?.put(playlistKey(input.tenantId, input.playlistId), result);
-			return result;
+			return { row: rows[0], ...agg };
 		},
 
 		softDeletePlaylist: async (input) => {
@@ -348,15 +299,10 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 					)
 				)
 				.returning();
-			await invalidatePlaylistCache(input);
 			return rows[0] ?? null;
 		},
 
 		listPlaylistTracks: async ({ playlistId }) => {
-			const key = cacheKey('cache:playlist-tracks', playlistId);
-			const cached = await cache?.tryGet<PlaylistTrackWithTrack[]>(key);
-			if (cached) return cached.map(revivePlaylistTrackWithTrack);
-
 			const rows = await db
 				.select()
 				.from(playlistTracks)
@@ -375,15 +321,10 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				row: r.playlist_tracks as PlaylistTrackRow,
 				track: r.tracks as TrackRow
 			}));
-			await cache?.put(key, result);
 			return result;
 		},
 
 		listAllPlaylistTrackRows: async ({ playlistId }) => {
-			const key = cacheKey('cache:playlist-tracks:all', playlistId);
-			const cached = await cache?.tryGet<PlaylistTrackRow[]>(key);
-			if (cached) return cached.map(revivePlaylistTrackRow);
-
 			const rows = await db
 				.select()
 				.from(playlistTracks)
@@ -391,15 +332,10 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 					and(eq(playlistTracks.playlistId, playlistId), isNull(playlistTracks.deletedAt))
 				)
 				.orderBy(asc(playlistTracks.positionFrac), asc(playlistTracks.id));
-			await cache?.put(key, rows);
 			return rows;
 		},
 
 		findPlaylistTrack: async ({ playlistId, trackId }) => {
-			const key = cacheKey('cache:playlist-track-row', playlistId, trackId);
-			const cached = await cache?.tryGet<PlaylistTrackRow>(key);
-			if (cached) return revivePlaylistTrackRow(cached);
-
 			const rows = await db
 				.select()
 				.from(playlistTracks)
@@ -411,24 +347,16 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 					)
 				)
 				.limit(1);
-			const result = rows[0] ?? null;
-			if (result) await cache?.put(key, result);
-			return result;
+			return rows[0] ?? null;
 		},
 
 		findTrack: async (trackId, tenantId) => {
-			const key = cacheKey('cache:playlist-track-source', tenantId, trackId);
-			const cached = await cache?.tryGet<TrackRow>(key);
-			if (cached) return reviveTrack(cached);
-
 			const rows = await db
 				.select()
 				.from(tracks)
 				.where(and(eq(tracks.id, trackId), eq(tracks.tenantId, tenantId), isNull(tracks.deletedAt)))
 				.limit(1);
-			const result = rows[0] ?? null;
-			if (result) await cache?.put(key, result);
-			return result;
+			return rows[0] ?? null;
 		},
 
 		insertPlaylistTrack: async (input) => {
@@ -445,15 +373,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 				.from(playlistTracks)
 				.where(eq(playlistTracks.id, id))
 				.limit(1);
-			if (cache) {
-				const playlist = await db.select({ tenantId: playlists.tenantId }).from(playlists).where(eq(playlists.id, input.playlistId)).limit(1);
-				if (playlist[0]) {
-					await invalidatePlaylistCache({
-						tenantId: playlist[0].tenantId as Id<'tenant'>,
-						playlistId: input.playlistId
-					});
-				}
-			}
 			return rows[0]!;
 		},
 
@@ -470,9 +389,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 						)
 					);
 			}
-			await cache?.invalidate(cacheKey('cache:playlist-tracks', input.playlistId));
-			await cache?.invalidate(cacheKey('cache:playlist-tracks:all', input.playlistId));
-			await cache?.invalidatePrefix(cachePrefix('cache:playlist-track-row', input.playlistId));
 		},
 
 		softDeletePlaylistTrack: async (input) => {
@@ -487,15 +403,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 					)
 				)
 				.returning();
-			if (cache && rows[0]) {
-				const playlist = await db.select({ tenantId: playlists.tenantId }).from(playlists).where(eq(playlists.id, input.playlistId)).limit(1);
-				if (playlist[0]) {
-					await invalidatePlaylistCache({
-						tenantId: playlist[0].tenantId as Id<'tenant'>,
-						playlistId: input.playlistId
-					});
-				}
-			}
 			return rows[0] ?? null;
 		},
 
@@ -510,9 +417,6 @@ export function createPlaylistsRepository(db: Db, kv?: KVNamespace): PlaylistsRe
 						isNull(playlists.deletedAt)
 					)
 				);
-			if (cache) {
-				await invalidatePlaylistCache(input);
-			}
 		}
 	};
 }
@@ -558,30 +462,4 @@ function buildCursorCondition(
 		return or(gt(col, value), and(eq(col, value), gte(playlists.id, data.id))!)!;
 	}
 	return or(lt(col, value), and(eq(col, value), lte(playlists.id, data.id))!)!;
-}
-
-function revivePlaylistRow(row: PlaylistRow): PlaylistRow {
-	return reviveDateFields(row, ['createdAt', 'updatedAt', 'deletedAt']);
-}
-
-function revivePlaylistTrackRow(row: PlaylistTrackRow): PlaylistTrackRow {
-	return reviveDateFields(row, ['addedAt', 'deletedAt']);
-}
-
-function reviveTrack(row: TrackRow): TrackRow {
-	return reviveDateFields(row, ['createdAt', 'updatedAt', 'deletedAt']);
-}
-
-function revivePlaylistAggregate(value: PlaylistAggregate): PlaylistAggregate {
-	return {
-		...value,
-		row: revivePlaylistRow(value.row)
-	};
-}
-
-function revivePlaylistTrackWithTrack(value: PlaylistTrackWithTrack): PlaylistTrackWithTrack {
-	return {
-		row: revivePlaylistTrackRow(value.row),
-		track: reviveTrack(value.track)
-	};
 }

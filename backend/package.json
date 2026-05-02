@@ -9,7 +9,6 @@
 		"deploy": "WRANGLER_LOG_PATH=.wrangler/logs wrangler deploy",
 		"setup:d1": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 create r-listener",
 		"setup:r2": "WRANGLER_LOG_PATH=.wrangler/logs wrangler r2 bucket create r-listener-audio",
-		"setup:kv": "WRANGLER_LOG_PATH=.wrangler/logs wrangler kv namespace create r-listener-cache",
 		"db:generate": "drizzle-kit generate",
 		"db:migrate": "WRANGLER_LOG_PATH=.wrangler/logs wrangler d1 migrations apply r-listener --remote",
 		"compile": "tsc --noEmit",
@@ -36,4 +35,3 @@
 		"wrangler": "^4.0.0"
 	}
 }
-

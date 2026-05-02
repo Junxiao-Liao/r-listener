@@ -8,7 +8,7 @@ import { addQueueItemsInputSchema, updateQueueItemInputSchema } from './queue.dt
 import { createQueueServiceForDb, type QueueService } from './queue.service';
 
 export type QueueRouteDeps = {
-	createQueueService?: (db: Db, kv: KVNamespace) => QueueService;
+	createQueueService?: (db: Db) => QueueService;
 };
 
 export function createQueueRoute(deps: QueueRouteDeps = {}) {
@@ -16,7 +16,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 	const serviceFactory = deps.createQueueService ?? createQueueServiceForDb;
 
 	route.get('/queue', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const state = await service.getState({
 			userId: c.var.session.user.id,
 			tenantId: c.var.session.activeTenantId!
@@ -26,7 +26,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 
 	route.post('/queue/items', requireSession(), requireTenant(), async (c) => {
 		const body = await parseJsonBody(c, addQueueItemsInputSchema);
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 
 		const state = await service.addItems({
 			userId: c.var.session.user.id,
@@ -40,7 +40,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 
 	route.patch('/queue/items/:id', requireSession(), requireTenant(), async (c) => {
 		const body = await parseJsonBody(c, updateQueueItemInputSchema);
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 
 		const state = await service.updateItem({
 			userId: c.var.session.user.id,
@@ -54,7 +54,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 	});
 
 	route.post('/queue/shuffle', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const state = await service.shuffleQueue({
 			userId: c.var.session.user.id,
 			tenantId: c.var.session.activeTenantId!
@@ -63,7 +63,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 	});
 
 	route.delete('/queue/items/:id', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		const state = await service.deleteItem({
 			userId: c.var.session.user.id,
 			tenantId: c.var.session.activeTenantId!,
@@ -73,7 +73,7 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 	});
 
 	route.delete('/queue', requireSession(), requireTenant(), async (c) => {
-		const service = serviceFactory(c.var.db, c.var.kv);
+		const service = serviceFactory(c.var.db);
 		await service.clearQueue({
 			userId: c.var.session.user.id,
 			tenantId: c.var.session.activeTenantId!

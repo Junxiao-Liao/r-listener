@@ -62,6 +62,7 @@ export function useSwitchTenantMutation() {
 			}),
 		onSuccess: () => {
 			void qc.invalidateQueries({ queryKey: queryKeys.session });
+			void qc.invalidateQueries({ queryKey: ['admin'] });
 		}
 	});
 }

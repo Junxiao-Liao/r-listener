@@ -488,8 +488,8 @@ export function createAdminService(deps: AdminServiceDependencies): AdminService
 	};
 }
 
-export function createAdminServiceForDb(db: Db, kv: KVNamespace): AdminService {
-	return createAdminService({ adminRepository: createAdminRepository(db, kv) });
+export function createAdminServiceForDb(db: Db): AdminService {
+	return createAdminService({ adminRepository: createAdminRepository(db) });
 }
 
 export function redactSecrets(value: unknown): unknown {

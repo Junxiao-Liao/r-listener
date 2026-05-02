@@ -5,7 +5,6 @@ import type { UserId } from '../users/users.type';
 import { memberships, tenants } from './tenants.orm';
 import { toTenantDto, toTenantMembershipDto } from './tenants.dto';
 import type { TenantDto, TenantMembershipDto } from './tenants.type';
-import { cacheKey, createKvCache, KV_TTL } from '../lib/kv-cache';
 
 export type TenantsRepository = {
 	listActiveMembershipsForUser(userId: UserId): Promise<TenantMembershipDto[]>;
@@ -16,15 +15,9 @@ export type TenantsRepository = {
 	}): Promise<TenantMembershipDto | null>;
 };
 
-export function createTenantsRepository(db: Db, kv?: KVNamespace): TenantsRepository {
-	const cache = kv ? createKvCache(kv, { defaultTtlSeconds: KV_TTL.authz }) : null;
-
+export function createTenantsRepository(db: Db): TenantsRepository {
 	return {
 		listActiveMembershipsForUser: async (userId) => {
-			const key = cacheKey('cache:authz:user-memberships', userId);
-			const cached = await cache?.tryGet<TenantMembershipDto[]>(key);
-			if (cached) return cached;
-
 			const rows = await db
 				.select({ membership: memberships, tenant: tenants })
 				.from(memberships)
@@ -37,29 +30,17 @@ export function createTenantsRepository(db: Db, kv?: KVNamespace): TenantsReposi
 					)
 				)
 				.orderBy(asc(memberships.createdAt));
-			const result = rows.map(({ membership, tenant }) => toTenantMembershipDto(membership, tenant));
-			await cache?.put(key, result);
-			return result;
+			return rows.map(({ membership, tenant }) => toTenantMembershipDto(membership, tenant));
 		},
 		findActiveTenantById: async (tenantId) => {
-			const key = cacheKey('cache:tenant', tenantId);
-			const cached = await cache?.tryGet<TenantDto>(key);
-			if (cached) return cached;
-
 			const rows = await db
 				.select()
 				.from(tenants)
 				.where(and(eq(tenants.id, tenantId), isNull(tenants.deletedAt)))
 				.limit(1);
-			const result = rows[0] ? toTenantDto(rows[0]) : null;
-			if (result) await cache?.put(key, result);
-			return result;
+			return rows[0] ? toTenantDto(rows[0]) : null;
 		},
 		findActiveMembership: async ({ userId, tenantId }) => {
-			const key = cacheKey('cache:authz:membership', tenantId, userId);
-			const cached = await cache?.tryGet<TenantMembershipDto>(key);
-			if (cached) return cached;
-
 			const rows = await db
 				.select({ membership: memberships, tenant: tenants })
 				.from(memberships)
@@ -73,9 +54,7 @@ export function createTenantsRepository(db: Db, kv?: KVNamespace): TenantsReposi
 					)
 				)
 				.limit(1);
-			const result = rows[0] ? toTenantMembershipDto(rows[0].membership, rows[0].tenant) : null;
-			if (result) await cache?.put(key, result);
-			return result;
+			return rows[0] ? toTenantMembershipDto(rows[0].membership, rows[0].tenant) : null;
 		}
 	};
 }

@@ -4,7 +4,6 @@ import type { MiddlewareService, SessionContext } from './middleware/middleware.
 export type BackendBindings = {
 	DB: D1Database;
 	R2: R2Bucket;
-	KV: KVNamespace;
 	ASSETS: Fetcher;
 	SESSION_SECRET: string;
 	ENVIRONMENT?: string;
@@ -12,7 +11,6 @@ export type BackendBindings = {
 
 export type BackendVariables = {
 	db: Db;
-	kv: KVNamespace;
 	middlewareService: MiddlewareService;
 	session: SessionContext;
 };

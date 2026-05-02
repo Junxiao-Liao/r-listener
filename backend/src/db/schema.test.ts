@@ -11,6 +11,8 @@ describe('database schema exports', () => {
 			'playlistTracks',
 			'playlists',
 			'queueItems',
+			'rateLimits',
+			'sessions',
 			'tenants',
 			'trackArtists',
 			'tracks',

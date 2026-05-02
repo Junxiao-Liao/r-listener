@@ -94,6 +94,6 @@ export function createPlaybackService(deps: PlaybackServiceDependencies): Playba
 	};
 }
 
-export function createPlaybackServiceForDb(db: Db, kv?: KVNamespace): PlaybackService {
-	return createPlaybackService({ playbackRepository: createPlaybackRepository(db, kv) });
+export function createPlaybackServiceForDb(db: Db): PlaybackService {
+	return createPlaybackService({ playbackRepository: createPlaybackRepository(db) });
 }
