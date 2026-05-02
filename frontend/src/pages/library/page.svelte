@@ -1,6 +1,9 @@
 <script lang="ts">
+	import { goto } from '$app/navigation';
+	import Search from '@lucide/svelte/icons/search';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
+	import { Input } from '$shared/components/ui/input';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
 	import { isEditor } from '$shared/auth/role';
@@ -16,6 +19,15 @@
 	const items = $derived($tracks.data?.pages.flatMap((p) => p.items) ?? []);
 	const hasMore = $derived(!!$tracks.hasNextPage);
 	const loadingMore = $derived($tracks.isFetchingNextPage);
+
+	let q = $state('');
+
+	function submitSearch(event: SubmitEvent) {
+		event.preventDefault();
+		const value = q.trim();
+		if (!value) return;
+		void goto(`/search?q=${encodeURIComponent(value)}`);
+	}
 </script>
 
 <section class="flex flex-col gap-4 py-6">
@@ -25,6 +37,20 @@
 			<Button href="/library/upload">{m.library_upload()}</Button>
 		{/if}
 	</header>
+
+	<form class="flex gap-2" onsubmit={submitSearch} role="search">
+		<Input
+			type="search"
+			placeholder={m.home_search_placeholder()}
+			bind:value={q}
+			aria-label={m.home_search_placeholder()}
+			class="min-w-0 flex-1"
+		/>
+		<Button type="submit" disabled={q.trim().length === 0}>
+			<Search class="size-4" />
+			<span>{m.search_submit()}</span>
+		</Button>
+	</form>
 
 	{#if $tracks.isPending}
 		<ul class="flex flex-col gap-2" aria-busy="true">
