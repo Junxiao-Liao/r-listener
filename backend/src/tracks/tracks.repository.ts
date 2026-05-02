@@ -322,14 +322,18 @@ export function createTracksRepository(db: Db): TracksRepository {
 		await db.delete(trackArtists).where(eq(trackArtists.trackId, trackId));
 		const artistRows = await upsertArtists(tenantId, names, now);
 		if (artistRows.length === 0) return;
-		await db.insert(trackArtists).values(
-			artistRows.map((artist, position) => ({
-				trackId,
-				artistId: artist.id,
-				position,
-				createdAt: now
-			}))
-		);
+		const taRows = artistRows.map((artist, position) => ({
+			trackId,
+			artistId: artist.id,
+			position,
+			createdAt: now
+		}));
+
+		// D1 bound-parameter limit: 4 cols/row => max 25 rows; batch to be safe.
+		const TA_BATCH = 20;
+		for (let i = 0; i < taRows.length; i += TA_BATCH) {
+			await db.insert(trackArtists).values(taRows.slice(i, i + TA_BATCH));
+		}
 	}
 
 	async function upsertArtists(

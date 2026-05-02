@@ -129,18 +129,23 @@ export function createQueueRepository(db: Db): QueueRepository {
 
 		insertManyItems: async (input) => {
 			if (input.items.length === 0) return;
-			await db.insert(queueItems).values(
-				input.items.map((i) => ({
-					id: i.id,
-					userId: i.userId,
-					tenantId: i.tenantId,
-					trackId: i.trackId,
-					positionFrac: i.positionFrac,
-					isCurrent: i.isCurrent,
-					addedAt: i.addedAt,
-					updatedAt: i.updatedAt
-				}))
-			);
+
+			const rows = input.items.map((i) => ({
+				id: i.id,
+				userId: i.userId,
+				tenantId: i.tenantId,
+				trackId: i.trackId,
+				positionFrac: i.positionFrac,
+				isCurrent: i.isCurrent,
+				addedAt: i.addedAt,
+				updatedAt: i.updatedAt
+			}));
+
+			// D1 has a 100 bound-parameter limit; each row has 8 columns => max 12 rows per batch.
+			const BATCH_SIZE = 10;
+			for (let i = 0; i < rows.length; i += BATCH_SIZE) {
+				await db.insert(queueItems).values(rows.slice(i, i + BATCH_SIZE));
+			}
 		},
 
 		setPositions: async (input) => {

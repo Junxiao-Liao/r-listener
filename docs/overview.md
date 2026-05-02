@@ -29,6 +29,7 @@
 - **IDs:** Opaque prefixed UUIDv7 (`usr_`, `tnt_`, `trk_`, `pls_`, etc.)
 - **Cursor encoding:** `shared/cursor.ts` provides `encodeBase64Cursor`/`decodeBase64Cursor` for UTF-8-safe base64 pagination cursors (handles non-Latin1 text like Chinese via `encodeURIComponent` + `btoa`)
 - **Time:** Unix seconds in D1, ISO-8601 on the wire
+- **D1 bound-parameter limit:** D1 enforces a max of 100 bound parameters per query. Multi-row inserts (`db.insert(t).values(rows)`) must batch into chunks ≤ floor(100 / columns-per-row) to avoid `SQLITE_ERROR: too many SQL variables`.
 - **Soft delete:** `deleted_at` column on domain rows; reads filter it out
 - **Tenant scoping:** Every tenant-scoped resource has `tenant_id` FK; cross-tenant visibility is never granted
 - **Authz roles:** Platform admin → Tenant owner/member/viewer; viewers read-only on shared content
