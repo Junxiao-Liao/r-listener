@@ -164,7 +164,16 @@ export function mergeLrcCandidates(candidates: string[]): string {
 
 	const frames = parsed.flatMap((p) => p.lines);
 	frames.sort((a, b) => a.timeMs - b.timeMs);
-	return syltFramesToLrc(frames);
+
+	const seen = new Set<string>();
+	const deduped = frames.filter((f) => {
+		const key = `${f.timeMs}|${f.text}`;
+		if (seen.has(key)) return false;
+		seen.add(key);
+		return true;
+	});
+
+	return syltFramesToLrc(deduped);
 }
 
 function extractEmbeddedCover(pictures: unknown): EmbeddedCover | null {

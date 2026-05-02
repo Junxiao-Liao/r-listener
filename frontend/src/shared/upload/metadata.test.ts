@@ -38,7 +38,22 @@ describe('mergeLrcCandidates', () => {
 		expect(parsed[3].text).toBe('Line D');
 	});
 
-	it('keeps same-timestamp lines as adjacent LRC lines', () => {
+	it('deduplicates frames with identical timeMs and text', () => {
+		const result = mergeLrcCandidates([
+			'[00:01.00]Hello\n[00:02.00]World',
+			'[00:01.00]Hello\n[00:03.00]Unique'
+		]);
+		const parsed = parseSyncedLrc(result);
+		expect(parsed).toHaveLength(3);
+		expect(parsed[0].text).toBe('Hello');
+		expect(parsed[0].timeMs).toBe(1000);
+		expect(parsed[1].text).toBe('World');
+		expect(parsed[1].timeMs).toBe(2000);
+		expect(parsed[2].text).toBe('Unique');
+		expect(parsed[2].timeMs).toBe(3000);
+	});
+
+	it('keeps same-timestamp lines when text differs', () => {
 		const result = mergeLrcCandidates([
 			'[00:01.00]Chinese\n[00:02.00]更多中文',
 			'[00:01.00]Romanised\n[00:02.00]more romanised'
