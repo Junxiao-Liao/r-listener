@@ -54,6 +54,7 @@ export type CreateTrackInput = {
 	album: string | null;
 	contentType: string;
 	sizeBytes: number;
+	audioHash: string;
 	audioR2Key: string;
 	now: Date;
 };
@@ -243,6 +244,7 @@ export function createTracksRepository(db: Db, kv?: KVNamespace): TracksReposito
 				album: input.album,
 				contentType: input.contentType,
 				sizeBytes: input.sizeBytes,
+				audioHash: input.audioHash,
 				audioR2Key: input.audioR2Key,
 				status: 'pending',
 				lyricsStatus: 'none',

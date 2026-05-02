@@ -844,6 +844,7 @@ function makeTrackRow(
 		year: null,
 		lyricsLrc: null,
 		lyricsStatus: 'none',
+		audioHash: null,
 		audioR2Key: `tenants/${tenantId}/tracks/${id}.mp3`,
 		coverR2Key: null,
 		status,

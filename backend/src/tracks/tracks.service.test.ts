@@ -5,13 +5,14 @@ import type { TracksRepository, TrackRow } from './tracks.repository';
 import type { TrackDto } from './tracks.type';
 
 const FIXED_DATE = new Date('2026-04-26T00:00:00.000Z');
+const FIXED_HASH = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef1234567890';
 
 describe('tracks service', () => {
 	describe('listTracks', () => {
 		it('delegates to repository with parsed sort and pagination', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.listTracks({
 				tenantId: tid('tnt_a'),
@@ -33,7 +34,7 @@ describe('tracks service', () => {
 		it('blocks viewer from using includePending', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.listTracks({
@@ -47,7 +48,7 @@ describe('tracks service', () => {
 		it('allows editor to use includePending', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.listTracks({
 				tenantId: tid('tnt_a'),
@@ -65,7 +66,7 @@ describe('tracks service', () => {
 		it('validates supported MIME types', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.createTrack({
@@ -80,7 +81,7 @@ describe('tracks service', () => {
 		it('validates file size limit', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.createTrack({
@@ -95,7 +96,7 @@ describe('tracks service', () => {
 		it('rejects empty files', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.createTrack({
@@ -110,7 +111,7 @@ describe('tracks service', () => {
 		it('creates pending track and stores file in R2', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			const result = await service.createTrack({
 				tenantId: tid('tnt_a'),
@@ -134,7 +135,7 @@ describe('tracks service', () => {
 		it('falls back to filename-derived title when no metadata title', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.createTrack({
 				tenantId: tid('tnt_a'),
@@ -147,13 +148,67 @@ describe('tracks service', () => {
 				expect.objectContaining({ title: 'awesome-track' })
 			);
 		});
+
+		it('uses content-addressed R2 key derived from hash', async () => {
+			const repo = createRepo();
+			const r2 = createR2();
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
+
+			await service.createTrack({
+				tenantId: tid('tnt_a'),
+				uploaderId: uid('usr_a'),
+				file: uploadFile({ name: 'song.mp3' }),
+				metadata: { artistNames: [] }
+			});
+
+			expect(repo.createTrack).toHaveBeenCalledWith(
+				expect.objectContaining({
+					audioHash: FIXED_HASH,
+					audioR2Key: `audio/${FIXED_HASH}.mp3`
+				})
+			);
+		});
+
+		it('skips R2 upload when content hash already exists', async () => {
+			const repo = createRepo();
+			const r2 = createR2({ headReturn: { httpMetadata: {}, size: 1024 } as unknown as R2Object });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
+
+			await service.createTrack({
+				tenantId: tid('tnt_a'),
+				uploaderId: uid('usr_a'),
+				file: uploadFile(),
+				metadata: { artistNames: [] }
+			});
+
+			expect(r2.put).not.toHaveBeenCalled();
+		});
+
+		it('uploads to R2 when content hash does not exist', async () => {
+			const repo = createRepo();
+			const r2 = createR2({ headReturn: null });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
+
+			await service.createTrack({
+				tenantId: tid('tnt_a'),
+				uploaderId: uid('usr_a'),
+				file: uploadFile(),
+				metadata: { artistNames: [] }
+			});
+
+			expect(r2.put).toHaveBeenCalledWith(
+				`audio/${FIXED_HASH}.mp3`,
+				expect.any(ArrayBuffer),
+				expect.objectContaining({ httpMetadata: { contentType: 'audio/mpeg' } })
+			);
+		});
 	});
 
 	describe('finalizeTrack', () => {
 		it('rejects already-ready track', async () => {
 			const repo = createRepo({ status: 'ready' });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.finalizeTrack({
@@ -167,7 +222,7 @@ describe('tracks service', () => {
 		it('rejects missing R2 object', async () => {
 			const repo = createRepo();
 			const r2 = createR2({ head: async () => null });
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.finalizeTrack({
@@ -181,7 +236,7 @@ describe('tracks service', () => {
 		it('parses synced lyrics status', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			const lrc = '[00:01.00]Hello\n[00:02.00]World\n';
 			await service.finalizeTrack({
@@ -198,7 +253,7 @@ describe('tracks service', () => {
 		it('ignores LRC metadata tags when parsing synced lyrics status', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			const lrc = [
 				'[ti:Someone Like You]',
@@ -224,7 +279,7 @@ describe('tracks service', () => {
 		it('parses plain lyrics status', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.finalizeTrack({
 				trackId: tkid('trk_a'),
@@ -240,7 +295,7 @@ describe('tracks service', () => {
 		it('parses invalid lyrics status for bracket-only lines', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.finalizeTrack({
 				trackId: tkid('trk_a'),
@@ -256,7 +311,7 @@ describe('tracks service', () => {
 		it('parses plain lyrics status for brackets with text content', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.finalizeTrack({
 				trackId: tkid('trk_a'),
@@ -272,7 +327,7 @@ describe('tracks service', () => {
 		it('classifies metadata-only LRC as none', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.finalizeTrack({
 				trackId: tkid('trk_a'),
@@ -288,7 +343,7 @@ describe('tracks service', () => {
 		it('classifies multi-timestamp lines as synced', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.finalizeTrack({
 				trackId: tkid('trk_a'),
@@ -306,7 +361,7 @@ describe('tracks service', () => {
 		it('rejects non-existent track', async () => {
 			const repo = createRepo({ findRowReturns: null });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.updateTrack({
@@ -320,7 +375,7 @@ describe('tracks service', () => {
 		it('delegates partial patch to repository', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.updateTrack({
 				trackId: tkid('trk_a'),
@@ -342,7 +397,7 @@ describe('tracks service', () => {
 		it('rejects non-existent track', async () => {
 			const repo = createRepo({ findRowReturns: null });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.setLyrics({
@@ -358,7 +413,7 @@ describe('tracks service', () => {
 		it('rejects non-existent track', async () => {
 			const repo = createRepo({ findRowReturns: null });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.clearLyrics(tkid('trk_nonexistent'), tid('tnt_a'))
@@ -368,7 +423,7 @@ describe('tracks service', () => {
 		it('clears lyrics through repository', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await service.clearLyrics(tkid('trk_a'), tid('tnt_a'));
 
@@ -380,7 +435,7 @@ describe('tracks service', () => {
 		it('rejects non-existent track', async () => {
 			const repo = createRepo({ findRowReturns: null });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.softDeleteTrack(tkid('trk_nonexistent'), tid('tnt_a'))
@@ -392,7 +447,7 @@ describe('tracks service', () => {
 		it('rejects pending track', async () => {
 			const repo = createRepo({ status: 'pending' });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			await expect(
 				service.getStream({ trackId: tkid('trk_a'), tenantId: tid('tnt_a') })
@@ -402,7 +457,7 @@ describe('tracks service', () => {
 		it('returns R2 object for ready track', async () => {
 			const repo = createRepo({ status: 'ready' });
 			const r2 = createR2();
-			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE });
+			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
 
 			const result = await service.getStream({
 				trackId: tkid('trk_a'),
@@ -440,20 +495,22 @@ function createRepo(overrides: {
 	};
 }
 
-function createR2(overrides: { head?: () => Promise<R2Object | null> } = {}): R2Bucket {
+function createR2(overrides: { head?: () => Promise<R2Object | null>; headReturn?: R2Object | null } = {}): R2Bucket {
 	return {
 		put: vi.fn(async () => undefined),
 		get: vi.fn(async () => ({ body: 'stream' as unknown as ReadableStream, httpMetadata: {}, size: 1000 })),
-		head: vi.fn(overrides.head ?? (async () => ({ httpMetadata: {}, size: 1000 } as unknown as R2Object)))
+		head: vi.fn(overrides.head ?? (async () => overrides.headReturn !== undefined ? overrides.headReturn : ({ httpMetadata: {}, size: 1000 } as unknown as R2Object)))
 	} as unknown as R2Bucket;
 }
 
-function uploadFile(overrides: { type?: string; size?: number; name?: string } = {}) {
+function uploadFile(overrides: { type?: string; size?: number; name?: string; content?: ArrayBuffer } = {}) {
+	const buffer = overrides.content ?? new ArrayBuffer(8);
 	return {
 		type: overrides.type ?? 'audio/mpeg',
-		size: overrides.size ?? 1024,
+		size: overrides.size ?? buffer.byteLength,
 		name: overrides.name ?? 'test.mp3',
-		stream: vi.fn(() => 'stream' as unknown as ReadableStream)
+		stream: vi.fn(() => 'stream' as unknown as ReadableStream),
+		arrayBuffer: vi.fn(async () => buffer)
 	};
 }
 
@@ -472,6 +529,7 @@ function trackRowFixture(overrides: { status?: string } = {}): TrackRow {
 		year: null,
 		lyricsLrc: null,
 		lyricsStatus: 'none',
+		audioHash: null,
 		audioR2Key: 'tenants/tnt_a/tracks/trk_a.mp3',
 		coverR2Key: null,
 		status: (overrides.status ?? 'pending') as TrackRow['status'],

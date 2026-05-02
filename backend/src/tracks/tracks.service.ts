@@ -74,6 +74,7 @@ export type UploadFile = {
 	size: number;
 	name: string;
 	stream(): ReadableStream;
+	arrayBuffer(): Promise<ArrayBuffer>;
 };
 
 export type ListServiceInput = {
@@ -117,10 +118,12 @@ export type TracksServiceDependencies = {
 	tracksRepository: TracksRepository;
 	r2: R2Bucket;
 	now?: () => Date;
+	computeHash?: (buffer: ArrayBuffer) => Promise<string>;
 };
 
 export function createTracksService(deps: TracksServiceDependencies): TracksService {
 	const now = deps.now ?? (() => new Date());
+	const computeHash = deps.computeHash ?? defaultComputeHash;
 
 	return {
 		listTracks: async (input) => {
@@ -156,10 +159,19 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 				throw apiError(400, 'upload_missing', 'Audio file is empty.');
 			}
 
-			const trackId = createId('trk_') as Id<'track'>;
+			const buffer = await input.file.arrayBuffer();
+			const hash = await computeHash(buffer);
 			const ext = MIME_TO_EXT[contentType] ?? (getExt(input.file.name) || 'bin');
-			const r2Key = `tenants/${input.tenantId}/tracks/${trackId}.${ext}`;
+			const r2Key = `audio/${hash}.${ext}`;
 
+			const existing = await deps.r2.head(r2Key);
+			if (!existing) {
+				await deps.r2.put(r2Key, buffer, {
+					httpMetadata: { contentType }
+				});
+			}
+
+			const trackId = createId('trk_') as Id<'track'>;
 			const title = input.metadata.title || deriveTitleFromFilename(input.file.name);
 			const now_ = now();
 
@@ -172,12 +184,9 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 				album: input.metadata.album ?? null,
 				contentType,
 				sizeBytes: input.file.size,
+				audioHash: hash,
 				audioR2Key: r2Key,
 				now: now_
-			});
-
-			await deps.r2.put(r2Key, input.file.stream(), {
-				httpMetadata: { contentType }
 			});
 
 			return track;
@@ -297,6 +306,19 @@ export function createTracksServiceForDb(db: Db, r2: R2Bucket, kv?: KVNamespace)
 		tracksRepository: createTracksRepository(db, kv),
 		r2
 	});
+}
+
+async function defaultComputeHash(buffer: ArrayBuffer): Promise<string> {
+	const digest = await crypto.subtle.digest('SHA-256', buffer);
+	return bufferToHex(new Uint8Array(digest));
+}
+
+function bufferToHex(bytes: Uint8Array): string {
+	let hex = '';
+	for (let i = 0; i < bytes.length; i++) {
+		hex += bytes[i]!.toString(16).padStart(2, '0');
+	}
+	return hex;
 }
 
 function getExt(name: string): string {

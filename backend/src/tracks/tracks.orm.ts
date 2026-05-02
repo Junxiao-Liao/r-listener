@@ -24,6 +24,7 @@ export const tracks = sqliteTable(
 		lyricsStatus: text('lyrics_status', { enum: ['none', 'synced', 'plain', 'invalid'] })
 			.notNull()
 			.default('none'),
+		audioHash: text('audio_hash'),
 		audioR2Key: text('audio_r2_key').notNull(),
 		coverR2Key: text('cover_r2_key'),
 		status: text('status', { enum: ['pending', 'ready'] }).notNull().default('pending'),

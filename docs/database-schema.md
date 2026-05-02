@@ -14,7 +14,7 @@
 |---------|-----------|---------|
 | D1 | SQLite (Drizzle ORM) | Domain data: users, tenants, memberships, tracks, playlists, queue, preferences, audit logs |
 | KV | Cloudflare KV | Sessions, rate limiting, entity/query caching, preference caching, playback history buffer |
-| R2 | Cloudflare R2 | Audio file storage and streaming |
+| R2 | Cloudflare R2 | Content-addressable audio file storage (`audio/{sha256}.{ext}`) and streaming |
 
 ## Tables
 
@@ -61,3 +61,11 @@
 | `buffer:history:<userId>:<tenantId>` | Buffered playback events array | 1 hour | Playback history buffering (drained inline on reads) |
 
 KV is a performance layer only. Read-through cache misses and KV failures fall back to D1, not-found DB results are not cached, entity/detail entries are refreshed after successful writes when fresh data is available, and list/search/admin aggregate pages are invalidated by prefix after related mutations.
+
+## R2 Key Patterns
+
+| R2 Key Pattern | Purpose |
+|---------------|---------|
+| `audio/{sha256hex}.{ext}` | Content-addressable audio blob (SHA-256 of file bytes). Deduplication: if a file with the same hash has already been uploaded, the R2 object is reused. Multiple track rows can reference the same R2 blob. |
+
+The `tracks.audio_hash` column stores the hex-encoded SHA-256 hash. Combined with the `tracks.audio_r2_key` column pointing to the content-addressable R2 key, duplicate uploads are caught by checking `r2.head()` before storing.
