@@ -42,7 +42,7 @@ export function syltFramesToLrc(frames: SyltFrame[]): string {
 	return frames.map((f) => `${formatLrcStamp(f.timeMs)}${f.text}`).join('\n');
 }
 
-function formatLrcStamp(ms: number): string {
+export function formatLrcStamp(ms: number): string {
 	const total = Math.max(0, Math.floor(ms));
 	const minutes = Math.floor(total / 60000);
 	const seconds = Math.floor((total % 60000) / 1000);

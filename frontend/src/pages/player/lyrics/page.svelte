@@ -3,6 +3,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
+	import { formatDurationMs } from '$shared/format/duration';
 	import { cn } from '$shared/utils';
 	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
@@ -73,14 +74,17 @@
 						<button
 							type="button"
 							class={cn(
-								'w-full rounded-md px-3 py-2 text-left text-sm transition-colors',
+								'w-full flex items-baseline gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
 								i === activeIndex
 									? 'bg-muted text-foreground font-medium'
 									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
 							)}
 							onclick={() => onLineClick(line)}
 						>
-							{line.text || ' '}
+							<span class="shrink-0 tabular-nums text-xs text-muted-foreground/70">
+								{formatDurationMs(line.timeMs)}
+							</span>
+							<span>{line.text || ' '}</span>
 						</button>
 					</li>
 				{/each}
