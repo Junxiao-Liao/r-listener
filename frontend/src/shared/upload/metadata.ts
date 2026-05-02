@@ -2,7 +2,7 @@
 // shape that matches what Upload Review needs.
 
 import { parseBlob } from 'music-metadata-browser';
-import { syltFramesToLrc, type SyltFrame } from '$shared/lyrics/lyrics';
+import { parseSyncedLrc, syltFramesToLrc } from '$shared/lyrics/lyrics';
 import { parseFilenameMetadata, splitArtistNames } from './filename-metadata';
 
 export type EmbeddedCover = {
@@ -51,7 +51,7 @@ export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
 			typeof format?.duration === 'number' && Number.isFinite(format.duration)
 				? Math.round(format.duration * 1000)
 				: null,
-		embeddedLyricsLrc: extractEmbeddedLyrics(common?.lyrics),
+		embeddedLyricsLrc: extractEmbeddedLyrics(parsed),
 		embeddedCover: extractEmbeddedCover(common?.picture)
 	};
 }
@@ -75,30 +75,96 @@ function stringOrNull(v: string | undefined): string | null {
 	return trimmed.length > 0 ? trimmed : null;
 }
 
-function extractEmbeddedLyrics(tags: unknown): string | null {
-	if (!Array.isArray(tags) || tags.length === 0) return null;
+export function extractEmbeddedLyrics(parsed: { native?: unknown; common?: unknown } | null): string | null {
+	if (!parsed) return null;
 
-	for (const tag of tags as Array<Record<string, unknown>>) {
-		const synced = tag.syncText as
-			| Array<{ timestamp?: number; text?: string }>
-			| undefined;
-		if (Array.isArray(synced) && synced.length > 0) {
-			const frames: SyltFrame[] = synced
-				.map((s) => ({
-					timeMs: Math.max(0, Math.round(s.timestamp ?? 0)),
-					text: typeof s.text === 'string' ? s.text : ''
-				}))
-				.filter((f) => f.text.length > 0);
-			if (frames.length > 0) return syltFramesToLrc(frames);
+	const candidates: string[] = [];
+
+	const nat = parsed.native as Record<string, Array<{ id: string; value: unknown }>> | undefined;
+	if (nat) {
+		for (const version of ['ID3v2.4', 'ID3v2.3', 'ID3v2.2']) {
+			const tags = nat[version];
+			if (Array.isArray(tags)) {
+				for (const tag of tags) {
+					if (tag.id === 'USLT' || tag.id === 'ULT') {
+						const val = tag.value as { text?: string } | undefined;
+						if (val && typeof val.text === 'string' && val.text.trim().length > 0) {
+							candidates.push(val.text);
+						}
+					}
+				}
+			}
+		}
+
+		for (const key of ['iTunes MP4', 'iTunes']) {
+			const tags = nat[key];
+			if (Array.isArray(tags)) {
+				for (const tag of tags) {
+					if (tag.id === '\u00a9lyr' && typeof tag.value === 'string' && tag.value.trim().length > 0) {
+						candidates.push(tag.value);
+					}
+				}
+			}
+		}
+
+		const vorbisTags = nat['vorbis'];
+		if (Array.isArray(vorbisTags)) {
+			for (const tag of vorbisTags) {
+				const upperId = String(tag.id).toUpperCase();
+				if (
+					(upperId === 'LYRICS' || upperId === 'SYNCEDLYRICS' || upperId === 'UNSYNCEDLYRICS') &&
+					typeof tag.value === 'string' &&
+					tag.value.trim().length > 0
+				) {
+					candidates.push(tag.value);
+				}
+			}
+		}
+
+		const apeTags = nat['APEv2'];
+		if (Array.isArray(apeTags)) {
+			for (const tag of apeTags) {
+				if (
+					String(tag.id).toLowerCase() === 'lyrics' &&
+					typeof tag.value === 'string' &&
+					tag.value.trim().length > 0
+				) {
+					candidates.push(tag.value);
+				}
+			}
 		}
 	}
 
-	for (const tag of tags as Array<Record<string, unknown>>) {
-		const text = tag.text;
-		if (typeof text === 'string' && text.trim().length > 0) return text;
+	if (candidates.length === 0) {
+		const common = parsed.common as { lyrics?: readonly string[] } | undefined;
+		const lyrics = common?.lyrics;
+		if (Array.isArray(lyrics)) {
+			for (const l of lyrics) {
+				if (typeof l === 'string' && l.trim().length > 0) {
+					candidates.push(l);
+				}
+			}
+		}
 	}
 
-	return null;
+	if (candidates.length === 0) return null;
+
+	return mergeLrcCandidates(candidates);
+}
+
+export function mergeLrcCandidates(candidates: string[]): string {
+	if (candidates.length === 0) return '';
+
+	const parsed = candidates.map((text) => ({ text, lines: parseSyncedLrc(text) }));
+	const anyTimed = parsed.some((p) => p.lines.length > 0);
+
+	if (!anyTimed) {
+		return candidates.find((c) => c.trim().length > 0) ?? '';
+	}
+
+	const frames = parsed.flatMap((p) => p.lines);
+	frames.sort((a, b) => a.timeMs - b.timeMs);
+	return syltFramesToLrc(frames);
 }
 
 function extractEmbeddedCover(pictures: unknown): EmbeddedCover | null {
