@@ -423,6 +423,8 @@ function cursorSortValue(row: TrackRow, field: TrackSortField): string | number 
 	}
 }
 
+const TIMESTAMP_FIELDS: ReadonlySet<TrackSortField> = new Set(['createdAt', 'updatedAt']);
+
 function buildCursorCondition(
 	input: Pick<ListTracksInput, 'cursor' | 'sortField' | 'sortDir'>
 ): ReturnType<typeof and> | null {
@@ -431,15 +433,18 @@ function buildCursorCondition(
 	const cursorData = decodeCursor(input.cursor);
 	const col = columnForSortField(input.sortField);
 	const isAsc = input.sortDir === 'asc';
+	const value = TIMESTAMP_FIELDS.has(input.sortField)
+		? new Date(cursorData.value as number)
+		: cursorData.value;
 
 	if (isAsc) {
 		return or(
-			gt(col, cursorData.value),
-			and(eq(col, cursorData.value), gte(tracks.id, cursorData.id))!
+			gt(col, value),
+			and(eq(col, value), gte(tracks.id, cursorData.id))!
 		)!;
 	}
 	return or(
-		lt(col, cursorData.value),
-		and(eq(col, cursorData.value), lte(tracks.id, cursorData.id))!
+		lt(col, value),
+		and(eq(col, value), lte(tracks.id, cursorData.id))!
 	)!;
 }
