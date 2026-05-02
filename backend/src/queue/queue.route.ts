@@ -53,6 +53,15 @@ export function createQueueRoute(deps: QueueRouteDeps = {}) {
 		return c.json(state);
 	});
 
+	route.post('/queue/shuffle', requireSession(), requireTenant(), async (c) => {
+		const service = serviceFactory(c.var.db, c.var.kv);
+		const state = await service.shuffleQueue({
+			userId: c.var.session.user.id,
+			tenantId: c.var.session.activeTenantId!
+		});
+		return c.json(state);
+	});
+
 	route.delete('/queue/items/:id', requireSession(), requireTenant(), async (c) => {
 		const service = serviceFactory(c.var.db, c.var.kv);
 		const state = await service.deleteItem({

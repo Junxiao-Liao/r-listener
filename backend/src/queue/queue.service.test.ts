@@ -312,6 +312,71 @@ describe('queue service', () => {
 		});
 	});
 
+	describe('shuffleQueue', () => {
+		it('returns empty state for empty queue', async () => {
+			const repo = createFakeRepo({ tracks: [] });
+			const service = createQueueService({ queueRepository: repo, now: () => FIXED_NOW });
+
+			const state = await service.shuffleQueue({
+				userId: uid('usr_a'),
+				tenantId: tid('tnt_a')
+			});
+
+			expect(state.items).toEqual([]);
+			expect(state.currentItemId).toBeNull();
+		});
+
+		it('returns unchanged state for single item', async () => {
+			const repo = createFakeRepo({ tracks: [readyTrack('trk_a')] });
+			const service = createQueueService({ queueRepository: repo, now: () => FIXED_NOW });
+
+			await service.addItems({
+				userId: uid('usr_a'),
+				tenantId: tid('tnt_a'),
+				trackIds: [tkid('trk_a')],
+				position: null
+			});
+
+			const state = await service.shuffleQueue({
+				userId: uid('usr_a'),
+				tenantId: tid('tnt_a')
+			});
+
+			expect(state.items).toHaveLength(1);
+			expect(state.items[0]!.trackId).toBe('trk_a');
+		});
+
+		it('preserves all items and key order constraints after shuffle', async () => {
+			const repo = createFakeRepo({
+				tracks: [readyTrack('trk_a'), readyTrack('trk_b'), readyTrack('trk_c'), readyTrack('trk_d')]
+			});
+			const service = createQueueService({ queueRepository: repo, now: () => FIXED_NOW });
+
+			await service.addItems({
+				userId: uid('usr_a'),
+				tenantId: tid('tnt_a'),
+				trackIds: [tkid('trk_a'), tkid('trk_b'), tkid('trk_c'), tkid('trk_d')],
+				position: null
+			});
+
+			const state = await service.shuffleQueue({
+				userId: uid('usr_a'),
+				tenantId: tid('tnt_a')
+			});
+
+			expect(state.items).toHaveLength(4);
+			const trackIds = state.items.map((i) => i.trackId).sort();
+			expect(trackIds).toEqual(['trk_a', 'trk_b', 'trk_c', 'trk_d']);
+			// Positions should be dense sequential 1..4
+			const positions = state.items.map((i) => i.position).sort((a, b) => a - b);
+			expect(positions).toEqual([1, 2, 3, 4]);
+			// isCurrent should still be false for all (no item was marked current)
+			for (const item of state.items) {
+				expect(item.isCurrent).toBe(false);
+			}
+		});
+	});
+
 	describe('tenant scoping', () => {
 		it('queue items are not visible from another tenant', async () => {
 			const repo = createFakeRepo({

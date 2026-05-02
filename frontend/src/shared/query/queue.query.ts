@@ -70,6 +70,17 @@ export function useDeleteQueueItemMutation() {
 	});
 }
 
+export function useShuffleQueueMutation() {
+	const qc = useQueryClient();
+	return createMutation<QueueStateDto, ApiError, void>({
+		mutationFn: () =>
+			api<QueueStateDto>('/queue/shuffle', { method: 'POST' }),
+		onSuccess: (state) => {
+			qc.setQueryData(queryKeys.queue, state);
+		}
+	});
+}
+
 export function useClearQueueMutation() {
 	const qc = useQueryClient();
 	return createMutation<void, ApiError, void>({

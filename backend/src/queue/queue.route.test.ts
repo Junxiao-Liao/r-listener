@@ -130,6 +130,23 @@ describe('queue route', () => {
 		expect(service.deleteItem).toHaveBeenCalled();
 	});
 
+	it('POST /queue/shuffle returns 200 with state', async () => {
+		const service = createService();
+		const app = createFixtureApp({ service, session: memberSession() });
+
+		const res = await app.request(
+			'/queue/shuffle',
+			{
+				method: 'POST',
+				headers: { cookie: 'session=valid' }
+			},
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(200);
+		expect(service.shuffleQueue).toHaveBeenCalled();
+	});
+
 	it('DELETE /queue returns 204', async () => {
 		const service = createService();
 		const app = createFixtureApp({ service, session: memberSession() });
@@ -186,6 +203,7 @@ function createService(overrides: Partial<QueueService> = {}): QueueService {
 		getState: vi.fn(async () => emptyState()),
 		addItems: vi.fn(async () => emptyState()),
 		updateItem: vi.fn(async () => emptyState()),
+		shuffleQueue: vi.fn(async () => emptyState()),
 		deleteItem: vi.fn(async () => emptyState()),
 		clearQueue: vi.fn(async () => undefined),
 		...overrides

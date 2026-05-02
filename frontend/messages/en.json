@@ -26,6 +26,7 @@
 	"player_view_queue": "Queue",
 	"player_no_track": "Nothing playing yet.",
 	"player_no_track_hint": "Pick a track from your library to start listening.",
+	"player_shuffle": "Shuffle",
 	"queue_title": "Queue",
 	"queue_empty": "Your queue is empty.",
 	"queue_now_playing": "Now playing",

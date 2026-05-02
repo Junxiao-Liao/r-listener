@@ -1,6 +1,7 @@
 <script lang="ts">
 	import GripVertical from '@lucide/svelte/icons/grip-vertical';
 	import Play from '@lucide/svelte/icons/play';
+	import Shuffle from '@lucide/svelte/icons/shuffle';
 	import Trash2 from '@lucide/svelte/icons/trash-2';
 	import X from '@lucide/svelte/icons/x';
 	import * as m from '$shared/paraglide/messages';
@@ -13,6 +14,7 @@
 		useClearQueueMutation,
 		useDeleteQueueItemMutation,
 		useQueueQuery,
+		useShuffleQueueMutation,
 		useUpdateQueueItemMutation
 	} from '$shared/query/queue.query';
 	import type { Id, QueueItemDto } from '$shared/types/dto';
@@ -22,6 +24,7 @@
 	const queueQuery = useQueueQuery();
 	const updateItem = useUpdateQueueItemMutation();
 	const deleteItem = useDeleteQueueItemMutation();
+	const shuffleQueue = useShuffleQueueMutation();
 	const clearQueue = useClearQueueMutation();
 
 	let confirmingClear = $state(false);
@@ -83,17 +86,28 @@
 <section class="flex flex-col gap-4 py-6">
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="text-2xl font-semibold">{m.queue_title()}</h1>
-		{#if items.length > 0}
-			<Button
-				variant="outline"
-				size="sm"
-				onclick={() => (confirmingClear = true)}
-				disabled={$clearQueue.isPending}
-			>
-				<Trash2 class="size-4" />
-				<span>{m.queue_clear()}</span>
-			</Button>
-		{/if}
+		<div class="flex items-center gap-2">
+			{#if items.length > 0}
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={() => $shuffleQueue.mutate()}
+					disabled={$shuffleQueue.isPending}
+				>
+					<Shuffle class="size-4" />
+					<span>{m.player_shuffle()}</span>
+				</Button>
+				<Button
+					variant="outline"
+					size="sm"
+					onclick={() => (confirmingClear = true)}
+					disabled={$clearQueue.isPending}
+				>
+					<Trash2 class="size-4" />
+					<span>{m.queue_clear()}</span>
+				</Button>
+			{/if}
+		</div>
 	</header>
 
 	{#if confirmingClear}

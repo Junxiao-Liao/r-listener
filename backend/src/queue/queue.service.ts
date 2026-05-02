@@ -31,6 +31,7 @@ export type QueueService = {
 	getState(input: ScopedInput): Promise<QueueStateDto>;
 	addItems(input: AddItemsServiceInput): Promise<QueueStateDto>;
 	updateItem(input: UpdateItemServiceInput): Promise<QueueStateDto>;
+	shuffleQueue(input: ScopedInput): Promise<QueueStateDto>;
 	deleteItem(input: DeleteItemServiceInput): Promise<QueueStateDto>;
 	clearQueue(input: ScopedInput): Promise<void>;
 };
@@ -166,6 +167,30 @@ export function createQueueService(deps: QueueServiceDependencies): QueueService
 					now: stamp
 				});
 			}
+
+			return loadState(input);
+		},
+
+		shuffleQueue: async (input) => {
+			const stamp = now();
+			const rows = await deps.queueRepository.listItemsWithTracks(input);
+			if (rows.length <= 1) return loadState(input);
+
+			const ids = rows.map((r) => r.row.id);
+			for (let i = ids.length - 1; i > 0; i--) {
+				const j = Math.floor(Math.random() * (i + 1));
+				[ids[i], ids[j]] = [ids[j]!, ids[i]!];
+			}
+
+			await deps.queueRepository.setPositions({
+				userId: input.userId,
+				tenantId: input.tenantId,
+				updates: ids.map((id, i) => ({
+					id: id as Id<'queue_item'>,
+					positionFrac: i + 1
+				})),
+				now: stamp
+			});
 
 			return loadState(input);
 		},
