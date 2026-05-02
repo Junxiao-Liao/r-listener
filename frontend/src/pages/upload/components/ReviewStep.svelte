@@ -77,7 +77,7 @@
 					</label>
 					<label class="flex flex-col gap-1 text-xs">
 						<span class="text-muted-foreground">{m.track_field_artist()}</span>
-						<ArtistChipsInput bind:value={item.artistNames} />
+						<ArtistChipsInput bind:value={item.artistNames} editable />
 					</label>
 					<label class="flex flex-col gap-1 text-xs">
 						<span class="text-muted-foreground">{m.track_field_album()}</span>
@@ -90,15 +90,23 @@
 						/>
 					</label>
 				</div>
+
+				{#if item.resolvedLyricsLrc}
+					<div class="flex flex-col gap-1">
+						<span class="text-xs text-muted-foreground">{m.upload_review_lyrics_preview()}</span>
+						<pre class="max-h-24 overflow-auto rounded-md border border-border bg-muted/50 p-2 text-xs whitespace-pre-wrap break-all">{item.resolvedLyricsLrc}</pre>
+					</div>
+				{/if}
+
 				<Button
 					type="button"
 					variant="outline"
 					size="sm"
 					class="self-start"
+					title={m.action_swap_tooltip()}
 					onclick={() => swapTitleAndArtists(item.id)}
 				>
 					<ArrowLeftRight class="size-4" />
-					{m.action_swap()}
 				</Button>
 			</li>
 		{/each}

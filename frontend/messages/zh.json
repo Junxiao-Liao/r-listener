@@ -45,6 +45,7 @@
 	"action_remove": "移除",
 	"action_delete": "删除",
 	"action_swap": "交换",
+	"action_swap_tooltip": "交换标题和艺人",
 
 	"admin_eyebrow": "管理员",
 	"admin_settings_eyebrow": "设置",
@@ -238,6 +239,7 @@
 	"upload_review_ignored": "已忽略 {count} 个不支持的文件。",
 	"upload_review_lyrics_external": "已配对 .lrc",
 	"upload_review_lyrics_embedded": "内嵌歌词",
+	"upload_review_lyrics_preview": "歌词预览",
 
 	"upload_progress_title": "上传中",
 	"upload_progress_subtitle": "已完成 {done} / {total}。",

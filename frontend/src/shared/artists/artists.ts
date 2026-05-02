@@ -23,3 +23,17 @@ export function dedupeArtistNames(names: readonly string[]): string[] {
 
 	return out;
 }
+
+export function renameArtist(
+	names: readonly string[],
+	oldName: string,
+	newName: string
+): string[] {
+	const trimmed = newName.trim();
+	if (trimmed.length === 0) return names.filter((n) => n !== oldName);
+	const oldKey = oldName.trim().normalize('NFKC').toLocaleLowerCase();
+	return names.map((n) => {
+		const key = n.trim().normalize('NFKC').toLocaleLowerCase();
+		return key === oldKey ? trimmed : n;
+	});
+}

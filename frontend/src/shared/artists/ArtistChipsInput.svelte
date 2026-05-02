@@ -4,20 +4,22 @@
 	import { api } from '$shared/api/client';
 	import * as m from '$shared/paraglide/messages';
 	import type { ArtistDto, ListResponse } from '$shared/types/dto';
-	import { dedupeArtistNames } from './artists';
+	import { dedupeArtistNames, renameArtist } from './artists';
 
 	type Props = {
 		value: string[];
 		id?: string;
 		placeholder?: string;
 		disabled?: boolean;
+		editable?: boolean;
 	};
 
 	let {
 		value = $bindable([]),
 		id = undefined,
 		placeholder = '',
-		disabled = false
+		disabled = false,
+		editable = false
 	}: Props = $props();
 
 	let query = $state('');
@@ -26,6 +28,40 @@
 	let nextCursor = $state<string | null>(null);
 	let loading = $state(false);
 	let requestSeq = 0;
+
+	let editingTarget = $state<string | null>(null);
+	let editBuffer = $state('');
+
+	function startEdit(name: string) {
+		if (!editable || disabled) return;
+		editingTarget = name;
+		editBuffer = name;
+	}
+
+	function commitEdit() {
+		if (editingTarget === null) return;
+		const trimmed = editBuffer.trim();
+		if (trimmed.length > 0 && trimmed !== editingTarget) {
+			value = renameArtist(value, editingTarget, trimmed);
+		}
+		editingTarget = null;
+		editBuffer = '';
+	}
+
+	function cancelEdit() {
+		editingTarget = null;
+		editBuffer = '';
+	}
+
+	function handleEditKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter') {
+			event.preventDefault();
+			commitEdit();
+		} else if (event.key === 'Escape') {
+			event.preventDefault();
+			cancelEdit();
+		}
+	}
 
 	$effect(() => {
 		if (!open) return;
@@ -96,7 +132,27 @@
 >
 	{#each value as name (name)}
 		<span class="inline-flex max-w-full items-center gap-1 rounded-sm bg-muted px-1.5 py-0.5">
-			<span class="truncate">{name}</span>
+			{#if editable && editingTarget === name}
+				<input
+					type="text"
+					bind:value={editBuffer}
+					class="w-auto min-w-0 bg-transparent outline-none"
+					style="width:{Math.max(editBuffer.length, 2)}ch"
+					onkeydown={handleEditKeydown}
+					onblur={commitEdit}
+				/>
+			{:else}
+				<span
+					class="truncate"
+					class:cursor-text={editable}
+					role={editable ? 'button' : undefined}
+					tabindex={editable ? 0 : undefined}
+					onclick={() => startEdit(name)}
+					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') startEdit(name); }}
+				>
+					{name}
+				</span>
+			{/if}
 			<button
 				type="button"
 				class="grid size-4 place-items-center rounded-sm text-muted-foreground hover:bg-background hover:text-foreground"

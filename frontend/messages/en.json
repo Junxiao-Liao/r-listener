@@ -45,6 +45,7 @@
 	"action_remove": "Remove",
 	"action_delete": "Delete",
 	"action_swap": "Swap",
+	"action_swap_tooltip": "Swap title and artist",
 
 	"admin_eyebrow": "Admin",
 	"admin_settings_eyebrow": "Settings",
@@ -238,6 +239,7 @@
 	"upload_review_ignored": "{count} unsupported files were ignored.",
 	"upload_review_lyrics_external": ".lrc paired",
 	"upload_review_lyrics_embedded": "Embedded lyrics",
+	"upload_review_lyrics_preview": "Lyrics preview",
 
 	"upload_progress_title": "Uploading",
 	"upload_progress_subtitle": "{done} of {total} done.",
