@@ -1,6 +1,7 @@
 <script lang="ts">
 	import { goto } from '$app/navigation';
 	import Search from '@lucide/svelte/icons/search';
+	import Upload from '@lucide/svelte/icons/upload';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
@@ -34,7 +35,10 @@
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="text-2xl font-semibold">{m.library_title()}</h1>
 		{#if editor}
-			<Button href="/library/upload">{m.library_upload()}</Button>
+			<Button variant="outline" href="/library/upload">
+				<Upload class="size-4" />
+				<span>{m.library_upload()}</span>
+			</Button>
 		{/if}
 	</header>
 
@@ -72,7 +76,10 @@
 		<div class="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border px-4 py-10 text-center">
 			<p class="text-sm text-muted-foreground">{m.library_empty()}</p>
 			{#if editor}
-				<Button variant="outline" href="/library/upload">{m.library_upload()}</Button>
+				<Button variant="outline" href="/library/upload">
+					<Upload class="size-4" />
+					<span>{m.library_upload()}</span>
+				</Button>
 			{/if}
 		</div>
 	{:else}

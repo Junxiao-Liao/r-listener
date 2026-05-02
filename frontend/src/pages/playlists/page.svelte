@@ -1,5 +1,6 @@
 <script lang="ts">
 	import * as m from '$shared/paraglide/messages';
+	import Plus from '@lucide/svelte/icons/plus';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
 	import { isEditor } from '$shared/auth/role';
@@ -23,7 +24,10 @@
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="text-2xl font-semibold">{m.playlists_title()}</h1>
 		{#if editor}
-			<Button href="/playlists/new">{m.playlists_create()}</Button>
+			<Button variant="outline" href="/playlists/new">
+				<Plus class="size-4" />
+				<span>{m.playlists_create()}</span>
+			</Button>
 		{/if}
 	</header>
 
@@ -45,7 +49,10 @@
 			<p class="text-sm font-medium">{m.playlists_empty_title()}</p>
 			<p class="text-xs text-muted-foreground">{m.playlists_empty_hint()}</p>
 			{#if editor}
-				<Button variant="outline" href="/playlists/new">{m.playlists_create()}</Button>
+				<Button variant="outline" href="/playlists/new">
+					<Plus class="size-4" />
+					<span>{m.playlists_create()}</span>
+				</Button>
 			{/if}
 		</div>
 	{:else}
