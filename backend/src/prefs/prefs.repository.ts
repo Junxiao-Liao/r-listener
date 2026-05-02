@@ -57,6 +57,7 @@ export function createPrefsRepository(db: Db, kv?: KVNamespace): PrefsRepository
 			return dto;
 		},
 		update: async ({ userId, patch, now }) => {
+			if (cache) await cache.invalidate(prefsKey(userId));
 			const rows = await db
 				.update(userPreferences)
 				.set({ ...patch, updatedAt: now })
