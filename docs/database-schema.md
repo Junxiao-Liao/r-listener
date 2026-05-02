@@ -32,7 +32,7 @@
 | `user_preferences` | Settings per user (`user_id` PK) | `user_id → users` |
 | `sessions` | Hashed cookie session tokens, active tenant, expiry, sliding refresh metadata | `user_id → users`, `active_tenant_id → tenants` |
 | `rate_limits` | Fixed-window auth/API rate-limit counters | — |
-| `audit_logs` | Append-only admin action trail | `actor_id → users`, `tenant_id → tenants` |
+| `audit_logs` | Append-only admin action trail (hard-delete tracks records audioR2Key, sizeBytes, r2Deleted boolean per row) | `actor_id → users`, `tenant_id → tenants` |
 
 ## R2 Key Patterns
 

@@ -4,6 +4,9 @@ import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.servic
 import { queryKeys } from '$shared/query/keys';
 import type {
 	AdminCreateTenantInput,
+	AdminHardDeleteTracksInput,
+	AdminHardDeleteTracksResult,
+	AdminTrackListItemDto,
 	AdminCreateUserInput,
 	AdminTenantListItemDto,
 	AdminTenantMemberDto,
@@ -29,6 +32,10 @@ export type AdminListParams = {
 export type AdminUsersParams = AdminListParams & {
 	includeInactive?: boolean;
 	excludeTenantId?: Id<'tenant'>;
+};
+
+export type AdminTracksParams = AdminListParams & {
+	tenantId?: Id<'tenant'>;
 };
 
 function listPath(base: string, params: Record<string, string | number | boolean | null | undefined>) {
@@ -60,6 +67,15 @@ export function buildAdminUsersPath(params: AdminUsersParams = {}) {
 	});
 }
 
+export function buildAdminTracksPath(params: AdminTracksParams = {}) {
+	return listPath('/admin/tracks', {
+		limit: params.limit,
+		cursor: params.cursor,
+		q: params.q,
+		tenantId: params.tenantId
+	});
+}
+
 export function useAdminTenantsQuery(enabled: () => boolean, params: () => AdminListParams = () => ({})) {
 	return createQuery<ListResponse<AdminTenantListItemDto>, ApiError>({
 		get queryKey() {
@@ -80,6 +96,16 @@ export function useAdminUsersQuery(params: () => AdminUsersParams = () => ({})) 
 		},
 		meta: suppressGlobalApiErrorToast,
 		queryFn: () => api<ListResponse<AdminUserListItemDto>>(buildAdminUsersPath(params()))
+	});
+}
+
+export function useAdminTracksQuery(params: () => AdminTracksParams = () => ({})) {
+	return createQuery<ListResponse<AdminTrackListItemDto>, ApiError>({
+		get queryKey() {
+			return queryKeys.adminTracks(params());
+		},
+		meta: suppressGlobalApiErrorToast,
+		queryFn: () => api<ListResponse<AdminTrackListItemDto>>(buildAdminTracksPath(params()))
 	});
 }
 
@@ -246,6 +272,19 @@ export function useDeleteAdminMembershipMutation() {
 			void qc.invalidateQueries({ queryKey: queryKeys.adminTenantMembers(tenantId) });
 			void qc.invalidateQueries({ queryKey: queryKeys.adminUser(userId) });
 			invalidateAdminAndSession(qc);
+		}
+	});
+}
+
+export function useHardDeleteAdminTracksMutation() {
+	const qc = useQueryClient();
+	return createMutation<AdminHardDeleteTracksResult, ApiError, AdminHardDeleteTracksInput>({
+		mutationFn: (body) =>
+			api<AdminHardDeleteTracksResult>('/admin/tracks/bulk-delete', { method: 'POST', body }),
+		meta: suppressGlobalApiErrorToast,
+		onSuccess: () => {
+			void qc.invalidateQueries({ queryKey: ['admin', 'tracks'] });
+			void qc.invalidateQueries({ queryKey: queryKeys.tracks });
 		}
 	});
 }

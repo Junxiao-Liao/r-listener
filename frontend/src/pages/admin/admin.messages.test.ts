@@ -9,6 +9,7 @@ const adminMessageKeys = [
 	'admin_home',
 	'admin_users',
 	'admin_tenants',
+	'admin_tracks',
 	'admin_back',
 	'admin_create_user',
 	'admin_username',
@@ -20,8 +21,14 @@ const adminMessageKeys = [
 	'admin_role_viewer',
 	'admin_create',
 	'admin_filter_users',
+	'admin_filter_tracks',
+	'admin_filter_by_tenant',
+	'admin_all_tenants',
 	'admin_search',
 	'admin_clear',
+	'admin_select_page',
+	'admin_clear_selection',
+	'admin_tracks_selected',
 	'admin_load_more',
 	'admin_no_results',
 	'admin_user_status_active',
@@ -51,7 +58,13 @@ const adminMessageKeys = [
 	'admin_last_owner_guard',
 	'admin_update',
 	'admin_remove_member',
-	'admin_remove_member_description'
+	'admin_remove_member_description',
+	'admin_track_soft_deleted',
+	'admin_track_tenant_deleted',
+	'admin_tracks_delete',
+	'admin_tracks_delete_confirm_title',
+	'admin_tracks_delete_confirm_description',
+	'admin_tracks_delete_success'
 ] as const;
 
 describe('admin messages', () => {

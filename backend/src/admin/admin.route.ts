@@ -15,15 +15,22 @@ import {
 	adminUpdateUserSchema,
 	adminUserListQuerySchema
 } from './admin.dto';
+import { adminHardDeleteTracksSchema, adminTrackListQuerySchema } from './admin.tracks.dto';
+import {
+	createAdminTracksServiceForDb,
+	type AdminTracksService
+} from './admin.tracks.service';
 import { createAdminServiceForDb, type AdminService } from './admin.service';
 
 export type AdminRouteDeps = {
 	createAdminService?: (db: Db) => AdminService;
+	createAdminTracksService?: (db: Db, r2: R2Bucket) => AdminTracksService;
 };
 
 export function createAdminRoute(deps: AdminRouteDeps = {}) {
 	const route = new Hono<Env>();
 	const serviceFactory = deps.createAdminService ?? createAdminServiceForDb;
+	const tracksServiceFactory = deps.createAdminTracksService ?? createAdminTracksServiceForDb;
 	const guards = [requireSession(), requireAdmin()] as const;
 
 	route.get('/admin/users', ...guards, async (c) => {
@@ -190,6 +197,30 @@ export function createAdminRoute(deps: AdminRouteDeps = {}) {
 			userId: c.req.param('userId') as Id<'user'>
 		});
 		return c.body(null, 204);
+	});
+
+	route.get('/admin/tracks', ...guards, async (c) => {
+		const service = tracksServiceFactory(c.var.db, c.env.R2);
+		const query = parseQuery(c, adminTrackListQuerySchema);
+		return c.json(
+			await service.listTracks({
+				...query,
+				tenantId: query.tenantId as Id<'tenant'> | undefined
+			})
+		);
+	});
+
+	route.post('/admin/tracks/bulk-delete', ...guards, async (c) => {
+		const service = tracksServiceFactory(c.var.db, c.env.R2);
+		const body = await parseJsonBody(c, adminHardDeleteTracksSchema);
+		return c.json(
+			await service.hardDeleteTracks({
+				actor: c.var.session.user,
+				input: {
+					trackIds: body.trackIds as Id<'track'>[]
+				}
+			})
+		);
 	});
 
 	return route;

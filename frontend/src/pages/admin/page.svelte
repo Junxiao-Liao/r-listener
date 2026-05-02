@@ -20,5 +20,6 @@
 	<nav class="grid gap-2">
 		<Button href="/admin/users" variant="outline" class="justify-start">{m.admin_users()}</Button>
 		<Button href="/admin/tenants" variant="outline" class="justify-start">{m.admin_tenants()}</Button>
+		<Button href="/admin/tracks" variant="outline" class="justify-start">{m.admin_tracks()}</Button>
 	</nav>
 </section>

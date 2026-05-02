@@ -119,6 +119,24 @@ export type AdminTenantMemberDto = TenantMembershipDto & {
 	user: UserDto;
 };
 
+export type AdminTrackListItemDto = TrackDto & {
+	tenantName: string;
+	tenantDeleted: boolean;
+	isDeleted: boolean;
+	audioR2Key: string;
+};
+
+export type AdminHardDeleteTracksInput = {
+	trackIds: Id<'track'>[];
+};
+
+export type AdminHardDeleteTracksResult = {
+	deletedCount: number;
+	freedBytes: number;
+	r2KeysDeleted: number;
+	r2KeysRetained: number;
+};
+
 export type ListResponse<T> = {
 	items: T[];
 	nextCursor: string | null;
@@ -310,5 +328,4 @@ export type AddPlaylistTrackInput = {
 	trackId: Id<'track'>;
 	position?: number | null;
 };
-
 

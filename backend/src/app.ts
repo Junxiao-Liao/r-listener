@@ -11,6 +11,7 @@ import { authRoute } from './auth/auth.route';
 import { prefsRoute } from './prefs/prefs.route';
 import { createAdminRoute } from './admin/admin.route';
 import type { AdminService } from './admin/admin.service';
+import type { AdminTracksService } from './admin/admin.tracks.service';
 import { tracksRoute } from './tracks/tracks.route';
 import { artistsRoute } from './artists/artists.route';
 import { playbackRoute } from './playback/playback.route';
@@ -21,6 +22,7 @@ import { playlistsRoute } from './playlists/playlists.route';
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db }) => MiddlewareService;
 	createAdminService?: (db: Db) => AdminService;
+	createAdminTracksService?: (db: Db, r2: R2Bucket) => AdminTracksService;
 	configure?: (app: Hono<BackendEnv>) => void;
 };
 
@@ -38,7 +40,13 @@ export function createApp(options: AppOptions = {}) {
 	api.route('/', healthRoute);
 	api.route('/', authRoute);
 	api.route('/', prefsRoute);
-	api.route('/', createAdminRoute({ createAdminService: options.createAdminService }));
+	api.route(
+		'/',
+		createAdminRoute({
+			createAdminService: options.createAdminService,
+			createAdminTracksService: options.createAdminTracksService
+		})
+	);
 	api.route('/', artistsRoute);
 	api.route('/', tracksRoute);
 	api.route('/', playbackRoute);

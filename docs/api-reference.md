@@ -98,3 +98,9 @@ All routes under `/api/*`. Session cookie (first-party). JSON bodies unless note
 | POST | `/admin/tenants/{id}/members` | Add member |
 | PATCH | `/admin/tenants/{id}/members/{userId}` | Update membership |
 | DELETE | `/admin/tenants/{id}/members/{userId}` | Remove member |
+
+## Admin — Tracks
+| Method | Path | Purpose |
+|--------|------|---------|
+| GET | `/admin/tracks` | List all tracks (paginated with `cursor`, `limit`, optional search `q` and `tenantId`) |
+| POST | `/admin/tracks/bulk-delete` | Hard delete tracks from DB and R2 (max 50 trackIds; deduplicates R2 keys) |

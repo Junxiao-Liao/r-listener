@@ -2,6 +2,7 @@ export const queryKeys = {
 	session: ['session'] as const,
 	adminTenants: (params: Record<string, unknown> = {}) => ['admin', 'tenants', params] as const,
 	adminUsers: (params: Record<string, unknown> = {}) => ['admin', 'users', params] as const,
+	adminTracks: (params: Record<string, unknown> = {}) => ['admin', 'tracks', params] as const,
 	adminUser: (id: string) => ['admin', 'users', id] as const,
 	adminTenant: (id: string) => ['admin', 'tenants', id] as const,
 	adminTenantMembers: (id: string) => ['admin', 'tenants', id, 'members'] as const,
