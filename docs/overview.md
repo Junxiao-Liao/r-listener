@@ -27,6 +27,7 @@
 ## Key Conventions
 
 - **IDs:** Opaque prefixed UUIDv7 (`usr_`, `tnt_`, `trk_`, `pls_`, etc.)
+- **Cursor encoding:** `shared/cursor.ts` provides `encodeBase64Cursor`/`decodeBase64Cursor` for UTF-8-safe base64 pagination cursors (handles non-Latin1 text like Chinese via `encodeURIComponent` + `btoa`)
 - **Time:** Unix seconds in D1, ISO-8601 on the wire
 - **Soft delete:** `deleted_at` column on domain rows; reads filter it out
 - **Tenant scoping:** Every tenant-scoped resource has `tenant_id` FK; cross-tenant visibility is never granted

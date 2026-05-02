@@ -1,5 +1,6 @@
 import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
+import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { createId } from '../shared/id';
 import { artists, trackArtists } from '../artists/artists.orm';
@@ -382,11 +383,11 @@ export function createTracksRepository(db: Db): TracksRepository {
 }
 
 function encodeCursor(data: CursorData): string {
-	return btoa(JSON.stringify(data));
+	return encodeBase64Cursor(data);
 }
 
 function decodeCursor(cursor: string): CursorData {
-	return JSON.parse(atob(cursor));
+	return decodeBase64Cursor<CursorData>(cursor);
 }
 
 function columnForSortField(field: TrackSortField) {

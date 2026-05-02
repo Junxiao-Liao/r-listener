@@ -1,5 +1,6 @@
 import { and, asc, eq, gt, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
+import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { tracks } from '../tracks/tracks.orm';
 import type { TrackStatus } from '../tracks/tracks.type';
@@ -147,12 +148,12 @@ export function createArtistsRepository(db: Db): ArtistsRepository {
 }
 
 function encodeCursor(data: CursorData): string {
-	return btoa(JSON.stringify(data));
+	return encodeBase64Cursor(data);
 }
 
 function decodeCursor(cursor: string): CursorData {
 	try {
-		const data = JSON.parse(atob(cursor)) as Partial<CursorData>;
+		const data = decodeBase64Cursor<Partial<CursorData>>(cursor);
 		return {
 			id: typeof data.id === 'string' ? data.id : '',
 			nameKey: typeof data.nameKey === 'string' ? data.nameKey : ''

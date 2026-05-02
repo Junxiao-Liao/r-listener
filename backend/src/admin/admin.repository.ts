@@ -14,6 +14,7 @@ import { auditLogs } from '../audit/audit.orm';
 import { sessions } from '../auth/auth.orm';
 import type { Db } from '../db';
 import { playlistTracks, playlists } from '../playlists/playlists.orm';
+import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import { createId } from '../shared/id';
 import type { Id } from '../shared/shared.type';
 import { toTenantDto, toTenantMembershipDto } from '../tenants/tenants.dto';
@@ -493,13 +494,13 @@ function countMap<TKey extends 'userId' | 'tenantId'>(
 }
 
 function encodeCursor(offset: number): string {
-	return btoa(JSON.stringify({ offset }));
+	return encodeBase64Cursor({ offset });
 }
 
 function decodeCursor(cursor: string | undefined): number {
 	if (!cursor) return 0;
 	try {
-		const value = JSON.parse(atob(cursor)) as { offset?: unknown };
+		const value = decodeBase64Cursor<{ offset?: unknown }>(cursor);
 		return typeof value.offset === 'number' && value.offset >= 0 ? value.offset : 0;
 	} catch {
 		return 0;

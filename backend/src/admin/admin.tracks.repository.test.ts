@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { Db } from '../db';
+import { encodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { createAdminTracksRepository } from './admin.tracks.repository';
 
@@ -10,7 +11,7 @@ describe('admin tracks repository', () => {
 
 		await repository.listTracks({
 			limit: 10,
-			cursor: btoa(JSON.stringify({ offset: 20 })),
+			cursor: encodeBase64Cursor({ offset: 20 }),
 			q: undefined,
 			tenantId: undefined
 		});

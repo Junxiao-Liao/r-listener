@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import { fromUnixTimestampSeconds } from '../shared/time';
 import type { Id, Iso8601 } from '../shared/shared.type';
 import type { TrackDto } from '../tracks/tracks.type';
@@ -50,10 +51,10 @@ export function toRecentTrackDto(row: RecentTrackJoinedRow): RecentTrackDto {
 }
 
 export function encodeRecentCursor(lastPlayedAt: Iso8601, trackId: Id<'track'>): string {
-	return btoa(JSON.stringify({ t: lastPlayedAt, id: trackId }));
+	return encodeBase64Cursor({ t: lastPlayedAt, id: trackId });
 }
 
 export function decodeRecentCursor(cursor: string): { lastPlayedAt: Iso8601; trackId: Id<'track'> } {
-	const data = JSON.parse(atob(cursor)) as { t: string; id: string };
+	const data = decodeBase64Cursor<{ t: string; id: string }>(cursor);
 	return { lastPlayedAt: data.t as Iso8601, trackId: data.id as Id<'track'> };
 }

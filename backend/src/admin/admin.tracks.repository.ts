@@ -2,6 +2,7 @@ import { and, asc, desc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm'
 import { artists, trackArtists } from '../artists/artists.orm';
 import { auditLogs } from '../audit/audit.orm';
 import type { Db } from '../db';
+import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import { createId } from '../shared/id';
 import type { Id } from '../shared/shared.type';
 import { tenants } from '../tenants/tenants.orm';
@@ -167,13 +168,13 @@ export function createAdminTracksRepository(db: Db): AdminTracksRepository {
 }
 
 function encodeCursor(offset: number): string {
-	return btoa(JSON.stringify({ offset }));
+	return encodeBase64Cursor({ offset });
 }
 
 function decodeCursor(cursor: string | undefined): number {
 	if (!cursor) return 0;
 	try {
-		const value = JSON.parse(atob(cursor)) as { offset?: unknown };
+		const value = decodeBase64Cursor<{ offset?: unknown }>(cursor);
 		return typeof value.offset === 'number' && value.offset >= 0 ? value.offset : 0;
 	} catch {
 		return 0;
