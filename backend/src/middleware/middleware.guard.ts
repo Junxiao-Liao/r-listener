@@ -5,6 +5,7 @@ import { setSessionCookie } from '../auth/session.cookie';
 import type { BackendEnv } from '../app.type';
 import { apiError } from '../http/api-error';
 import { getClientIp } from './request-context';
+import { DEMO_API_RATE_LIMIT_MAX } from './rate-limit.service';
 
 export const enforceAuthRateLimit = () =>
 	createMiddleware<BackendEnv>(async (c, next) => {
@@ -50,9 +51,11 @@ export const requireSession = () =>
 		}
 
 		if (!sessionContext.user.isAdmin) {
+			const isDemoUser = sessionContext.user.username === 'demo';
 			const apiLimitResult = await c.var.middlewareService.checkApiRateLimit({
 				userId: sessionContext.user.id,
-				now: new Date()
+				now: new Date(),
+				...(isDemoUser ? { max: DEMO_API_RATE_LIMIT_MAX } : {})
 			});
 			if (!apiLimitResult.allowed) {
 				throw apiError(429, 'rate_limited', 'Too many API requests. Try again later.');

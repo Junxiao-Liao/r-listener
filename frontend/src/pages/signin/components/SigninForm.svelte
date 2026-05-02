@@ -4,11 +4,12 @@
 	import { Input } from '$shared/components/ui/input';
 	import { Label } from '$shared/components/ui/label';
 	import * as m from '$shared/paraglide/messages';
-	import { useSigninMutation } from '$shared/query/session.query';
+	import { useSigninMutation, useDemoSigninMutation } from '$shared/query/session.query';
 	import { ApiError } from '$shared/api/client';
 	import { signinSchema, postSigninRedirect, type SigninForm } from '../signin.form';
 
 	const signin = useSigninMutation();
+	const demoSignin = useDemoSigninMutation();
 
 	function readJustChanged(): boolean {
 		if (typeof window === 'undefined') return false;
@@ -35,13 +36,30 @@
 	});
 
 	const flashError = $derived(errorText($signin.error));
+	const demoError = $derived(demoErrorText($demoSignin.error));
 	const submitting = $derived($signin.isPending);
+	const demoSubmitting = $derived($demoSignin.isPending);
 
 	function errorText(error: unknown): string | null {
 		if (!(error instanceof ApiError)) return null;
 		switch (error.code) {
 			case 'invalid_credentials':
 				return m.signin_error_invalid();
+			case 'account_disabled':
+				return m.signin_error_disabled();
+			case 'rate_limited':
+				return m.signin_error_rate_limited();
+			default:
+				return m.signin_error_invalid();
+		}
+	}
+
+	function demoErrorText(error: unknown): string | null {
+		if (!(error instanceof ApiError)) return null;
+		switch (error.code) {
+			case 'not_found':
+			case 'insufficient_role':
+				return m.signin_error_demo_not_found();
 			case 'account_disabled':
 				return m.signin_error_disabled();
 			case 'rate_limited':
@@ -62,6 +80,15 @@
 			void goto(postSigninRedirect(session), { replaceState: true });
 		} catch {
 			// Error surfaced via $signin.error / flashError.
+		}
+	}
+
+	async function handleDemoSignin() {
+		try {
+			const session = await $demoSignin.mutateAsync();
+			void goto(postSigninRedirect(session), { replaceState: true });
+		} catch {
+			// Error surfaced via $demoSignin.error / demoError.
 		}
 	}
 </script>
@@ -109,4 +136,28 @@
 			{m.signin_submit()}
 		</Button>
 	</form>
+
+	<div class="flex flex-col gap-2">
+		<div class="relative">
+			<div class="absolute inset-0 flex items-center">
+				<span class="w-full border-t" />
+			</div>
+			<div class="relative flex justify-center text-xs uppercase">
+				<span class="bg-background px-2 text-muted-foreground">{m.signin_title()}</span>
+			</div>
+		</div>
+
+		<Button
+			variant="outline"
+			class="w-full"
+			disabled={demoSubmitting || submitting}
+			onclick={handleDemoSignin}
+		>
+			{demoSubmitting ? m.signin_demo_loading() : m.signin_demo_button()}
+		</Button>
+
+		{#if demoError}
+			<p class="text-center text-sm text-destructive" role="alert">{demoError}</p>
+		{/if}
+	</div>
 </div>

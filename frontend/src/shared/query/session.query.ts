@@ -41,6 +41,20 @@ export function useSigninMutation() {
 	});
 }
 
+export function useDemoSigninMutation() {
+	const qc = useQueryClient();
+	return createMutation<CurrentSessionDto, ApiError, void>({
+		mutationFn: () => api<CurrentSessionDto>('/auth/demo-signin', { method: 'POST' }),
+		meta: suppressGlobalApiErrorToast,
+		onSuccess: (session) => {
+			qc.setQueryData(queryKeys.session, session);
+			setThemeCookie(session.preferences.theme);
+			applyTheme(session.preferences.theme);
+			void setLocale(session.preferences.language, { reload: false });
+		}
+	});
+}
+
 export function useSignoutMutation() {
 	const qc = useQueryClient();
 	return createMutation<void, ApiError, void>({

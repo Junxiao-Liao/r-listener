@@ -17,6 +17,17 @@ export function createAuthRoute(deps: AuthRouteDeps = {}) {
 	const route = new Hono<Env>();
 	const serviceFactory = deps.createAuthService ?? createAuthServiceForDb;
 
+	route.post('/auth/demo-signin', async (c) => {
+		const service = serviceFactory(c.var.db);
+		const result = await service.demoSignIn({
+			ip: getClientIp(c.req.raw.headers),
+			userAgent: c.req.header('User-Agent') ?? null
+		});
+		setSessionCookie(c, result.sessionToken, result.sessionExpiresAt);
+		const { sessionToken: _omit, ...response } = result;
+		return c.json(response);
+	});
+
 	route.post('/auth/signin', async (c) => {
 		const body = await parseJsonBody(c, signinInputSchema);
 		const service = serviceFactory(c.var.db);

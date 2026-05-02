@@ -190,6 +190,59 @@ describe('auth service', () => {
 		expect(passwordMeetsPolicy('Short1!')).toBe(false);
 		expect(passwordMeetsPolicy('longbutnoclasses')).toBe(false);
 	});
+
+	describe('demo signin', () => {
+		it('signs in demo user and returns token plus expiry', async () => {
+			const deps = createDeps({
+				user: userFixture({ username: 'demo' }),
+				memberships: [membershipFixture({ tenantId: tenantId('tnt_a'), role: 'viewer' })]
+			});
+			const service = createAuthService(deps);
+
+			const result = await service.demoSignIn({ ip: '127.0.0.1', userAgent: 'vitest' });
+
+			expect(result.sessionToken).toBe('raw-token');
+			expect(result.sessionExpiresAt).toBe('2026-05-26T00:00:00.000Z');
+			expect(result.activeTenantId).toBe('tnt_a');
+		});
+
+		it('rejects when demo user is not found', async () => {
+			const service = createAuthService(createDeps({ user: null }));
+
+			await expect(service.demoSignIn({ ip: null, userAgent: null }))
+				.rejects.toMatchObject({ status: 404, code: 'not_found' });
+		});
+
+		it('rejects when demo user is disabled', async () => {
+			const service = createAuthService(createDeps({ user: userFixture({ username: 'demo', isActive: false }) }));
+
+			await expect(service.demoSignIn({ ip: null, userAgent: null }))
+				.rejects.toMatchObject({ status: 403, code: 'account_disabled' });
+		});
+
+		it('rejects when demo user has non-viewer role', async () => {
+			const service = createAuthService(createDeps({
+				user: userFixture({ username: 'demo' }),
+				memberships: [membershipFixture({ tenantId: tenantId('tnt_a'), role: 'owner' })]
+			}));
+
+			await expect(service.demoSignIn({ ip: null, userAgent: null }))
+				.rejects.toMatchObject({ status: 403, code: 'insufficient_role' });
+		});
+
+		it('rejects when demo user has mixed roles including non-viewer', async () => {
+			const service = createAuthService(createDeps({
+				user: userFixture({ username: 'demo' }),
+				memberships: [
+					membershipFixture({ tenantId: tenantId('tnt_a'), role: 'viewer' }),
+					membershipFixture({ tenantId: tenantId('tnt_b'), role: 'member' })
+				]
+			}));
+
+			await expect(service.demoSignIn({ ip: null, userAgent: null }))
+				.rejects.toMatchObject({ status: 403, code: 'insufficient_role' });
+		});
+	});
 });
 
 function signIn(service: ReturnType<typeof createAuthService>) {

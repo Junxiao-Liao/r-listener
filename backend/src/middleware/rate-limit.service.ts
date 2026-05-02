@@ -10,6 +10,8 @@ const AUTH_RATE_LIMIT_WINDOW_SECONDS = 60;
 const API_RATE_LIMIT_MAX = 60;
 const API_RATE_LIMIT_WINDOW_SECONDS = 60;
 
+export const DEMO_API_RATE_LIMIT_MAX = 20;
+
 export async function checkAuthRateLimit(
 	db: Db,
 	input: AuthRateLimitInput
@@ -30,12 +32,13 @@ export async function checkApiRateLimit(
 	db: Db,
 	input: ApiRateLimitInput
 ): Promise<ApiRateLimitResult> {
+	const max = input.max ?? API_RATE_LIMIT_MAX;
 	const windowStart = Math.floor(input.now.getTime() / (API_RATE_LIMIT_WINDOW_SECONDS * 1000));
 	const key = `rate:api:${input.userId}:${windowStart}`;
 
 	try {
 		const next = await incrementRateLimit(db, key, input.now, API_RATE_LIMIT_WINDOW_SECONDS);
-		return { allowed: next <= API_RATE_LIMIT_MAX };
+		return { allowed: next <= max };
 	} catch (err) {
 		console.error('checkApiRateLimit error:', err);
 		throw internalError();

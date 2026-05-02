@@ -19,6 +19,15 @@ export type SigninInput = {
 	userAgent: string | null;
 };
 
+export type DemoSigninInput = {
+	ip: string | null;
+	userAgent: string | null;
+};
+
+export type DemoSigninResult = CurrentSessionDto & {
+	sessionToken: string;
+};
+
 export type SigninResult = CurrentSessionDto & {
 	sessionToken: string;
 };

@@ -114,9 +114,12 @@
 	"signin_title": "R Listener",
 	"signin_tagline": "你的私人音乐库",
 	"signin_submit": "登录",
+	"signin_demo_button": "体验演示",
+	"signin_demo_loading": "登录中…",
 	"signin_error_invalid": "用户名或密码错误。",
 	"signin_error_disabled": "此账号已被停用,请联系管理员。",
 	"signin_error_rate_limited": "尝试次数过多,请稍后再试。",
+	"signin_error_demo_not_found": "演示账号不可用。",
 
 	"tenants_title": "选择工作区",
 	"tenants_role_owner": "所有者",

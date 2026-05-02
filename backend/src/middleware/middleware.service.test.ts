@@ -130,6 +130,57 @@ describe('backend middleware', () => {
 		expect((await readError(res)).code).toBe('internal_error');
 	});
 
+	it('returns 429 when API rate limit is exceeded for non-admin users', async () => {
+		const app = createFixtureApp({ session: sessionFixture(), apiRateLimitAllowed: false });
+
+		const res = await app.request(
+			'/api/fixture/session',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(429);
+		expect((await readError(res)).code).toBe('rate_limited');
+	});
+
+	it('passes demo rate limit max when user is demo', async () => {
+		const checkApiRateLimit = vi.fn(async () => ({ allowed: true }));
+		const app = createFixtureApp({
+			session: sessionFixture({ username: 'demo' }),
+			checkApiRateLimitOverride: checkApiRateLimit
+		});
+
+		const res = await app.request(
+			'/api/fixture/session',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(200);
+		expect(checkApiRateLimit).toHaveBeenCalledWith(
+			expect.objectContaining({ max: 20 })
+		);
+	});
+
+	it('does not pass demo max when user is not demo', async () => {
+		const checkApiRateLimit = vi.fn(async () => ({ allowed: true }));
+		const app = createFixtureApp({
+			session: sessionFixture({ username: 'alice' }),
+			checkApiRateLimitOverride: checkApiRateLimit
+		});
+
+		const res = await app.request(
+			'/api/fixture/session',
+			{ headers: { cookie: 'session=valid' } },
+			createTestEnv()
+		);
+
+		expect(res.status).toBe(200);
+		expect(checkApiRateLimit).toHaveBeenCalledWith(
+			expect.not.objectContaining({ max: expect.anything() })
+		);
+	});
+
 	it('lets injected fixtures exercise successful protected routes', async () => {
 		const app = createFixtureApp({ session: sessionFixture({ userIsAdmin: true }) });
 
@@ -232,6 +283,7 @@ type FixtureOptions = {
 	rateLimitThrows?: boolean;
 	apiRateLimitAllowed?: boolean;
 	apiRateLimitThrows?: boolean;
+	checkApiRateLimitOverride?: ReturnType<typeof vi.fn>;
 };
 
 function createFixtureApp(options: FixtureOptions) {
@@ -256,10 +308,10 @@ function createFixtureApp(options: FixtureOptions) {
 			if (options.rateLimitThrows) throw internalError();
 			return { allowed: options.rateLimitAllowed ?? true };
 		}),
-		checkApiRateLimit: vi.fn(async () => {
+		checkApiRateLimit: (options.checkApiRateLimitOverride ?? vi.fn(async () => {
 			if (options.apiRateLimitThrows) throw internalError();
 			return { allowed: options.apiRateLimitAllowed ?? true };
-		})
+		})) as (input: { userId: string; now: Date; max?: number }) => Promise<{ allowed: boolean }>
 	};
 
 	return createApp({
@@ -285,12 +337,12 @@ function createFixtureApp(options: FixtureOptions) {
 }
 
 function sessionFixture(
-	overrides: { activeTenantId?: SessionContext['activeTenantId']; userIsAdmin?: boolean } = {}
+	overrides: { activeTenantId?: SessionContext['activeTenantId']; userIsAdmin?: boolean; username?: string } = {}
 ): SessionContext {
 	return {
 		user: {
 			id: 'usr_018f0000-0000-7000-8000-000000000000' as SessionContext['user']['id'],
-			username: 'user',
+			username: overrides.username ?? 'user',
 			isAdmin: overrides.userIsAdmin ?? false,
 			isActive: true,
 			lastActiveTenantId: null,

@@ -44,6 +44,7 @@ export type AuthRateLimitResult = {
 export type ApiRateLimitInput = {
 	userId: UserId;
 	now: Date;
+	max?: number;
 };
 
 export type ApiRateLimitResult = {

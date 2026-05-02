@@ -114,9 +114,12 @@
 	"signin_title": "R Listener",
 	"signin_tagline": "Your private music library",
 	"signin_submit": "Sign in",
+	"signin_demo_button": "Try Demo",
+	"signin_demo_loading": "Signing in…",
 	"signin_error_invalid": "Wrong username or password.",
 	"signin_error_disabled": "This account is disabled. Contact your admin.",
 	"signin_error_rate_limited": "Too many attempts. Try again in a moment.",
+	"signin_error_demo_not_found": "Demo account is not available.",
 
 	"tenants_title": "Choose a workspace",
 	"tenants_role_owner": "Owner",

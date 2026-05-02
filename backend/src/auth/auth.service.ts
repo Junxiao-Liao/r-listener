@@ -19,6 +19,8 @@ import type {
 	ChangePasswordInput,
 	CurrentSessionDto,
 	CurrentSessionInput,
+	DemoSigninInput,
+	DemoSigninResult,
 	SigninInput,
 	SigninResult,
 	SwitchTenantInput,
@@ -27,6 +29,7 @@ import type {
 
 export type AuthService = {
 	signIn(input: SigninInput): Promise<SigninResult>;
+	demoSignIn(input: DemoSigninInput): Promise<DemoSigninResult>;
 	getCurrentSession(input: CurrentSessionInput): Promise<CurrentSessionDto>;
 	signOut(input: { sessionTokenHash: string }): Promise<void>;
 	switchTenant(input: SwitchTenantInput): Promise<SwitchTenantResult>;
@@ -76,6 +79,41 @@ export function createAuthService(deps: AuthServiceDependencies): AuthService {
 
 			return {
 				user: toPublicUser(user),
+				tenants,
+				preferences,
+				activeTenantId: suggestedTenantId,
+				sessionToken: session.token,
+				sessionExpiresAt: toIso8601(session.expiresAt)
+			};
+		},
+		demoSignIn: async (input) => {
+			const demoUser = await deps.usersRepository.findByUsername('demo');
+			if (!demoUser) {
+				throw apiError(404, 'not_found', 'Demo account is not configured.');
+			}
+			if (!demoUser.isActive) {
+				throw apiError(403, 'account_disabled', 'Account is disabled.');
+			}
+
+			const tenants = await deps.tenantsRepository.listActiveMembershipsForUser(demoUser.id);
+			const hasElevatedRole = tenants.some((t) => t.role !== 'viewer');
+			if (hasElevatedRole) {
+				throw apiError(403, 'insufficient_role', 'Demo account must be viewer-only.');
+			}
+
+			const suggestedTenantId = selectSuggestedTenant(demoUser.lastActiveTenantId, tenants);
+			const boundTenantId = tenants.length === 1 ? tenants[0]!.tenantId : null;
+			const session = await deps.authRepository.createSession({
+				userId: demoUser.id,
+				activeTenantId: boundTenantId,
+				now: now(),
+				ip: input.ip,
+				userAgent: input.userAgent
+			});
+			const preferences = await deps.prefsService.getPreferences(demoUser.id);
+
+			return {
+				user: toPublicUser(demoUser),
 				tenants,
 				preferences,
 				activeTenantId: suggestedTenantId,
