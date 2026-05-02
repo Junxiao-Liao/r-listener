@@ -1,7 +1,5 @@
 <script lang="ts">
 	import ChevronDown from '@lucide/svelte/icons/chevron-down';
-	import ListMusic from '@lucide/svelte/icons/list-music';
-	import Mic2 from '@lucide/svelte/icons/mic-2';
 	import Pause from '@lucide/svelte/icons/pause';
 	import Play from '@lucide/svelte/icons/play';
 	import SkipBack from '@lucide/svelte/icons/skip-back';
@@ -11,15 +9,38 @@
 	import { formatDurationMs } from '$shared/format/duration';
 	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
+	import { parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
+	import { cn } from '$shared/utils';
 
 	const player = getPlayer();
 
 	const durationMs = $derived(player.durationMs || player.currentTrack?.durationMs || 0);
 
+	const lines: LrcLine[] = $derived.by(() => {
+		const t = player.currentTrack;
+		if (!t || t.lyricsStatus !== 'synced' || !t.lyricsLrc) return [];
+		return parseSyncedLrc(t.lyricsLrc);
+	});
+
+	const activeIndex = $derived.by(() => {
+		const ms = player.currentTimeMs;
+		let idx = -1;
+		for (let i = 0; i < lines.length; i++) {
+			if (lines[i]!.timeMs <= ms) idx = i;
+			else break;
+		}
+		return idx;
+	});
+
 	function onScrubInput(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
 		const ms = Number(input.value);
 		player.seek(ms);
+	}
+
+	function onLineClick(line: LrcLine) {
+		player.seek(line.timeMs);
+		if (!player.isPlaying) player.play();
 	}
 </script>
 
@@ -35,13 +56,7 @@
 		<h1 class="text-sm font-medium uppercase tracking-wide text-muted-foreground">
 			{m.player_open_full()}
 		</h1>
-		<a
-			href="/queue"
-			class="grid size-9 place-items-center rounded-full hover:bg-muted"
-			aria-label={m.player_view_queue()}
-		>
-			<ListMusic class="size-5" />
-		</a>
+		<div class="size-9" />
 	</header>
 
 	{#if !player.currentTrack}
@@ -112,21 +127,39 @@
 				</button>
 			</div>
 
-			<div class="flex w-full items-center justify-around pt-2">
-				<a
-					href="/player/lyrics"
-					class="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-				>
-					<Mic2 class="size-5" />
-					<span>{m.player_view_lyrics()}</span>
-				</a>
-				<a
-					href="/queue"
-					class="flex flex-col items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
-				>
-					<ListMusic class="size-5" />
-					<span>{m.player_view_queue()}</span>
-				</a>
+			<div class="flex w-full flex-col gap-3 pt-2">
+				<h3 class="text-sm font-medium text-muted-foreground">{m.player_view_lyrics()}</h3>
+
+				{#if t.lyricsStatus === 'none' || !t.lyricsLrc}
+					<p class="text-sm text-muted-foreground">{m.track_lyrics_none()}</p>
+				{:else if t.lyricsStatus === 'invalid'}
+					<p class="text-sm text-amber-700 dark:text-amber-300">{m.track_lyrics_invalid()}</p>
+					<pre class="max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-xs">{t.lyricsLrc}</pre>
+				{:else if t.lyricsStatus === 'plain'}
+					<pre class="max-h-[40vh] overflow-auto whitespace-pre-wrap rounded-md bg-muted p-3 text-sm">{t.lyricsLrc}</pre>
+				{:else}
+					<ul class="flex flex-col gap-1">
+						{#each lines as line, i (i)}
+							<li>
+								<button
+									type="button"
+									class={cn(
+										'w-full flex items-baseline gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
+										i === activeIndex
+											? 'bg-muted text-foreground font-medium'
+											: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+									)}
+									onclick={() => onLineClick(line)}
+								>
+									<span class="shrink-0 tabular-nums text-xs text-muted-foreground/70">
+										{formatDurationMs(line.timeMs)}
+									</span>
+									<span>{line.text || ' '}</span>
+								</button>
+							</li>
+						{/each}
+					</ul>
+				{/if}
 			</div>
 		</div>
 	{/if}
