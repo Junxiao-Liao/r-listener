@@ -6,12 +6,12 @@ BACKEND_PID=""
 FRONTEND_PID=""
 
 cleanup() {
-	if [[ -n "${BACKEND_PID}" ]] && kill -0 "${BACKEND_PID}" 2>/dev/null; then
-		kill "${BACKEND_PID}" 2>/dev/null || true
-	fi
-	if [[ -n "${FRONTEND_PID}" ]] && kill -0 "${FRONTEND_PID}" 2>/dev/null; then
-		kill "${FRONTEND_PID}" 2>/dev/null || true
-	fi
+	trap - INT TERM EXIT
+	# Kill the entire process group so all descendants (npm, vite, etc.) die.
+	# kill -TERM 0 sends to every process in the caller's PGID except self.
+	kill -TERM 0 2>/dev/null || true
+	sleep 0.3
+	kill -KILL 0 2>/dev/null || true
 	wait 2>/dev/null || true
 }
 
@@ -33,4 +33,4 @@ echo "Starting frontend (vite, /api proxied to :8787) on http://localhost:5173"
 (cd "${ROOT_DIR}/frontend" && npm run dev) &
 FRONTEND_PID=$!
 
-wait -n "${BACKEND_PID}" "${FRONTEND_PID}"
+wait -n "${BACKEND_PID}" "${FRONTEND_PID}" || true
