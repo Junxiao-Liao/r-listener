@@ -1,15 +1,37 @@
 <script lang="ts">
 	import * as m from '$shared/paraglide/messages';
-	import { Input } from '$shared/components/ui/input';
+	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { useArtistsQuery } from '$shared/query/artists.query';
 	import ArtistRow from './components/ArtistRow.svelte';
 
-	let q = $state('');
+	let draftQ = $state('');
+	let appliedQ = $state('');
 	const artists = useArtistsQuery(() => ({
-		q: q.trim() || undefined
+		q: appliedQ || undefined
 	}));
 
 	const items = $derived($artists.data?.items ?? []);
+
+	$effect(() => {
+		if (draftQ.length === 0 && appliedQ.length > 0) {
+			appliedQ = '';
+		}
+	});
+
+	$effect(() => {
+		void appliedQ;
+		$artists.refetch();
+	});
+
+	function submitSearch(event: SubmitEvent) {
+		event.preventDefault();
+		appliedQ = draftQ.trim();
+	}
+
+	function clearSearch() {
+		draftQ = '';
+		appliedQ = '';
+	}
 </script>
 
 <section class="flex flex-col gap-4 py-6">
@@ -17,11 +39,12 @@
 		<h1 class="text-2xl font-semibold">{m.artists_title()}</h1>
 	</header>
 
-	<Input
-		type="search"
+	<SearchBar
+		bind:value={draftQ}
 		placeholder={m.artists_search_placeholder()}
-		bind:value={q}
 		class="max-w-md"
+		onsubmit={submitSearch}
+		onclear={clearSearch}
 	/>
 
 	{#if $artists.isPending}

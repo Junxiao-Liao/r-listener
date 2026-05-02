@@ -2,7 +2,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import Plus from '@lucide/svelte/icons/plus';
 	import { Button } from '$shared/components/ui/button';
-	import { Input } from '$shared/components/ui/input';
+	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { isEditor } from '$shared/auth/role';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { usePlaylistsQuery } from '$shared/query/playlists.query';
@@ -11,13 +11,35 @@
 	const session = useSessionQuery();
 	const editor = $derived(isEditor($session.data));
 
-	let q = $state('');
+	let draftQ = $state('');
+	let appliedQ = $state('');
 	const playlists = usePlaylistsQuery(() => ({
 		sort: 'updatedAt:desc',
-		q: q.trim() || undefined
+		q: appliedQ || undefined
 	}));
 
 	const items = $derived($playlists.data?.items ?? []);
+
+	$effect(() => {
+		if (draftQ.length === 0 && appliedQ.length > 0) {
+			appliedQ = '';
+		}
+	});
+
+	$effect(() => {
+		void appliedQ;
+		$playlists.refetch();
+	});
+
+	function submitSearch(event: SubmitEvent) {
+		event.preventDefault();
+		appliedQ = draftQ.trim();
+	}
+
+	function clearSearch() {
+		draftQ = '';
+		appliedQ = '';
+	}
 </script>
 
 <section class="flex flex-col gap-4 py-6">
@@ -31,11 +53,12 @@
 		{/if}
 	</header>
 
-	<Input
-		type="search"
+	<SearchBar
+		bind:value={draftQ}
 		placeholder={m.playlists_search_placeholder()}
-		bind:value={q}
 		class="max-w-md"
+		onsubmit={submitSearch}
+		onclear={clearSearch}
 	/>
 
 	{#if $playlists.isPending}

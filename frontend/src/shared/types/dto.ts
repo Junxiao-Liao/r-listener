@@ -311,14 +311,4 @@ export type AddPlaylistTrackInput = {
 	position?: number | null;
 };
 
-// Search -------------------------------------------------------------
-export type SearchKind = 'track' | 'playlist';
 
-export type SearchHitDto =
-	| { kind: 'track'; track: TrackDto }
-	| { kind: 'playlist'; playlist: PlaylistDto };
-
-export type SearchResponse = {
-	items: SearchHitDto[];
-	nextCursor: string | null;
-};

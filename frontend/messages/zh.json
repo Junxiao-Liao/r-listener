@@ -184,6 +184,7 @@
 	"library_load_more": "加载更多",
 	"library_loading_more": "加载中…",
 	"library_status_pending": "待处理",
+	"library_search_placeholder": "搜索曲目",
 
 	"track_loading": "加载曲目中…",
 	"track_details": "详情",

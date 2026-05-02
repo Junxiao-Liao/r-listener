@@ -22,6 +22,4 @@ export const queryKeys = {
 		['playlists', 'list', params] as const,
 	playlist: (id: string) => ['playlists', 'detail', id] as const,
 	playlistTracks: (id: string) => ['playlists', 'detail', id, 'tracks'] as const,
-	search: (params: { q: string; limit: number; kinds?: string }) =>
-		['search', params] as const
 };

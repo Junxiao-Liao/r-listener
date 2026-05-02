@@ -4,6 +4,7 @@
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
 	import { Input } from '$shared/components/ui/input';
+	import SearchBar from '$shared/components/SearchBar.svelte';
 	import EntityCombobox from '$pages/admin/components/EntityCombobox.svelte';
 	import {
 		applyAdminListFilter,
@@ -53,6 +54,17 @@
 		draftQ = next.draft;
 		appliedQ = next.applied;
 	}
+
+	$effect(() => {
+		if (draftQ.length === 0 && appliedQ.length > 0) {
+			appliedQ = '';
+		}
+	});
+
+	$effect(() => {
+		void appliedQ;
+		$users.refetch();
+	});
 </script>
 
 <section class="flex flex-col gap-6 py-6">
@@ -88,13 +100,12 @@
 		{/if}
 	</form>
 
-	<form class="flex flex-col gap-2 sm:flex-row" onsubmit={(e) => { e.preventDefault(); applyFilter(); }}>
-		<Input placeholder={m.admin_filter_users()} bind:value={draftQ} />
-		<div class="flex gap-2">
-			<Button type="submit">{m.admin_search()}</Button>
-			<Button type="button" variant="outline" onclick={clearFilter}>{m.admin_clear()}</Button>
-		</div>
-	</form>
+	<SearchBar
+		bind:value={draftQ}
+		placeholder={m.admin_filter_users()}
+		onsubmit={(e) => { e.preventDefault(); applyFilter(); }}
+		onclear={clearFilter}
+	/>
 
 	{#if $users.isPending}
 		<p class="text-sm text-muted-foreground">{m.admin_loading()}</p>

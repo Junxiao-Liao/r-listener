@@ -2,7 +2,7 @@
 	import { goto } from '$app/navigation';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
-	import { Input } from '$shared/components/ui/input';
+	import SearchBar from '$shared/components/SearchBar.svelte';
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
 	import { trackArtistDisplay } from '$shared/artists/artists';
@@ -16,10 +16,11 @@
 	type Props = { id: Id<'playlist'> };
 	let { id }: Props = $props();
 
-	let q = $state('');
+	let draftQ = $state('');
+	let appliedQ = $state('');
 	const tracks = useTracksInfiniteQuery(() => ({
 		sort: 'createdAt:desc',
-		q: q.trim() || undefined
+		q: appliedQ || undefined
 	}));
 	const existing = usePlaylistTracksQuery(() => id);
 	const addTrack = useAddPlaylistTrackMutation(id);
@@ -31,6 +32,17 @@
 
 	let selected = $state(new Set<Id<'track'>>());
 	const selectedCount = $derived(selected.size);
+
+	$effect(() => {
+		if (draftQ.length === 0 && appliedQ.length > 0) {
+			appliedQ = '';
+		}
+	});
+
+	$effect(() => {
+		void appliedQ;
+		$tracks.refetch();
+	});
 
 	function toggle(trackId: Id<'track'>) {
 		if (existingIds.has(trackId)) return;
@@ -54,6 +66,16 @@
 			saving = false;
 		}
 	}
+
+	function submitSearch(event: SubmitEvent) {
+		event.preventDefault();
+		appliedQ = draftQ.trim();
+	}
+
+	function clearSearch() {
+		draftQ = '';
+		appliedQ = '';
+	}
 </script>
 
 <section class="flex flex-col gap-4 py-6 pb-24">
@@ -62,11 +84,12 @@
 		<Button variant="outline" href={`/playlists/${id}`}>{m.playlist_create_cancel()}</Button>
 	</header>
 
-	<Input
-		type="search"
+	<SearchBar
+		bind:value={draftQ}
 		placeholder={m.playlist_add_music_search()}
-		bind:value={q}
 		class="max-w-md"
+		onsubmit={submitSearch}
+		onclear={clearSearch}
 	/>
 
 	{#if $tracks.isPending}
@@ -77,7 +100,7 @@
 		</p>
 	{:else if items.length === 0}
 		<p class="rounded-md border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-			{q.trim() ? m.playlist_add_music_empty() : m.playlist_add_music_no_library()}
+			{appliedQ ? m.playlist_add_music_empty() : m.playlist_add_music_no_library()}
 		</p>
 	{:else}
 		<ul class="flex flex-col gap-1">

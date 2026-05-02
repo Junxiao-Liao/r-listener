@@ -16,7 +16,7 @@ import { artistsRoute } from './artists/artists.route';
 import { playbackRoute } from './playback/playback.route';
 import { queueRoute } from './queue/queue.route';
 import { playlistsRoute } from './playlists/playlists.route';
-import { searchRoute } from './search/search.route';
+
 
 export type AppOptions = {
 	createMiddlewareService?: (input: { db: Db; kv: KVNamespace }) => MiddlewareService;
@@ -44,7 +44,7 @@ export function createApp(options: AppOptions = {}) {
 	api.route('/', playbackRoute);
 	api.route('/', queueRoute);
 	api.route('/', playlistsRoute);
-	api.route('/', searchRoute);
+
 
 	options.configure?.(api);
 

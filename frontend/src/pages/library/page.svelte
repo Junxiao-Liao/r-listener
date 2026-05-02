@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { goto } from '$app/navigation';
-	import Search from '@lucide/svelte/icons/search';
 	import Upload from '@lucide/svelte/icons/upload';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
-	import { Input } from '$shared/components/ui/input';
+	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
 	import { isEditor } from '$shared/auth/role';
@@ -13,21 +11,37 @@
 	const session = useSessionQuery();
 	const editor = $derived(isEditor($session.data));
 
+	let draftQ = $state('');
+	let appliedQ = $state('');
+
 	const tracks = useTracksInfiniteQuery(() => ({
-		sort: 'createdAt:desc'
+		sort: 'createdAt:desc',
+		q: appliedQ || undefined
 	}));
 
 	const items = $derived($tracks.data?.pages.flatMap((p) => p.items) ?? []);
 	const hasMore = $derived(!!$tracks.hasNextPage);
 	const loadingMore = $derived($tracks.isFetchingNextPage);
 
-	let q = $state('');
+	$effect(() => {
+		if (draftQ.length === 0 && appliedQ.length > 0) {
+			appliedQ = '';
+		}
+	});
+
+	$effect(() => {
+		void appliedQ;
+		$tracks.refetch();
+	});
 
 	function submitSearch(event: SubmitEvent) {
 		event.preventDefault();
-		const value = q.trim();
-		if (!value) return;
-		void goto(`/search?q=${encodeURIComponent(value)}`);
+		appliedQ = draftQ.trim();
+	}
+
+	function clearSearch() {
+		draftQ = '';
+		appliedQ = '';
 	}
 </script>
 
@@ -42,19 +56,12 @@
 		{/if}
 	</header>
 
-	<form class="flex gap-2" onsubmit={submitSearch} role="search">
-		<Input
-			type="search"
-			placeholder={m.home_search_placeholder()}
-			bind:value={q}
-			aria-label={m.home_search_placeholder()}
-			class="min-w-0 flex-1"
-		/>
-		<Button type="submit" disabled={q.trim().length === 0}>
-			<Search class="size-4" />
-			<span>{m.search_submit()}</span>
-		</Button>
-	</form>
+	<SearchBar
+		bind:value={draftQ}
+		placeholder={m.library_search_placeholder()}
+		onsubmit={submitSearch}
+		onclear={clearSearch}
+	/>
 
 	{#if $tracks.isPending}
 		<ul class="flex flex-col gap-2" aria-busy="true">
