@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { BackendEnv } from '../app.type';
 import { registerErrorHandlers } from '../http/error-handler';
 import type { MiddlewareService, SessionContext } from '../middleware/middleware.type';
-import type { Id } from '../shared/shared.type';
+import type { Id, Iso8601 } from '../shared/shared.type';
 import { createTestEnv } from '../test/test-env';
 import type { AdminTracksService } from './admin.tracks.service';
 import { createAdminRoute } from './admin.route';
@@ -206,7 +206,7 @@ function createAdminService(
 				tenantId: tenantId('tnt_a'),
 				tenantName: 'Tenant A',
 				role: 'owner' as const,
-				createdAt: '2026-04-01T00:00:00.000Z'
+				createdAt: iso('2026-04-01T00:00:00.000Z')
 			}
 		})),
 		updateTenant: vi.fn(async () => tenantFixture()),
@@ -216,13 +216,13 @@ function createAdminService(
 			tenantId: tenantId('tnt_a'),
 			tenantName: 'Tenant A',
 			role: 'viewer' as const,
-			createdAt: '2026-04-01T00:00:00.000Z'
+			createdAt: iso('2026-04-01T00:00:00.000Z')
 		})),
 		updateMembership: vi.fn(async () => ({
 			tenantId: tenantId('tnt_a'),
 			tenantName: 'Tenant A',
 			role: 'viewer' as const,
-			createdAt: '2026-04-01T00:00:00.000Z'
+			createdAt: iso('2026-04-01T00:00:00.000Z')
 		})),
 		deleteMembership: vi.fn(async () => undefined)
 	};
@@ -234,7 +234,7 @@ function sessionFixture(overrides: { isAdmin: boolean }): SessionContext {
 		sessionTokenHash: 'hash',
 		activeTenantId: null,
 		role: null,
-		sessionExpiresAt: '2026-05-26T00:00:00.000Z'
+		sessionExpiresAt: iso('2026-05-26T00:00:00.000Z')
 	};
 }
 
@@ -245,7 +245,7 @@ function userFixture(overrides: Partial<SessionContext['user']> = {}): SessionCo
 		isAdmin: true,
 		isActive: true,
 		lastActiveTenantId: null,
-		createdAt: '2026-04-26T00:00:00.000Z',
+		createdAt: iso('2026-04-26T00:00:00.000Z'),
 		...overrides
 	};
 }
@@ -254,7 +254,7 @@ function tenantFixture(overrides: Partial<AdminTenantListItemDto> = {}): AdminTe
 	return {
 		id: tenantId('tnt_a'),
 		name: 'Tenant A',
-		createdAt: '2026-04-01T00:00:00.000Z',
+		createdAt: iso('2026-04-01T00:00:00.000Z'),
 		memberCount: 0,
 		trackCount: 0,
 		...overrides
@@ -278,8 +278,8 @@ function trackFixture(overrides: Partial<AdminTrackListItemDto> = {}): AdminTrac
 		contentType: 'audio/mpeg',
 		sizeBytes: 100,
 		status: 'ready',
-		createdAt: '2026-04-26T00:00:00.000Z',
-		updatedAt: '2026-04-26T00:00:00.000Z',
+		createdAt: iso('2026-04-26T00:00:00.000Z'),
+		updatedAt: iso('2026-04-26T00:00:00.000Z'),
 		tenantName: 'Tenant A',
 		tenantDeleted: false,
 		isDeleted: false,
@@ -298,5 +298,9 @@ function tenantId(value: string): Id<'tenant'> {
 
 function trackId(value: string): Id<'track'> {
 	return value as Id<'track'>;
+}
+
+function iso(value: string): Iso8601 {
+	return value as Iso8601;
 }
 

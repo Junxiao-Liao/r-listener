@@ -131,7 +131,7 @@ describe('admin tracks service', () => {
 		const calls = (repository.insertTrackHardDeleteAuditLogs as unknown as ReturnType<typeof vi.fn>).mock
 			.calls;
 		expect(calls).toHaveLength(1);
-		expect(calls[0][0].entries).toEqual([
+		expect(calls[0]![0].entries).toEqual([
 			expect.objectContaining({ trackId: trackId('trk_a'), r2Deleted: true }),
 			expect.objectContaining({ trackId: trackId('trk_b'), r2Deleted: false })
 		]);

@@ -124,22 +124,22 @@ export function createAdminTracksRepository(db: Db): AdminTracksRepository {
 		},
 		insertTrackHardDeleteAuditLogs: async ({ actorId, now, entries }) => {
 			if (entries.length === 0) return;
-			await db.insert(auditLogs).values(
-				entries.map((entry) => ({
+			for (const entry of entries) {
+				await db.insert(auditLogs).values({
 					id: createId('aud_'),
 					actorId,
 					action: 'track.hard_delete',
-					targetType: 'track',
+					targetType: 'track' as const,
 					targetId: entry.trackId,
 					tenantId: entry.tenantId,
 					meta: {
 						audioR2Key: entry.audioR2Key,
 						sizeBytes: entry.sizeBytes,
 						r2Deleted: entry.r2Deleted
-					},
+					} as Record<string, unknown>,
 					createdAt: now
-				}))
-			);
+				});
+			}
 		}
 	};
 

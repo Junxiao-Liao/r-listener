@@ -85,15 +85,19 @@
 
 	async function deleteSelected() {
 		if (selectedCount === 0) return;
-		const result = await $hardDelete.mutateAsync({
-			trackIds: [...selected]
-		});
-		clearSelection();
-		successMessage = m.admin_tracks_delete_success({
-			count: result.deletedCount,
-			size: formatBytes(result.freedBytes)
-		});
-		await $tracks.refetch();
+		try {
+			const result = await $hardDelete.mutateAsync({
+				trackIds: [...selected]
+			});
+			clearSelection();
+			successMessage = m.admin_tracks_delete_success({
+				count: result.deletedCount,
+				size: formatBytes(result.freedBytes)
+			});
+			await $tracks.refetch();
+		} catch {
+			await $tracks.refetch();
+		}
 	}
 
 	function trackSecondaryLine(track: AdminTrackListItemDto): string {
@@ -158,6 +162,12 @@
 	{#if successMessage}
 		<p class="rounded-md bg-primary/10 px-3 py-2 text-sm text-primary">
 			{successMessage}
+		</p>
+	{/if}
+
+	{#if $hardDelete.error}
+		<p class="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive">
+			{$hardDelete.error.message}
 		</p>
 	{/if}
 
