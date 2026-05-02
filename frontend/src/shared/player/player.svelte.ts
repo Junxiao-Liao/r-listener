@@ -91,6 +91,8 @@ export function createPlayer(callbacks: PlayerCallbacks): Player {
 			audioEl.dataset.trackId = track.id;
 			audioEl.src = desired;
 			audioEl.load();
+			currentTimeMs = 0;
+			durationMs = 0;
 			if (autoplay) {
 				audioEl.play().catch(() => {});
 			}
@@ -237,6 +239,10 @@ export function createPlayer(callbacks: PlayerCallbacks): Player {
 			loadCurrentTrackIntoAudio(shouldAutoplay);
 		} else if (audioEl && currentItem && audioEl.dataset.trackId !== currentItem.track.id) {
 			loadCurrentTrackIntoAudio(shouldAutoplay);
+		} else if (shouldAutoplay && audioEl && audioEl.paused) {
+			// Track is already loaded (e.g. a prior queue-cache update beat us here);
+			// honour the requested autoplay by starting playback now.
+			audioEl.play().catch(() => {});
 		}
 	}
 
