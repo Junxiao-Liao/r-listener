@@ -23,7 +23,7 @@
 		q: appliedQ || undefined
 	}));
 	const existing = usePlaylistTracksQuery(() => id);
-	const addTrack = useAddPlaylistTrackMutation(id);
+	const addTrack = useAddPlaylistTrackMutation(() => id);
 
 	const items = $derived($tracks.data?.pages.flatMap((p) => p.items) ?? []);
 	const existingIds = $derived(

@@ -47,19 +47,22 @@
 			pendingId = null;
 		}
 	}
+
+	function handleBackdropClick(event: MouseEvent) {
+		if (event.target === event.currentTarget) onclose();
+	}
 </script>
 
 <div
 	class="fixed inset-0 z-40 flex items-end justify-center bg-black/40"
 	role="presentation"
-	onclick={onclose}
+	onclick={handleBackdropClick}
 >
 	<div
 		class="w-full max-w-md rounded-t-2xl border border-border bg-background p-4 shadow-xl"
 		role="dialog"
 		aria-modal="true"
 		aria-label={m.playlist_picker_title()}
-		onclick={(e) => e.stopPropagation()}
 	>
 		<div class="mb-3 flex items-center justify-between">
 			<h2 class="text-lg font-semibold">{m.playlist_picker_title()}</h2>

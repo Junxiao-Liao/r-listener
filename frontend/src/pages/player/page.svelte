@@ -48,7 +48,7 @@
 		<h1 class="text-sm font-medium uppercase tracking-wide text-muted-foreground">
 			{m.player_open_full()}
 		</h1>
-		<div class="size-9" />
+		<div class="size-9"></div>
 	</header>
 
 	{#if !player.currentTrack}

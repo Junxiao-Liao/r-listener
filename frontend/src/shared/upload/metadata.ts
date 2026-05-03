@@ -1,9 +1,10 @@
 // Browser-side metadata extraction. Wraps music-metadata-browser with a small
 // shape that matches what Upload Review needs.
 
-import { parseBlob } from 'music-metadata-browser';
 import { parseSyncedLrc, syltFramesToLrc } from '$shared/lyrics/lyrics';
 import { parseFilenameMetadata, splitArtistNames } from './filename-metadata';
+
+type ParseBlob = typeof import('music-metadata-browser').parseBlob;
 
 export type EmbeddedCover = {
 	bytes: Uint8Array;
@@ -24,8 +25,9 @@ export type ExtractedMetadata = {
 
 export async function extractMetadata(file: File): Promise<ExtractedMetadata> {
 	const filenameMetadata = parseFilenameMetadata(file.name);
-	let parsed: Awaited<ReturnType<typeof parseBlob>> | null = null;
+	let parsed: Awaited<ReturnType<ParseBlob>> | null = null;
 	try {
+		const { parseBlob } = await import('music-metadata-browser');
 		parsed = await parseBlob(file);
 	} catch {
 		parsed = null;

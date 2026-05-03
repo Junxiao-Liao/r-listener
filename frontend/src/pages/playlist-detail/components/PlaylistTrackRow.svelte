@@ -20,7 +20,7 @@
 	const session = useSessionQuery();
 	const editor = $derived(isEditor($session.data));
 	const playList = usePlayListMutation();
-	const remove = useRemovePlaylistTrackMutation(playlistId);
+	const remove = useRemovePlaylistTrackMutation(() => playlistId);
 	const player = getPlayer();
 
 	let confirmingRemove = $state(false);

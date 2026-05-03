@@ -24,6 +24,8 @@ export type PlaylistsQueryParams = {
 	q?: string;
 };
 
+type PlaylistIdGetter = () => Id<'playlist'>;
+
 export function usePlaylistsQuery(
 	params: () => PlaylistsQueryParams = () => ({})
 ): CreateQueryResult<PlaylistListResponse, ApiError> {
@@ -91,14 +93,16 @@ export function useCreatePlaylistMutation() {
 	});
 }
 
-export function useUpdatePlaylistMutation(id: Id<'playlist'>) {
+export function useUpdatePlaylistMutation(id: PlaylistIdGetter) {
 	const qc = useQueryClient();
 	return createMutation<PlaylistDto, ApiError, UpdatePlaylistInput>({
-		mutationFn: (input) =>
-			api<PlaylistDto>(`/playlists/${id}`, { method: 'PATCH', body: input }),
+		mutationFn: (input) => {
+			const playlistId = id();
+			return api<PlaylistDto>(`/playlists/${playlistId}`, { method: 'PATCH', body: input });
+		},
 		meta: suppressGlobalApiErrorToast,
 		onSuccess: (data) => {
-			qc.setQueryData(queryKeys.playlist(id), data);
+			qc.setQueryData(queryKeys.playlist(data.id), data);
 			qc.invalidateQueries({ queryKey: queryKeys.playlists });
 		}
 	});
@@ -116,46 +120,57 @@ export function useDeletePlaylistMutation() {
 	});
 }
 
-export function useAddPlaylistTrackMutation(playlistId: Id<'playlist'>) {
+export function useAddPlaylistTrackMutation(id: PlaylistIdGetter) {
 	const qc = useQueryClient();
 	return createMutation<PlaylistTrackDto, ApiError, AddPlaylistTrackInput>({
-		mutationFn: (input) =>
-			api<PlaylistTrackDto>(`/playlists/${playlistId}/tracks`, {
+		mutationFn: (input) => {
+			const playlistId = id();
+			return api<PlaylistTrackDto>(`/playlists/${playlistId}/tracks`, {
 				method: 'POST',
 				body: input
-			}),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: queryKeys.playlist(playlistId) });
-			qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(playlistId) });
+			});
+		},
+		onSuccess: (data) => {
+			qc.invalidateQueries({ queryKey: queryKeys.playlist(data.playlistId) });
+			qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(data.playlistId) });
 			qc.invalidateQueries({ queryKey: queryKeys.playlists });
 		}
 	});
 }
 
-export function useMovePlaylistTrackMutation(playlistId: Id<'playlist'>) {
+export function useMovePlaylistTrackMutation(id: PlaylistIdGetter) {
 	const qc = useQueryClient();
 	return createMutation<
 		PlaylistTrackDto,
 		ApiError,
 		{ trackId: Id<'track'>; position: number }
 	>({
-		mutationFn: ({ trackId, position }) =>
-			api<PlaylistTrackDto>(`/playlists/${playlistId}/tracks/${trackId}`, {
+		mutationFn: ({ trackId, position }) => {
+			const playlistId = id();
+			return api<PlaylistTrackDto>(`/playlists/${playlistId}/tracks/${trackId}`, {
 				method: 'PATCH',
 				body: { position }
-			}),
-		onSuccess: () => {
-			qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(playlistId) });
+			});
+		},
+		onSuccess: (data) => {
+			qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(data.playlistId) });
 		}
 	});
 }
 
-export function useRemovePlaylistTrackMutation(playlistId: Id<'playlist'>) {
+export function useRemovePlaylistTrackMutation(id: PlaylistIdGetter) {
 	const qc = useQueryClient();
-	return createMutation<void, ApiError, { trackId: Id<'track'> }>({
-		mutationFn: ({ trackId }) =>
-			api<void>(`/playlists/${playlistId}/tracks/${trackId}`, { method: 'DELETE' }),
-		onSuccess: () => {
+	return createMutation<
+		{ playlistId: Id<'playlist'> },
+		ApiError,
+		{ trackId: Id<'track'> }
+	>({
+		mutationFn: async ({ trackId }) => {
+			const playlistId = id();
+			await api<void>(`/playlists/${playlistId}/tracks/${trackId}`, { method: 'DELETE' });
+			return { playlistId };
+		},
+		onSuccess: ({ playlistId }) => {
 			qc.invalidateQueries({ queryKey: queryKeys.playlist(playlistId) });
 			qc.invalidateQueries({ queryKey: queryKeys.playlistTracks(playlistId) });
 			qc.invalidateQueries({ queryKey: queryKeys.playlists });

@@ -17,7 +17,7 @@
 	let { id }: Props = $props();
 
 	const playlist = usePlaylistQuery(() => id);
-	const update = useUpdatePlaylistMutation(id);
+	const update = useUpdatePlaylistMutation(() => id);
 	const remove = useDeletePlaylistMutation();
 
 	let name = $state('');

@@ -141,14 +141,19 @@
 					onkeydown={handleEditKeydown}
 					onblur={commitEdit}
 				/>
+			{:else if editable}
+				<button
+					type="button"
+					class="min-w-0 truncate bg-transparent p-0 text-left text-inherit"
+					class:cursor-text={!disabled}
+					{disabled}
+					onclick={() => startEdit(name)}
+				>
+					{name}
+				</button>
 			{:else}
 				<span
 					class="truncate"
-					class:cursor-text={editable}
-					role={editable ? 'button' : undefined}
-					tabindex={editable ? 0 : undefined}
-					onclick={() => startEdit(name)}
-					onkeydown={(e: KeyboardEvent) => { if (e.key === 'Enter') startEdit(name); }}
 				>
 					{name}
 				</span>

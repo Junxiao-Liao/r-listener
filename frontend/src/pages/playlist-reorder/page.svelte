@@ -17,7 +17,7 @@
 	type RowItem = PlaylistTrackDto & { _dndId: string };
 
 	const tracks = usePlaylistTracksQuery(() => id);
-	const move = useMovePlaylistTrackMutation(id);
+	const move = useMovePlaylistTrackMutation(() => id);
 
 	let rows = $state<RowItem[]>([]);
 	let initialized = $state(false);
