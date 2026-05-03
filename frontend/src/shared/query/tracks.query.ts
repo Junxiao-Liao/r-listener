@@ -1,5 +1,4 @@
 import {
-	createInfiniteQuery,
 	createMutation,
 	createQuery,
 	useQueryClient
@@ -12,44 +11,32 @@ import type {
 	Id,
 	TrackDto,
 	TrackListResponse,
-	TrackPatch,
-	TrackSort
+	TrackPatch
 } from '$shared/types/dto';
 
 export type TracksListParams = {
-	sort: TrackSort;
 	q?: string;
 	includePending?: boolean;
 };
 
-export function useTracksInfiniteQuery(params: () => TracksListParams) {
-	return createInfiniteQuery<
-		TrackListResponse,
-		ApiError,
-		{ pages: TrackListResponse[]; pageParams: (string | null)[] },
-		readonly unknown[],
-		string | null
-	>({
+export function useTracksQuery(params: () => TracksListParams) {
+	return createQuery<TrackListResponse, ApiError>({
 		get queryKey() {
 			const p = params();
 			return queryKeys.tracksList({
-				sort: p.sort,
 				q: p.q,
 				includePending: !!p.includePending
 			});
 		},
 		meta: suppressGlobalApiErrorToast,
-		initialPageParam: null,
-		queryFn: ({ pageParam }) => {
+		queryFn: () => {
 			const p = params();
 			const search = new URLSearchParams();
-			search.set('sort', p.sort);
 			if (p.q && p.q.length > 0) search.set('q', p.q);
 			if (p.includePending) search.set('includePending', 'true');
-			if (pageParam) search.set('cursor', pageParam);
-			return api<TrackListResponse>(`/tracks?${search.toString()}`);
-		},
-		getNextPageParam: (last) => last.nextCursor ?? null
+			const qs = search.toString();
+			return api<TrackListResponse>(`/tracks${qs ? `?${qs}` : ''}`);
+		}
 	});
 }
 

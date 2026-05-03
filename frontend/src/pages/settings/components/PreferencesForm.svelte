@@ -1,10 +1,8 @@
 <script lang="ts">
-	import { Label } from '$shared/components/ui/label';
 	import * as m from '$shared/paraglide/messages';
 	import { applyTheme } from '$shared/theme/theme';
 	import type {
 		Language,
-		LibrarySort,
 		PreferencesDto,
 		Theme
 	} from '$shared/types/dto';
@@ -24,13 +22,6 @@
 	const autoPlayNext = $derived(preferences.autoPlayNext);
 	const showMiniPlayer = $derived(preferences.showMiniPlayer);
 	const preferSyncedLyrics = $derived(preferences.preferSyncedLyrics);
-	const defaultLibrarySort = $derived<LibrarySort>(preferences.defaultLibrarySort);
-
-	const sortOptions = [
-		{ value: 'createdAt:desc', label: m.settings_sort_recent },
-		{ value: 'title:asc', label: m.settings_sort_title },
-		{ value: 'album:asc', label: m.settings_sort_album }
-	] as const;
 
 	const themeOptions = [
 		{ value: 'system', label: m.settings_theme_system },
@@ -70,11 +61,6 @@
 			pendingVisualPreference = null;
 		}
 	}
-
-	function pickSort(next: LibrarySort) {
-		if (next === defaultLibrarySort) return;
-		void $update.mutateAsync({ defaultLibrarySort: next });
-	}
 </script>
 
 <div class="flex flex-col gap-5">
@@ -109,23 +95,6 @@
 				class="size-4"
 			/>
 		</label>
-	</section>
-
-	<section class="flex flex-col gap-2">
-		<h2 class="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
-			{m.settings_library()}
-		</h2>
-		<Label for="defaultLibrarySort">{m.settings_default_sort()}</Label>
-		<select
-			id="defaultLibrarySort"
-			class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-			value={defaultLibrarySort}
-			onchange={(event) => pickSort(event.currentTarget.value as LibrarySort)}
-		>
-			{#each sortOptions as opt (opt.value)}
-				<option value={opt.value}>{opt.label()}</option>
-			{/each}
-		</select>
 	</section>
 
 	<section class="flex flex-col gap-2">

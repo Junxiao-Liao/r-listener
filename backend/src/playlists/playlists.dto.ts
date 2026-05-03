@@ -17,17 +17,7 @@ export const playlistDtoSchema = z.object({
 	updatedAt: z.string()
 });
 
-export const playlistSortSchema = z
-	.string()
-	.regex(
-		/^(name|createdAt|updatedAt):(asc|desc)$/,
-		'Sort must be name|createdAt|updatedAt with asc|desc'
-	);
-
 export const playlistQuerySchema = z.object({
-	cursor: z.string().optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(50),
-	sort: playlistSortSchema.optional().default('createdAt:desc'),
 	q: z.string().optional()
 });
 

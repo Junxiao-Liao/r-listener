@@ -131,14 +131,8 @@ export function createTracksService(deps: TracksServiceDependencies): TracksServ
 				throw apiError(403, 'insufficient_role', 'Editor role required to view pending uploads.');
 			}
 
-			const [sortField, sortDir] = input.query.sort.split(':') as [string, string];
-
 			return deps.tracksRepository.listTracks({
 				tenantId: input.tenantId,
-				cursor: input.query.cursor,
-				limit: input.query.limit,
-				sortField: sortField as never,
-				sortDir: sortDir as never,
 				q: input.query.q || undefined,
 				includePending: input.query.includePending
 			});

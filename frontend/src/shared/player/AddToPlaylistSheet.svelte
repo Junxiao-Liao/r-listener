@@ -17,7 +17,7 @@
 	let { trackId, trackIds = [trackId], onclose }: Props = $props();
 
 	const qc = useQueryClient();
-	const playlists = usePlaylistsQuery(() => ({ sort: 'updatedAt:desc' }));
+	const playlists = usePlaylistsQuery(() => ({}));
 	const items = $derived($playlists.data?.items ?? []);
 
 	let pendingId = $state<string | null>(null);

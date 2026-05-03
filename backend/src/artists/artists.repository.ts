@@ -1,6 +1,5 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, like, sql } from 'drizzle-orm';
 import type { Db } from '../db';
-import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { tracks } from '../tracks/tracks.orm';
 import type { TrackStatus } from '../tracks/tracks.type';
@@ -10,18 +9,9 @@ import { artists, trackArtists } from './artists.orm';
 import type { ArtistAggregateDto, ArtistDto, ArtistTrackListResult, ListArtistsResult } from './artists.type';
 import { artistNameKey } from './artists.util';
 
-type CursorData = { id: string; nameKey: string };
-
-export type ArtistSortField = 'name';
-export type SortDirection = 'asc' | 'desc';
-
 export type ListArtistsInput = {
 	tenantId: Id<'tenant'>;
 	q?: string | undefined;
-	cursor?: string | undefined;
-	limit: number;
-	sortField: ArtistSortField;
-	sortDir: SortDirection;
 };
 
 export type ArtistsRepository = {
@@ -39,30 +29,15 @@ export function createArtistsRepository(db: Db): ArtistsRepository {
 				conditions.push(like(artists.nameKey, `%${artistNameKey(input.q)}%`));
 			}
 
-			if (input.cursor) {
-				const cursor = decodeCursor(input.cursor);
-				conditions.push(buildCursorCondition(cursor, input.sortDir));
-			}
-
-			const isAsc = input.sortDir === 'asc';
-			const orderFn = isAsc ? asc : desc;
-			const tiebreakFn = isAsc ? asc : desc;
-
 			const rows = await db
 				.select()
 				.from(artists)
 				.where(and(...conditions))
-				.orderBy(orderFn(artists.nameKey), tiebreakFn(artists.id))
-				.limit(input.limit + 1);
+				.orderBy(asc(artists.nameKey), asc(artists.id));
 
-			const items = rows.slice(0, input.limit);
-			const nextItem = rows.length > input.limit ? items.at(-1) : null;
-
-			const result = {
-				items: items.map(toArtistDto),
-				nextCursor: nextItem ? encodeCursor({ id: nextItem.id, nameKey: nextItem.nameKey }) : null
+			return {
+				items: rows.map(toArtistDto)
 			};
-			return result;
 		},
 
 		findArtist: async ({ tenantId, artistId }) => {
@@ -149,36 +124,4 @@ export function createArtistsRepository(db: Db): ArtistsRepository {
 		}
 		return map;
 	}
-}
-
-function encodeCursor(data: CursorData): string {
-	return encodeBase64Cursor(data);
-}
-
-function decodeCursor(cursor: string): CursorData {
-	try {
-		const data = decodeBase64Cursor<Partial<CursorData>>(cursor);
-		return {
-			id: typeof data.id === 'string' ? data.id : '',
-			nameKey: typeof data.nameKey === 'string' ? data.nameKey : ''
-		};
-	} catch {
-		return { id: '', nameKey: '' };
-	}
-}
-
-function buildCursorCondition(
-	cursor: CursorData,
-	dir: SortDirection
-): NonNullable<ReturnType<typeof or>> {
-	if (dir === 'asc') {
-		return or(
-			gt(artists.nameKey, cursor.nameKey),
-			and(eq(artists.nameKey, cursor.nameKey), gte(artists.id, cursor.id))!
-		)!;
-	}
-	return or(
-		lt(artists.nameKey, cursor.nameKey),
-		and(eq(artists.nameKey, cursor.nameKey), lte(artists.id, cursor.id))!
-	)!;
 }

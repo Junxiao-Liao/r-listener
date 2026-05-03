@@ -7,11 +7,11 @@ export const queryKeys = {
 	adminTenant: (id: string) => ['admin', 'tenants', id] as const,
 	adminTenantMembers: (id: string) => ['admin', 'tenants', id, 'members'] as const,
 	tracks: ['tracks'] as const,
-	tracksList: (params: { sort: string; q?: string; includePending: boolean }) =>
+	tracksList: (params: { q?: string; includePending: boolean }) =>
 		['tracks', 'list', params] as const,
 	track: (id: string) => ['tracks', 'detail', id] as const,
 	artists: ['artists'] as const,
-	artistsList: (params: { q?: string; limit: number; sort: string }) =>
+	artistsList: (params: { q?: string }) =>
 		['artists', 'list', params] as const,
 	artistDetail: (id: string) => ['artists', 'detail', id] as const,
 	artistTracks: (id: string) => ['artists', 'detail', id, 'tracks'] as const,
@@ -19,7 +19,7 @@ export const queryKeys = {
 	recentTracks: ['playback', 'recent'] as const,
 	continueListening: ['playback', 'continue'] as const,
 	playlists: ['playlists'] as const,
-	playlistsList: (params: { sort: string; q?: string }) =>
+	playlistsList: (params: { q?: string }) =>
 		['playlists', 'list', params] as const,
 	playlist: (id: string) => ['playlists', 'detail', id] as const,
 	playlistTracks: (id: string) => ['playlists', 'detail', id, 'tracks'] as const,

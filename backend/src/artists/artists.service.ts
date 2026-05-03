@@ -16,11 +16,7 @@ export function createArtistsService(deps: { artistsRepository: ArtistsRepositor
 		listArtists: (input) =>
 			deps.artistsRepository.listArtists({
 				tenantId: input.tenantId,
-				q: input.query.q,
-				cursor: input.query.cursor,
-				limit: input.query.limit,
-				sortField: 'name',
-				sortDir: input.query.sort === 'name:desc' ? 'desc' : 'asc'
+				q: input.query.q
 			}),
 
 		getArtist: async (input) => {

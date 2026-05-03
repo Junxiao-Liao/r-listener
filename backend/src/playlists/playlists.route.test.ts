@@ -230,8 +230,7 @@ describe('playlists route', () => {
 		it('viewer can list playlist tracks', async () => {
 			const service = createService({
 				listTracks: vi.fn(async () => ({
-					items: [makePlaylistTrackDto()],
-					nextCursor: null
+					items: [makePlaylistTrackDto()]
 				}))
 			});
 			const app = createFixtureApp({ service, session: viewerSession() });
@@ -387,12 +386,12 @@ function createFixtureApp(options: FixtureOptions) {
 
 function createService(overrides: Partial<PlaylistsService> = {}): PlaylistsService {
 	return {
-		listPlaylists: vi.fn(async () => ({ items: [], nextCursor: null })),
+		listPlaylists: vi.fn(async () => ({ items: [] })),
 		getPlaylist: vi.fn(async () => makePlaylistDto()),
 		createPlaylist: vi.fn(async () => makePlaylistDto()),
 		updatePlaylist: vi.fn(async () => makePlaylistDto()),
 		deletePlaylist: vi.fn(async () => undefined),
-		listTracks: vi.fn(async () => ({ items: [], nextCursor: null })),
+		listTracks: vi.fn(async () => ({ items: [] })),
 		addTrack: vi.fn(async () => makePlaylistTrackDto()),
 		moveTrack: vi.fn(async () => makePlaylistTrackDto()),
 		removeTrack: vi.fn(async () => undefined),

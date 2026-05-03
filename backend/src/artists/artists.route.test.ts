@@ -203,7 +203,7 @@ function createFixtureApp(options: FixtureOptions) {
 
 function createService(overrides: Partial<ArtistsService> = {}): ArtistsService {
 	return {
-		listArtists: vi.fn(async () => ({ items: [], nextCursor: null })),
+		listArtists: vi.fn(async () => ({ items: [] })),
 		getArtist: vi.fn(async () => makeArtistAggregate()),
 		listArtistTracks: vi.fn(async () => makeArtistTrackListResult()),
 		...overrides

@@ -36,17 +36,7 @@ export const createTrackInputSchema = z.object({
 
 export type CreateTrackInput = z.infer<typeof createTrackInputSchema>;
 
-export const trackSortSchema = z
-	.string()
-	.regex(
-		/^(title|album|year|durationMs|createdAt|updatedAt):(asc|desc)$/,
-		'Sort must be field:asc or field:desc'
-	);
-
 export const trackQuerySchema = z.object({
-	cursor: z.string().optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(50),
-	sort: trackSortSchema.optional().default('createdAt:desc'),
 	q: z.string().optional(),
 	includePending: z
 		.preprocess(

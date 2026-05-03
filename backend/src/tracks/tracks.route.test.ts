@@ -17,7 +17,7 @@ describe('tracks route', () => {
 		const res = await app.request('/tracks', { headers: { cookie: 'session=valid' } }, createTestEnv());
 
 		expect(res.status).toBe(200);
-		expect(await res.json()).toEqual({ items: [trackFixture()], nextCursor: null });
+		expect(await res.json()).toEqual({ items: [trackFixture()] });
 		expect(service.listTracks).toHaveBeenCalled();
 	});
 
@@ -346,7 +346,7 @@ function createFixtureApp(options: FixtureOptions) {
 
 function createService(overrides: Partial<TracksService> = {}): TracksService {
 	return {
-		listTracks: vi.fn(async () => ({ items: [trackFixture()], nextCursor: null })),
+		listTracks: vi.fn(async () => ({ items: [trackFixture()] })),
 		getTrack: vi.fn(async () => trackFixture()),
 		createTrack: vi.fn(async () => trackFixture()),
 		finalizeTrack: vi.fn(async () => trackFixture()),

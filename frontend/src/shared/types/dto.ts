@@ -38,10 +38,6 @@ export type ApiErrorBody = {
 };
 
 export type Language = 'en' | 'zh';
-export type LibrarySort = 'createdAt:desc' | 'title:asc' | 'album:asc';
-export type ArtistSortField = 'name';
-export type ArtistSortDirection = 'asc' | 'desc';
-export type ArtistSort = `${ArtistSortField}:${ArtistSortDirection}`;
 export type Theme = 'system' | 'light' | 'dark';
 export type TenantRole = 'owner' | 'member' | 'viewer';
 
@@ -73,7 +69,6 @@ export type PreferencesDto = {
 	autoPlayNext: boolean;
 	showMiniPlayer: boolean;
 	preferSyncedLyrics: boolean;
-	defaultLibrarySort: LibrarySort;
 	updatedAt: Iso8601;
 };
 
@@ -85,7 +80,6 @@ export type PreferencesPatch = Partial<
 		| 'autoPlayNext'
 		| 'showMiniPlayer'
 		| 'preferSyncedLyrics'
-		| 'defaultLibrarySort'
 	>
 >;
 
@@ -170,16 +164,6 @@ export type AdminUpdateTenantInput = {
 export type TrackStatus = 'pending' | 'ready';
 export type LyricsStatus = 'none' | 'synced' | 'plain' | 'invalid';
 
-export type TrackSortField =
-	| 'title'
-	| 'album'
-	| 'year'
-	| 'durationMs'
-	| 'createdAt'
-	| 'updatedAt';
-export type TrackSortDirection = 'asc' | 'desc';
-export type TrackSort = `${TrackSortField}:${TrackSortDirection}`;
-
 export type ArtistDto = {
 	id: Id<'artist'>;
 	name: string;
@@ -187,7 +171,6 @@ export type ArtistDto = {
 
 export type ArtistsListResponse = {
 	items: ArtistDto[];
-	nextCursor: string | null;
 };
 
 export type ArtistAggregateDto = ArtistDto & {
@@ -221,7 +204,6 @@ export type TrackDto = {
 
 export type TrackListResponse = {
 	items: TrackDto[];
-	nextCursor: string | null;
 };
 
 export type TrackPatch = {
@@ -306,16 +288,12 @@ export type PlaylistTrackDto = {
 
 export type PlaylistListResponse = {
 	items: PlaylistDto[];
-	nextCursor: string | null;
 };
 
 export type PlaylistTrackListResponse = {
 	items: PlaylistTrackDto[];
 	nextCursor: string | null;
 };
-
-export type PlaylistSortField = 'name' | 'createdAt' | 'updatedAt';
-export type PlaylistSort = `${PlaylistSortField}:${'asc' | 'desc'}`;
 
 export type CreatePlaylistInput = {
 	name: string;

@@ -32,7 +32,6 @@ export type ListPlaylistsServiceInput = ScopedTenantInput & {
 
 export type ListPlaylistsServiceResult = {
 	items: PlaylistDto[];
-	nextCursor: string | null;
 };
 
 export type GetPlaylistInput = ScopedTenantInput & {
@@ -60,7 +59,6 @@ export type ListPlaylistTracksServiceInput = ScopedTenantInput & {
 
 export type ListPlaylistTracksServiceResult = {
 	items: PlaylistTrackDto[];
-	nextCursor: string | null;
 };
 
 export type AddPlaylistTrackServiceInput = ScopedTenantInput & {
@@ -138,18 +136,12 @@ export function createPlaylistsService(deps: PlaylistsServiceDependencies): Play
 
 	return {
 		listPlaylists: async (input) => {
-			const [field, dir] = input.query.sort.split(':') as [string, string];
 			const result = await deps.playlistsRepository.listPlaylists({
 				tenantId: input.tenantId,
-				cursor: input.query.cursor,
-				limit: input.query.limit,
-				sortField: field as never,
-				sortDir: dir as never,
 				q: input.query.q || undefined
 			});
 			return {
-				items: result.items.map(dto),
-				nextCursor: result.nextCursor
+				items: result.items.map(dto)
 			};
 		},
 
@@ -206,8 +198,7 @@ export function createPlaylistsService(deps: PlaylistsServiceDependencies): Play
 				playlistId: input.playlistId
 			});
 			return {
-				items: buildPlaylistTrackList(rows),
-				nextCursor: null
+				items: buildPlaylistTrackList(rows)
 			};
 		},
 

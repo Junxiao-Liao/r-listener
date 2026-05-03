@@ -14,9 +14,7 @@
 
 	const session = useSessionQuery();
 	const recentTracks = useRecentTracksQuery();
-	const recentPlaylists = usePlaylistsQuery(() => ({
-		sort: 'updatedAt:desc'
-	}));
+	const recentPlaylists = usePlaylistsQuery(() => ({}));
 
 	const activeMembership = $derived(
 		$session.data?.tenants.find((t) => t.tenantId === $session.data?.activeTenantId) ?? null

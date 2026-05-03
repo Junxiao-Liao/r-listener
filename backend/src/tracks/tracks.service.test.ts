@@ -9,7 +9,7 @@ const FIXED_HASH = 'abcdef1234567890abcdef1234567890abcdef1234567890abcdef123456
 
 describe('tracks service', () => {
 	describe('listTracks', () => {
-		it('delegates to repository with parsed sort and pagination', async () => {
+		it('delegates to repository', async () => {
 			const repo = createRepo();
 			const r2 = createR2();
 			const service = createTracksService({ tracksRepository: repo, r2, now: () => FIXED_DATE, computeHash: async () => FIXED_HASH });
@@ -17,15 +17,12 @@ describe('tracks service', () => {
 			await service.listTracks({
 				tenantId: tid('tnt_a'),
 				isEditor: false,
-				query: { limit: 20, sort: 'title:asc', includePending: false }
+				query: { includePending: false }
 			});
 
 			expect(repo.listTracks).toHaveBeenCalledWith(
 				expect.objectContaining({
 					tenantId: 'tnt_a',
-					limit: 20,
-					sortField: 'title',
-					sortDir: 'asc',
 					includePending: false
 				})
 			);
@@ -40,7 +37,7 @@ describe('tracks service', () => {
 				service.listTracks({
 					tenantId: tid('tnt_a'),
 					isEditor: false,
-					query: { limit: 50, sort: 'createdAt:desc', includePending: true }
+					query: { includePending: true }
 				})
 			).rejects.toMatchObject({ status: 403, code: 'insufficient_role' });
 		});
@@ -53,7 +50,7 @@ describe('tracks service', () => {
 			await service.listTracks({
 				tenantId: tid('tnt_a'),
 				isEditor: true,
-				query: { limit: 50, sort: 'createdAt:desc', includePending: true }
+				query: { includePending: true }
 			});
 
 			expect(repo.listTracks).toHaveBeenCalledWith(
@@ -483,7 +480,7 @@ function createRepo(overrides: {
 } = {}): TracksRepository {
 	const row = trackRowFixture(overrides);
 	return {
-		listTracks: vi.fn(async () => ({ items: [trackDto()], nextCursor: null })),
+		listTracks: vi.fn(async () => ({ items: [trackDto()] })),
 		findById: vi.fn(async () => trackDto()),
 		findRowById: vi.fn(async () => (overrides.findRowReturns === undefined ? row : overrides.findRowReturns)),
 		createTrack: vi.fn(async () => trackDto()),

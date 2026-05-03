@@ -1,6 +1,5 @@
-import { and, asc, desc, eq, gt, gte, inArray, isNull, like, lt, lte, or, sql } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, like, or, sql } from 'drizzle-orm';
 import type { Db } from '../db';
-import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { createId } from '../shared/id';
 import { artists, trackArtists } from '../artists/artists.orm';
@@ -12,24 +11,14 @@ import type { LyricsStatus, TrackDto, TrackStatus } from './tracks.type';
 
 export type TrackRow = typeof tracks.$inferSelect;
 
-type CursorData = { id: string; value: string | number };
-
-export type TrackSortField = 'title' | 'album' | 'year' | 'durationMs' | 'createdAt' | 'updatedAt';
-export type SortDirection = 'asc' | 'desc';
-
 export type ListTracksInput = {
 	tenantId: Id<'tenant'>;
-	cursor?: string | undefined;
-	limit: number;
-	sortField: TrackSortField;
-	sortDir: SortDirection;
 	q?: string | undefined;
 	includePending: boolean;
 };
 
 export type ListTracksResult = {
 	items: TrackDto[];
-	nextCursor: string | null;
 };
 
 export type TracksRepository = {
@@ -113,36 +102,13 @@ export function createTracksRepository(db: Db): TracksRepository {
 				)`)!);
 			}
 
-			const cursorCondition = buildCursorCondition(input);
-			if (cursorCondition) {
-				conditions.push(cursorCondition);
-			}
-
-			const sortCol = columnForSortField(input.sortField);
-			const orderFn = input.sortDir === 'asc' ? asc : desc;
-			const tiebreakFn = input.sortDir === 'asc' ? asc : desc;
-
 			const rows = await db
 				.select()
 				.from(tracks)
 				.where(and(...conditions))
-				.orderBy(orderFn(sortCol), tiebreakFn(tracks.id))
-				.limit(input.limit + 1);
+				.orderBy(asc(tracks.id));
 
-			const hasMore = rows.length > input.limit;
-			const items = rows.slice(0, input.limit);
-
-			let nextCursor: string | null = null;
-			if (hasMore && items.length > 0) {
-				const lastItem = items[items.length - 1]!;
-				nextCursor = encodeCursor({
-					id: lastItem.id,
-					value: cursorSortValue(lastItem, input.sortField)
-				});
-			}
-
-			const result = { items: await toDtos(items), nextCursor };
-			return result;
+			return { items: await toDtos(rows) };
 		},
 
 		findById: async (trackId, tenantId) => {
@@ -384,72 +350,4 @@ export function createTracksRepository(db: Db): TracksRepository {
 
 		return rows;
 	}
-}
-
-function encodeCursor(data: CursorData): string {
-	return encodeBase64Cursor(data);
-}
-
-function decodeCursor(cursor: string): CursorData {
-	return decodeBase64Cursor<CursorData>(cursor);
-}
-
-function columnForSortField(field: TrackSortField) {
-	switch (field) {
-		case 'title':
-			return tracks.title;
-		case 'album':
-			return tracks.album;
-		case 'year':
-			return tracks.year;
-		case 'durationMs':
-			return tracks.durationMs;
-		case 'createdAt':
-			return tracks.createdAt;
-		case 'updatedAt':
-			return tracks.updatedAt;
-	}
-}
-
-function cursorSortValue(row: TrackRow, field: TrackSortField): string | number {
-	switch (field) {
-		case 'title':
-			return row.title;
-		case 'album':
-			return row.album ?? '';
-		case 'year':
-			return row.year ?? 0;
-		case 'durationMs':
-			return row.durationMs ?? 0;
-		case 'createdAt':
-			return row.createdAt.getTime();
-		case 'updatedAt':
-			return row.updatedAt.getTime();
-	}
-}
-
-const TIMESTAMP_FIELDS: ReadonlySet<TrackSortField> = new Set(['createdAt', 'updatedAt']);
-
-function buildCursorCondition(
-	input: Pick<ListTracksInput, 'cursor' | 'sortField' | 'sortDir'>
-): ReturnType<typeof and> | null {
-	if (!input.cursor) return null;
-
-	const cursorData = decodeCursor(input.cursor);
-	const col = columnForSortField(input.sortField);
-	const isAsc = input.sortDir === 'asc';
-	const value = TIMESTAMP_FIELDS.has(input.sortField)
-		? new Date(cursorData.value as number)
-		: cursorData.value;
-
-	if (isAsc) {
-		return or(
-			gt(col, value),
-			and(eq(col, value), gte(tracks.id, cursorData.id))!
-		)!;
-	}
-	return or(
-		lt(col, value),
-		and(eq(col, value), lte(tracks.id, cursorData.id))!
-	)!;
 }

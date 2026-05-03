@@ -6,7 +6,7 @@
 	import { isEditor } from '$shared/auth/role';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { usePlaylistsQuery } from '$shared/query/playlists.query';
-	import type { PlaylistSort } from '$shared/types/dto';
+	import type { PlaylistDto } from '$shared/types/dto';
 	import PlaylistRow from './components/PlaylistRow.svelte';
 
 	const session = useSessionQuery();
@@ -14,7 +14,7 @@
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
-	let sort = $state<PlaylistSort>('name:asc');
+	let sort = $state('name:asc');
 
 	const sortOptions = [
 		{ value: 'name:asc' as const, label: m.sort_name_asc },
@@ -24,11 +24,13 @@
 	];
 
 	const playlists = usePlaylistsQuery(() => ({
-		sort,
 		q: appliedQ || undefined
 	}));
 
-	const items = $derived($playlists.data?.items ?? []);
+	const allItems = $derived($playlists.data?.items ?? []);
+
+	const collator = new Intl.Collator('zh-CN');
+	const items = $derived(sorted(allItems, sort, collator));
 
 	$effect(() => {
 		if (draftQ.length === 0 && appliedQ.length > 0) {
@@ -38,7 +40,6 @@
 
 	$effect(() => {
 		void appliedQ;
-		void sort;
 		$playlists.refetch();
 	});
 
@@ -50,6 +51,24 @@
 	function clearSearch() {
 		draftQ = '';
 		appliedQ = '';
+	}
+
+	function sorted(list: PlaylistDto[], s: string, c: Intl.Collator): PlaylistDto[] {
+		const [field, dir] = s.split(':');
+		const desc = dir === 'desc';
+		const copy = [...list];
+		copy.sort((a, b) => {
+			let cmp = 0;
+			if (field === 'name') {
+				cmp = c.compare(a.name, b.name);
+			} else if (field === 'updatedAt') {
+				cmp = a.updatedAt.localeCompare(b.updatedAt);
+			} else if (field === 'createdAt') {
+				cmp = a.createdAt.localeCompare(b.createdAt);
+			}
+			return desc ? -cmp : cmp;
+		});
+		return copy;
 	}
 </script>
 
@@ -76,9 +95,9 @@
 			class="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
 			bind:value={sort}
 		>
-				{#each sortOptions as opt (opt.value)}
-					<option value={opt.value}>{opt.label()}</option>
-				{/each}
+			{#each sortOptions as opt (opt.value)}
+				<option value={opt.value}>{opt.label()}</option>
+			{/each}
 		</select>
 	</div>
 

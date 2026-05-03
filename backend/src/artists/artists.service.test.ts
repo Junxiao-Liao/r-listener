@@ -149,7 +149,7 @@ function createFakeRepo(): ArtistsRepository & {
 			});
 		},
 
-		listArtists: async () => ({ items: [], nextCursor: null }),
+		listArtists: async () => ({ items: [] }),
 
 		findArtist: async ({ tenantId, artistId }) => {
 			const entry = store.get(key(artistId, tenantId));

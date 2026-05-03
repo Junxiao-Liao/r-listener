@@ -4,9 +4,9 @@
 	import { Button } from '$shared/components/ui/button';
 	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { useSessionQuery } from '$shared/query/session.query';
-	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
+	import { useTracksQuery } from '$shared/query/tracks.query';
 	import { isEditor } from '$shared/auth/role';
-	import type { TrackSort } from '$shared/types/dto';
+	import type { TrackDto } from '$shared/types/dto';
 	import TrackRow from './components/TrackRow.svelte';
 
 	const session = useSessionQuery();
@@ -14,7 +14,8 @@
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
-	let sort = $state<TrackSort>('title:asc');
+	let sort = $state('title:asc');
+	let displayCount = $state(50);
 
 	const sortOptions = [
 		{ value: 'title:asc' as const, label: m.sort_title_asc },
@@ -24,14 +25,16 @@
 		{ value: 'durationMs:asc' as const, label: m.sort_duration_short }
 	];
 
-	const tracks = useTracksInfiniteQuery(() => ({
-		sort,
+	const tracks = useTracksQuery(() => ({
 		q: appliedQ || undefined
 	}));
 
-	const items = $derived($tracks.data?.pages.flatMap((p) => p.items) ?? []);
-	const hasMore = $derived(!!$tracks.hasNextPage);
-	const loadingMore = $derived($tracks.isFetchingNextPage);
+	const allItems = $derived($tracks.data?.items ?? []);
+
+	const collator = new Intl.Collator('zh-CN');
+	const items = $derived<TrackDto[]>(sorted(allItems, sort, collator));
+	const visible = $derived(items.slice(0, displayCount));
+	const hasMore = $derived(visible.length < items.length);
 
 	$effect(() => {
 		if (draftQ.length === 0 && appliedQ.length > 0) {
@@ -41,8 +44,12 @@
 
 	$effect(() => {
 		void appliedQ;
-		void sort;
 		$tracks.refetch();
+	});
+
+	$effect(() => {
+		displayCount = 50;
+		void sort;
 	});
 
 	function submitSearch(event: SubmitEvent) {
@@ -53,6 +60,30 @@
 	function clearSearch() {
 		draftQ = '';
 		appliedQ = '';
+	}
+
+	function showMore() {
+		displayCount += 50;
+	}
+
+	function sorted(list: TrackDto[], s: string, c: Intl.Collator): TrackDto[] {
+		const [field, dir] = s.split(':');
+		const desc = dir === 'desc';
+		const copy = [...list];
+		copy.sort((a, b) => {
+			let cmp = 0;
+			if (field === 'title') {
+				cmp = c.compare(a.title, b.title);
+			} else if (field === 'album') {
+				cmp = c.compare(a.album ?? '', b.album ?? '');
+			} else if (field === 'durationMs') {
+				cmp = (a.durationMs ?? 0) - (b.durationMs ?? 0);
+			} else if (field === 'createdAt') {
+				cmp = a.createdAt.localeCompare(b.createdAt);
+			}
+			return desc ? -cmp : cmp;
+		});
+		return copy;
 	}
 </script>
 
@@ -79,9 +110,9 @@
 			class="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
 			bind:value={sort}
 		>
-				{#each sortOptions as opt (opt.value)}
-					<option value={opt.value}>{opt.label()}</option>
-				{/each}
+			{#each sortOptions as opt (opt.value)}
+				<option value={opt.value}>{opt.label()}</option>
+			{/each}
 		</select>
 	</div>
 
@@ -113,9 +144,9 @@
 		</div>
 	{:else}
 		<ul class="flex flex-col gap-1">
-			{#each items as track (track.id)}
+			{#each visible as track (track.id)}
 				<li>
-					<TrackRow {track} siblings={items} />
+					<TrackRow {track} siblings={visible} />
 				</li>
 			{/each}
 		</ul>
@@ -124,10 +155,9 @@
 			<div class="flex justify-center pt-2">
 				<Button
 					variant="outline"
-					disabled={loadingMore}
-					onclick={() => $tracks.fetchNextPage()}
+					onclick={showMore}
 				>
-					{loadingMore ? m.library_loading_more() : m.library_load_more()}
+					{m.library_load_more()}
 				</Button>
 			</div>
 		{/if}

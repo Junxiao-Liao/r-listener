@@ -6,7 +6,7 @@
 	import CoverPlaceholder from '$shared/cover/CoverPlaceholder.svelte';
 	import { formatDurationMs } from '$shared/format/duration';
 	import { trackArtistDisplay } from '$shared/artists/artists';
-	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
+	import { useTracksQuery } from '$shared/query/tracks.query';
 	import {
 		useAddPlaylistTrackMutation,
 		usePlaylistTracksQuery
@@ -18,14 +18,15 @@
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
-	const tracks = useTracksInfiniteQuery(() => ({
-		sort: 'createdAt:desc',
+	let displayCount = $state(50);
+	const tracks = useTracksQuery(() => ({
 		q: appliedQ || undefined
 	}));
 	const existing = usePlaylistTracksQuery(() => id);
 	const addTrack = useAddPlaylistTrackMutation(() => id);
 
-	const items = $derived($tracks.data?.pages.flatMap((p) => p.items) ?? []);
+	const items = $derived(($tracks.data?.items ?? []).slice(0, displayCount));
+	const hasMore = $derived(displayCount < ($tracks.data?.items ?? []).length);
 	const existingIds = $derived(
 		new Set(($existing.data?.items ?? []).map((i) => i.trackId))
 	);
@@ -43,6 +44,14 @@
 		void appliedQ;
 		$tracks.refetch();
 	});
+
+	$effect(() => {
+		displayCount = 50;
+	});
+
+	function showMore() {
+		displayCount += 50;
+	}
 
 	function toggle(trackId: Id<'track'>) {
 		if (existingIds.has(trackId)) return;
@@ -137,14 +146,13 @@
 				</li>
 			{/each}
 		</ul>
-		{#if $tracks.hasNextPage}
+		{#if hasMore}
 			<div class="flex justify-center pt-2">
 				<Button
 					variant="outline"
-					disabled={$tracks.isFetchingNextPage}
-					onclick={() => $tracks.fetchNextPage()}
+					onclick={showMore}
 				>
-					{$tracks.isFetchingNextPage ? m.playlists_loading() : m.library_load_more()}
+					{m.library_load_more()}
 				</Button>
 			</div>
 		{/if}

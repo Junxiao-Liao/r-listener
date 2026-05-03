@@ -13,14 +13,12 @@ import type {
 	Id,
 	PlaylistDto,
 	PlaylistListResponse,
-	PlaylistSort,
 	PlaylistTrackDto,
 	PlaylistTrackListResponse,
 	UpdatePlaylistInput
 } from '$shared/types/dto';
 
 export type PlaylistsQueryParams = {
-	sort?: PlaylistSort;
 	q?: string;
 };
 
@@ -33,7 +31,6 @@ export function usePlaylistsQuery(
 		get queryKey() {
 			const p = params();
 			return queryKeys.playlistsList({
-				sort: p.sort ?? 'createdAt:desc',
 				q: p.q
 			});
 		},
@@ -41,7 +38,6 @@ export function usePlaylistsQuery(
 		queryFn: () => {
 			const p = params();
 			const search = new URLSearchParams();
-			if (p.sort) search.set('sort', p.sort);
 			if (p.q) search.set('q', p.q);
 			const qs = search.toString();
 			return api<PlaylistListResponse>(`/playlists${qs ? `?${qs}` : ''}`);

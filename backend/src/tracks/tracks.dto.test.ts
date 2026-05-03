@@ -32,31 +32,17 @@ describe('track DTO schemas', () => {
 		it('defaults to empty query', () => {
 			const result = trackQuerySchema.parse({});
 			expect(result).toEqual({
-				limit: 50,
-				sort: 'createdAt:desc',
 				includePending: false
 			});
 		});
 
-		it('parses cursor and limit', () => {
+		it('parses q and includePending', () => {
 			const result = trackQuerySchema.parse({
-				cursor: 'trk_018f0000-0000-7000-8000-000000000000',
-				limit: '10'
+				q: 'test',
+				includePending: 'true'
 			});
-			expect(result.cursor).toBe('trk_018f0000-0000-7000-8000-000000000000');
-			expect(result.limit).toBe(10);
-		});
-
-		it('validates sort format', () => {
-			expect(() => trackQuerySchema.parse({ sort: 'invalid' })).toThrow();
-			expect(() => trackQuerySchema.parse({ sort: 'title:up' })).toThrow();
-			expect(trackQuerySchema.parse({ sort: 'title:asc' }).sort).toBe('title:asc');
-			expect(() => trackQuerySchema.parse({ sort: 'artist:desc' })).toThrow();
-			expect(trackQuerySchema.parse({ sort: 'album:asc' }).sort).toBe('album:asc');
-			expect(trackQuerySchema.parse({ sort: 'year:desc' }).sort).toBe('year:desc');
-			expect(trackQuerySchema.parse({ sort: 'durationMs:asc' }).sort).toBe('durationMs:asc');
-			expect(trackQuerySchema.parse({ sort: 'createdAt:desc' }).sort).toBe('createdAt:desc');
-			expect(trackQuerySchema.parse({ sort: 'updatedAt:desc' }).sort).toBe('updatedAt:desc');
+			expect(result.q).toBe('test');
+			expect(result.includePending).toBe(true);
 		});
 
 		it('coerces includePending', () => {
@@ -64,14 +50,8 @@ describe('track DTO schemas', () => {
 			expect(trackQuerySchema.parse({ includePending: 'false' }).includePending).toBe(false);
 		});
 
-		it('rejects limit above 100', () => {
-			expect(() => trackQuerySchema.parse({ limit: '200' })).toThrow();
-		});
-
-		it('accepts empty q string', () => {
-			const result = trackQuerySchema.parse({ q: '' });
-			expect(result.limit).toBe(50);
-			expect(result.sort).toBe('createdAt:desc');
+		it('strips unknown query params', () => {
+			const result = trackQuerySchema.parse({ sort: 'createdAt:desc', limit: '50', cursor: 'abc' });
 			expect(result.includePending).toBe(false);
 		});
 	});

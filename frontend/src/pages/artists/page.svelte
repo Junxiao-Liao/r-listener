@@ -2,12 +2,12 @@
 	import * as m from '$shared/paraglide/messages';
 	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { useArtistsQuery } from '$shared/query/artists.query';
-	import type { ArtistSort } from '$shared/types/dto';
+	import type { ArtistDto } from '$shared/types/dto';
 	import ArtistRow from './components/ArtistRow.svelte';
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
-	let sort = $state<ArtistSort>('name:asc');
+	let sort = $state('name:asc');
 
 	const sortOptions = [
 		{ value: 'name:asc' as const, label: m.sort_name_asc },
@@ -15,11 +15,13 @@
 	];
 
 	const artists = useArtistsQuery(() => ({
-		q: appliedQ || undefined,
-		sort
+		q: appliedQ || undefined
 	}));
 
-	const items = $derived($artists.data?.items ?? []);
+	const allItems = $derived($artists.data?.items ?? []);
+
+	const collator = new Intl.Collator('zh-CN');
+	const items = $derived(sorted(allItems, sort, collator));
 
 	$effect(() => {
 		if (draftQ.length === 0 && appliedQ.length > 0) {
@@ -29,7 +31,6 @@
 
 	$effect(() => {
 		void appliedQ;
-		void sort;
 		$artists.refetch();
 	});
 
@@ -41,6 +42,19 @@
 	function clearSearch() {
 		draftQ = '';
 		appliedQ = '';
+	}
+
+	function sorted(list: ArtistDto[], s: string, c: Intl.Collator): ArtistDto[] {
+		const [field, dir] = s.split(':');
+		const desc = dir === 'desc';
+		const copy = [...list];
+		copy.sort((a, b) => {
+			if (field === 'name') {
+				return desc ? c.compare(b.name, a.name) : c.compare(a.name, b.name);
+			}
+			return 0;
+		});
+		return copy;
 	}
 </script>
 
@@ -61,9 +75,9 @@
 			class="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
 			bind:value={sort}
 		>
-				{#each sortOptions as opt (opt.value)}
-					<option value={opt.value}>{opt.label()}</option>
-				{/each}
+			{#each sortOptions as opt (opt.value)}
+				<option value={opt.value}>{opt.label()}</option>
+			{/each}
 		</select>
 	</div>
 

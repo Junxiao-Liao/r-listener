@@ -50,14 +50,14 @@
 		const copy = [...list];
 		switch (s) {
 			case 'title:asc':
-				copy.sort((a, b) => a.track.title.localeCompare(b.track.title));
+				copy.sort((a, b) => a.track.title.localeCompare(b.track.title, 'zh-CN'));
 				break;
 			case 'title:desc':
-				copy.sort((a, b) => b.track.title.localeCompare(a.track.title));
+				copy.sort((a, b) => b.track.title.localeCompare(a.track.title, 'zh-CN'));
 				break;
 			case 'artist:asc':
 				copy.sort((a, b) =>
-					trackArtistDisplay(a.track).localeCompare(trackArtistDisplay(b.track))
+					trackArtistDisplay(a.track).localeCompare(trackArtistDisplay(b.track), 'zh-CN')
 				);
 				break;
 			case 'position:asc':

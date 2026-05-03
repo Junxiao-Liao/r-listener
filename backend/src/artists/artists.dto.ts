@@ -12,18 +12,8 @@ export const artistAggregateDtoSchema = artistDtoSchema.extend({
 	totalDurationMs: z.number()
 });
 
-export const artistSortSchema = z
-	.string()
-	.regex(
-		/^(name):(asc|desc)$/,
-		'Sort must be field:asc or field:desc'
-	);
-
 export const artistsQuerySchema = z.object({
-	q: z.string().optional(),
-	cursor: z.string().optional(),
-	limit: z.coerce.number().int().min(1).max(100).default(25),
-	sort: artistSortSchema.optional().default('name:asc')
+	q: z.string().optional()
 });
 
 export type ArtistsQuery = z.infer<typeof artistsQuerySchema>;

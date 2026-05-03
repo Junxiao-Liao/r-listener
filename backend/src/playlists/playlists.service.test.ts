@@ -177,7 +177,7 @@ describe('playlists service', () => {
 
 			const list = await service.listPlaylists({
 				tenantId: tid('tnt_a'),
-				query: { limit: 50, sort: 'createdAt:desc' }
+				query: {  }
 			});
 			expect(list.items).toHaveLength(0);
 		});
@@ -536,7 +536,7 @@ describe('playlists service', () => {
 
 			const list = await service.listPlaylists({
 				tenantId: tid('tnt_a'),
-				query: { limit: 50, sort: 'createdAt:desc' }
+				query: {  }
 			});
 			expect(list.items).toHaveLength(1);
 			expect(list.items[0]!.trackCount).toBe(2);
@@ -591,7 +591,7 @@ describe('playlists service', () => {
 
 			const list = await service.listPlaylists({
 				tenantId: tid('tnt_a'),
-				query: { limit: 50, sort: 'createdAt:desc' }
+				query: {  }
 			});
 			expect(list.items.map((p) => p.name)).toEqual(['A']);
 		});
@@ -658,16 +658,8 @@ function createFakeRepo(options: FakeRepoOptions = {}): FakeRepo {
 					const haystack = `${p.name} ${p.description ?? ''}`.toLowerCase();
 					return haystack.includes(input.q.toLowerCase());
 				});
-			items.sort((a, b) => {
-				const av = sortValue(a, input.sortField);
-				const bv = sortValue(b, input.sortField);
-				if (av < bv) return input.sortDir === 'asc' ? -1 : 1;
-				if (av > bv) return input.sortDir === 'asc' ? 1 : -1;
-				return 0;
-			});
 			return {
-				items: items.map((p) => ({ row: p, ...aggregate(p) })),
-				nextCursor: null
+				items: items.map((p) => ({ row: p, ...aggregate(p) }))
 			};
 		},
 
@@ -802,18 +794,6 @@ function createFakeRepo(options: FakeRepoOptions = {}): FakeRepo {
 	}
 
 	return repo;
-}
-
-function sortValue(row: PlaylistRow, field: string): string | number {
-	switch (field) {
-		case 'name':
-			return row.name;
-		case 'updatedAt':
-			return row.updatedAt.getTime();
-		case 'createdAt':
-		default:
-			return row.createdAt.getTime();
-	}
 }
 
 function readyTrack(id: string, opts: { tenantId?: string; durationMs?: number } = {}): TrackRow {

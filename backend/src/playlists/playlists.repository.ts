@@ -1,19 +1,13 @@
 import {
 	and,
 	asc,
-	desc,
 	eq,
-	gt,
-	gte,
 	isNull,
 	like,
-	lt,
-	lte,
 	or,
 	sql
 } from 'drizzle-orm';
 import type { Db } from '../db';
-import { encodeBase64Cursor, decodeBase64Cursor } from '../shared/cursor';
 import type { Id } from '../shared/shared.type';
 import { tracks } from '../tracks/tracks.orm';
 import type { TrackStatus } from '../tracks/tracks.type';
@@ -25,9 +19,6 @@ import type {
 } from './playlists.dto';
 import { playlistTracks, playlists } from './playlists.orm';
 
-export type PlaylistSortField = 'name' | 'createdAt' | 'updatedAt';
-export type SortDirection = 'asc' | 'desc';
-
 export type PlaylistAggregate = {
 	row: PlaylistRow;
 	trackCount: number;
@@ -36,16 +27,11 @@ export type PlaylistAggregate = {
 
 export type ListPlaylistsInput = {
 	tenantId: Id<'tenant'>;
-	cursor?: string | undefined;
-	limit: number;
-	sortField: PlaylistSortField;
-	sortDir: SortDirection;
 	q?: string | undefined;
 };
 
 export type ListPlaylistsResult = {
 	items: PlaylistAggregate[];
-	nextCursor: string | null;
 };
 
 export type FindPlaylistInput = {
@@ -178,36 +164,15 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 				conditions.push(or(like(playlists.name, pattern), like(playlists.description, pattern))!);
 			}
 
-			const cursorCondition = buildCursorCondition(input);
-			if (cursorCondition) conditions.push(cursorCondition);
-
-			const sortCol = columnForSortField(input.sortField);
-			const orderFn = input.sortDir === 'asc' ? asc : desc;
-
 			const rows = await db
 				.select()
 				.from(playlists)
 				.where(and(...conditions))
-				.orderBy(orderFn(sortCol), orderFn(playlists.id))
-				.limit(input.limit + 1);
+				.orderBy(asc(playlists.name), asc(playlists.id));
 
-			const hasMore = rows.length > input.limit;
-			const items = rows.slice(0, input.limit);
-
-			let nextCursor: string | null = null;
-			if (hasMore && items.length > 0) {
-				const lastItem = items[items.length - 1]!;
-				nextCursor = encodeCursor({
-					id: lastItem.id,
-					value: cursorSortValue(lastItem, input.sortField)
-				});
-			}
-
-			const result = {
-				items: await attachAggregates(items),
-				nextCursor
+			return {
+				items: await attachAggregates(rows)
 			};
-			return result;
 		},
 
 		findPlaylist: async ({ tenantId, playlistId }) => {
@@ -422,45 +387,3 @@ export function createPlaylistsRepository(db: Db): PlaylistsRepository {
 	};
 }
 
-function encodeCursor(data: CursorData): string {
-	return encodeBase64Cursor(data);
-}
-
-function decodeCursor(cursor: string): CursorData {
-	return decodeBase64Cursor<CursorData>(cursor);
-}
-
-function columnForSortField(field: PlaylistSortField) {
-	switch (field) {
-		case 'name':
-			return playlists.name;
-		case 'createdAt':
-			return playlists.createdAt;
-		case 'updatedAt':
-			return playlists.updatedAt;
-	}
-}
-
-function cursorSortValue(row: PlaylistRow, field: PlaylistSortField): string | number {
-	switch (field) {
-		case 'name':
-			return row.name;
-		case 'createdAt':
-			return row.createdAt.getTime();
-		case 'updatedAt':
-			return row.updatedAt.getTime();
-	}
-}
-
-function buildCursorCondition(
-	input: Pick<ListPlaylistsInput, 'cursor' | 'sortField' | 'sortDir'>
-): ReturnType<typeof and> | null {
-	if (!input.cursor) return null;
-	const data = decodeCursor(input.cursor);
-	const col = columnForSortField(input.sortField) as never;
-	const value = data.value as never;
-	if (input.sortDir === 'asc') {
-		return or(gt(col, value), and(eq(col, value), gte(playlists.id, data.id))!)!;
-	}
-	return or(lt(col, value), and(eq(col, value), lte(playlists.id, data.id))!)!;
-}

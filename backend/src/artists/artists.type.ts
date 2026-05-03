@@ -8,7 +8,6 @@ export type ArtistDto = {
 
 export type ListArtistsResult = {
 	items: ArtistDto[];
-	nextCursor: string | null;
 };
 
 export type ArtistAggregateDto = ArtistDto & {
