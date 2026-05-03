@@ -75,18 +75,14 @@
 			onclear={clearSearch}
 			class="flex-1"
 		/>
-		<div class="flex items-center gap-1.5 shrink-0">
-			<label for="library-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
-			<select
-				id="library-sort"
-				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-				bind:value={sort}
-			>
+		<select
+			class="h-9 shrink-0 rounded-md border border-input bg-background px-2 text-sm"
+			bind:value={sort}
+		>
 				{#each sortOptions as opt (opt.value)}
 					<option value={opt.value}>{opt.label()}</option>
 				{/each}
-			</select>
-		</div>
+		</select>
 	</div>
 
 	{#if $tracks.isPending}

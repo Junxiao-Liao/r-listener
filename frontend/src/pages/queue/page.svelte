@@ -119,18 +119,14 @@
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="text-2xl font-semibold">{m.queue_title()}</h1>
 		<div class="flex items-center gap-2">
-			<div class="flex items-center gap-1.5">
-				<label for="queue-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
-				<select
-					id="queue-sort"
-					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
-					bind:value={sort}
-				>
+			<select
+				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+				bind:value={sort}
+			>
 					{#each sortOptions as opt (opt.value)}
 						<option value={opt.value}>{opt.label()}</option>
 					{/each}
 				</select>
-			</div>
 			{#if rawItems.length > 0}
 				<Button
 					variant="outline"

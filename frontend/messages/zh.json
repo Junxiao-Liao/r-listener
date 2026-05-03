@@ -373,7 +373,6 @@
 	"sign_out_confirm_title": "确认退出登录？",
 	"sign_out_confirm_description": "你将被带回登录页面。",
 
-	"sort_label": "排序方式",
 	"sort_name_asc": "名称 A–Z",
 	"sort_name_desc": "名称 Z–A",
 	"sort_title_asc": "标题 A–Z",
