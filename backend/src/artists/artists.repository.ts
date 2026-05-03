@@ -170,7 +170,7 @@ function decodeCursor(cursor: string): CursorData {
 function buildCursorCondition(
 	cursor: CursorData,
 	dir: SortDirection
-): ReturnType<typeof or> {
+): NonNullable<ReturnType<typeof or>> {
 	if (dir === 'asc') {
 		return or(
 			gt(artists.nameKey, cursor.nameKey),
