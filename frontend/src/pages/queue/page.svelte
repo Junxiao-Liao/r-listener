@@ -32,7 +32,39 @@
 	let dragId: Id<'queue_item'> | null = $state(null);
 	let dragOverId: Id<'queue_item'> | null = $state(null);
 
-	const items = $derived<QueueItemDto[]>($queueQuery.data?.items ?? []);
+	type QueueSort = 'title:asc' | 'title:desc' | 'artist:asc' | 'position:asc';
+	let sort = $state<QueueSort>('title:asc');
+
+	const sortOptions = [
+		{ value: 'title:asc' as const, label: m.sort_title_asc },
+		{ value: 'title:desc' as const, label: m.sort_title_desc },
+		{ value: 'artist:asc' as const, label: m.sort_artist_asc },
+		{ value: 'position:asc' as const, label: m.sort_position }
+	];
+
+	const rawItems = $derived<QueueItemDto[]>($queueQuery.data?.items ?? []);
+
+	const items = $derived<QueueItemDto[]>(sorted(rawItems, sort));
+
+	function sorted(list: QueueItemDto[], s: QueueSort): QueueItemDto[] {
+		const copy = [...list];
+		switch (s) {
+			case 'title:asc':
+				copy.sort((a, b) => a.track.title.localeCompare(b.track.title));
+				break;
+			case 'title:desc':
+				copy.sort((a, b) => b.track.title.localeCompare(a.track.title));
+				break;
+			case 'artist:asc':
+				copy.sort((a, b) =>
+					trackArtistDisplay(a.track).localeCompare(trackArtistDisplay(b.track))
+				);
+				break;
+			case 'position:asc':
+				break;
+		}
+		return copy;
+	}
 
 	function onDragStart(id: Id<'queue_item'>, ev: DragEvent) {
 		dragId = id;
@@ -53,7 +85,7 @@
 		dragOverId = null;
 		if (!sourceId || sourceId === id) return;
 
-		const targetIdx = items.findIndex((q) => q.id === id);
+		const targetIdx = rawItems.findIndex((q) => q.id === id);
 		if (targetIdx < 0) return;
 
 		await $updateItem.mutateAsync({
@@ -87,7 +119,19 @@
 	<header class="flex items-center justify-between gap-2">
 		<h1 class="text-2xl font-semibold">{m.queue_title()}</h1>
 		<div class="flex items-center gap-2">
-			{#if items.length > 0}
+			<div class="flex items-center gap-1.5">
+				<label for="queue-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
+				<select
+					id="queue-sort"
+					class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+					bind:value={sort}
+				>
+					{#each sortOptions as opt (opt.value)}
+						<option value={opt.value}>{opt.label()}</option>
+					{/each}
+				</select>
+			</div>
+			{#if rawItems.length > 0}
 				<Button
 					variant="outline"
 					size="sm"

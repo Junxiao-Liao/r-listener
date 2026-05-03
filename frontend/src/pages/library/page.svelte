@@ -6,6 +6,7 @@
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { useTracksInfiniteQuery } from '$shared/query/tracks.query';
 	import { isEditor } from '$shared/auth/role';
+	import type { TrackSort } from '$shared/types/dto';
 	import TrackRow from './components/TrackRow.svelte';
 
 	const session = useSessionQuery();
@@ -13,9 +14,18 @@
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
+	let sort = $state<TrackSort>('title:asc');
+
+	const sortOptions = [
+		{ value: 'title:asc' as const, label: m.sort_title_asc },
+		{ value: 'title:desc' as const, label: m.sort_title_desc },
+		{ value: 'album:asc' as const, label: m.sort_album_asc },
+		{ value: 'createdAt:desc' as const, label: m.settings_sort_recent },
+		{ value: 'durationMs:asc' as const, label: m.sort_duration_short }
+	];
 
 	const tracks = useTracksInfiniteQuery(() => ({
-		sort: 'createdAt:desc',
+		sort,
 		q: appliedQ || undefined
 	}));
 
@@ -31,6 +41,7 @@
 
 	$effect(() => {
 		void appliedQ;
+		void sort;
 		$tracks.refetch();
 	});
 
@@ -56,12 +67,27 @@
 		{/if}
 	</header>
 
-	<SearchBar
-		bind:value={draftQ}
-		placeholder={m.library_search_placeholder()}
-		onsubmit={submitSearch}
-		onclear={clearSearch}
-	/>
+	<div class="flex items-center gap-2">
+		<SearchBar
+			bind:value={draftQ}
+			placeholder={m.library_search_placeholder()}
+			onsubmit={submitSearch}
+			onclear={clearSearch}
+			class="flex-1"
+		/>
+		<div class="flex items-center gap-1.5 shrink-0">
+			<label for="library-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
+			<select
+				id="library-sort"
+				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+				bind:value={sort}
+			>
+				{#each sortOptions as opt (opt.value)}
+					<option value={opt.value}>{opt.label()}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
 
 	{#if $tracks.isPending}
 		<ul class="flex flex-col gap-2" aria-busy="true">

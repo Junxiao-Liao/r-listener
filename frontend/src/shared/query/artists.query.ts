@@ -5,21 +5,22 @@ import {
 import { api, type ApiError } from '$shared/api/client';
 import { suppressGlobalApiErrorToast } from '$shared/feedback/error-toast.service';
 import { queryKeys } from '$shared/query/keys';
-import type { ArtistAggregateDto, ArtistTrackListResponse, ArtistsListResponse, Id } from '$shared/types/dto';
+import type { ArtistAggregateDto, ArtistSort, ArtistTrackListResponse, ArtistsListResponse, Id } from '$shared/types/dto';
 
 export function useArtistsQuery(
-	params: () => { q?: string } = () => ({})
+	params: () => { q?: string; sort?: ArtistSort } = () => ({})
 ): CreateQueryResult<ArtistsListResponse, ApiError> {
 	return createQuery<ArtistsListResponse, ApiError>({
 		get queryKey() {
 			const p = params();
-			return queryKeys.artistsList({ q: p.q, limit: 100 });
+			return queryKeys.artistsList({ q: p.q, limit: 100, sort: p.sort ?? 'name:asc' });
 		},
 		meta: suppressGlobalApiErrorToast,
 		queryFn: () => {
 			const p = params();
 			const search = new URLSearchParams();
 			if (p.q) search.set('q', p.q);
+			if (p.sort) search.set('sort', p.sort);
 			search.set('limit', '100');
 			const qs = search.toString();
 			return api<ArtistsListResponse>(`/artists${qs ? `?${qs}` : ''}`);

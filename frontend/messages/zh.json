@@ -371,5 +371,16 @@
 	"admin_reset_password_confirm_title": "重置密码？",
 	"admin_reset_password_confirm_description": "用户的会话将被撤销。他们需要新密码才能登录。",
 	"sign_out_confirm_title": "确认退出登录？",
-	"sign_out_confirm_description": "你将被带回登录页面。"
+	"sign_out_confirm_description": "你将被带回登录页面。",
+
+	"sort_label": "排序方式",
+	"sort_name_asc": "名称 A–Z",
+	"sort_name_desc": "名称 Z–A",
+	"sort_title_asc": "标题 A–Z",
+	"sort_title_desc": "标题 Z–A",
+	"sort_album_asc": "专辑 A–Z",
+	"sort_recently_updated": "最近更新",
+	"sort_duration_short": "时长 (短→长)",
+	"sort_position": "位置",
+	"sort_artist_asc": "艺人 A–Z"
 }

@@ -6,6 +6,7 @@
 	import { isEditor } from '$shared/auth/role';
 	import { useSessionQuery } from '$shared/query/session.query';
 	import { usePlaylistsQuery } from '$shared/query/playlists.query';
+	import type { PlaylistSort } from '$shared/types/dto';
 	import PlaylistRow from './components/PlaylistRow.svelte';
 
 	const session = useSessionQuery();
@@ -13,8 +14,17 @@
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
+	let sort = $state<PlaylistSort>('name:asc');
+
+	const sortOptions = [
+		{ value: 'name:asc' as const, label: m.sort_name_asc },
+		{ value: 'name:desc' as const, label: m.sort_name_desc },
+		{ value: 'updatedAt:desc' as const, label: m.sort_recently_updated },
+		{ value: 'createdAt:desc' as const, label: m.settings_sort_recent }
+	];
+
 	const playlists = usePlaylistsQuery(() => ({
-		sort: 'updatedAt:desc',
+		sort,
 		q: appliedQ || undefined
 	}));
 
@@ -28,6 +38,7 @@
 
 	$effect(() => {
 		void appliedQ;
+		void sort;
 		$playlists.refetch();
 	});
 
@@ -53,13 +64,27 @@
 		{/if}
 	</header>
 
-	<SearchBar
-		bind:value={draftQ}
-		placeholder={m.playlists_search_placeholder()}
-		class="max-w-md"
-		onsubmit={submitSearch}
-		onclear={clearSearch}
-	/>
+	<div class="flex items-center gap-2">
+		<SearchBar
+			bind:value={draftQ}
+			placeholder={m.playlists_search_placeholder()}
+			class="flex-1 max-w-md"
+			onsubmit={submitSearch}
+			onclear={clearSearch}
+		/>
+		<div class="flex items-center gap-1.5 shrink-0">
+			<label for="playlists-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
+			<select
+				id="playlists-sort"
+				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+				bind:value={sort}
+			>
+				{#each sortOptions as opt (opt.value)}
+					<option value={opt.value}>{opt.label()}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
 
 	{#if $playlists.isPending}
 		<p class="text-sm text-muted-foreground">{m.playlists_loading()}</p>

@@ -39,6 +39,9 @@ export type ApiErrorBody = {
 
 export type Language = 'en' | 'zh';
 export type LibrarySort = 'createdAt:desc' | 'title:asc' | 'album:asc';
+export type ArtistSortField = 'name';
+export type ArtistSortDirection = 'asc' | 'desc';
+export type ArtistSort = `${ArtistSortField}:${ArtistSortDirection}`;
 export type Theme = 'system' | 'light' | 'dark';
 export type TenantRole = 'owner' | 'member' | 'viewer';
 

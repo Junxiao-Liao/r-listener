@@ -2,12 +2,21 @@
 	import * as m from '$shared/paraglide/messages';
 	import SearchBar from '$shared/components/SearchBar.svelte';
 	import { useArtistsQuery } from '$shared/query/artists.query';
+	import type { ArtistSort } from '$shared/types/dto';
 	import ArtistRow from './components/ArtistRow.svelte';
 
 	let draftQ = $state('');
 	let appliedQ = $state('');
+	let sort = $state<ArtistSort>('name:asc');
+
+	const sortOptions = [
+		{ value: 'name:asc' as const, label: m.sort_name_asc },
+		{ value: 'name:desc' as const, label: m.sort_name_desc }
+	];
+
 	const artists = useArtistsQuery(() => ({
-		q: appliedQ || undefined
+		q: appliedQ || undefined,
+		sort
 	}));
 
 	const items = $derived($artists.data?.items ?? []);
@@ -20,6 +29,7 @@
 
 	$effect(() => {
 		void appliedQ;
+		void sort;
 		$artists.refetch();
 	});
 
@@ -39,13 +49,27 @@
 		<h1 class="text-2xl font-semibold">{m.artists_title()}</h1>
 	</header>
 
-	<SearchBar
-		bind:value={draftQ}
-		placeholder={m.artists_search_placeholder()}
-		class="max-w-md"
-		onsubmit={submitSearch}
-		onclear={clearSearch}
-	/>
+	<div class="flex items-center gap-2">
+		<SearchBar
+			bind:value={draftQ}
+			placeholder={m.artists_search_placeholder()}
+			class="flex-1 max-w-md"
+			onsubmit={submitSearch}
+			onclear={clearSearch}
+		/>
+		<div class="flex items-center gap-1.5 shrink-0">
+			<label for="artists-sort" class="text-xs text-muted-foreground">{m.sort_label()}</label>
+			<select
+				id="artists-sort"
+				class="h-9 rounded-md border border-input bg-background px-2 text-sm"
+				bind:value={sort}
+			>
+				{#each sortOptions as opt (opt.value)}
+					<option value={opt.value}>{opt.label()}</option>
+				{/each}
+			</select>
+		</div>
+	</div>
 
 	{#if $artists.isPending}
 		<p class="text-sm text-muted-foreground">{m.artists_loading()}</p>

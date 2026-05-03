@@ -371,5 +371,16 @@
 	"admin_reset_password_confirm_title": "Reset password?",
 	"admin_reset_password_confirm_description": "The user's sessions will be revoked. They will need the new password to sign in.",
 	"sign_out_confirm_title": "Sign out?",
-	"sign_out_confirm_description": "You will be returned to the sign in page."
+	"sign_out_confirm_description": "You will be returned to the sign in page.",
+
+	"sort_label": "Sort by",
+	"sort_name_asc": "Name A–Z",
+	"sort_name_desc": "Name Z–A",
+	"sort_title_asc": "Title A–Z",
+	"sort_title_desc": "Title Z–A",
+	"sort_album_asc": "Album A–Z",
+	"sort_recently_updated": "Recently updated",
+	"sort_duration_short": "Duration (short first)",
+	"sort_position": "Position",
+	"sort_artist_asc": "Artist A–Z"
 }
