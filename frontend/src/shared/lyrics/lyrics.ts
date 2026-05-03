@@ -62,3 +62,12 @@ export function parseSyncedLrc(input: string): LrcLine[] {
 		.map((l) => ({ timeMs: l.timestamp * 1000, text: l.content }))
 		.sort((a, b) => a.timeMs - b.timeMs);
 }
+
+export function activeTimeMs(lines: readonly LrcLine[], currentMs: number): number | null {
+	let active: number | null = null;
+	for (const line of lines) {
+		if (line.timeMs <= currentMs) active = line.timeMs;
+		else break;
+	}
+	return active;
+}

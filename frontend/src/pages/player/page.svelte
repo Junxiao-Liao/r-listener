@@ -9,7 +9,7 @@
 	import { formatDurationMs } from '$shared/format/duration';
 	import { trackArtistDisplay } from '$shared/artists/artists';
 	import { getPlayer } from '$shared/player/player.context';
-	import { parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
+	import { activeTimeMs, parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
 	import { cn } from '$shared/utils';
 
 	const player = getPlayer();
@@ -22,15 +22,7 @@
 		return parseSyncedLrc(t.lyricsLrc);
 	});
 
-	const activeIndex = $derived.by(() => {
-		const ms = player.currentTimeMs;
-		let idx = -1;
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i]!.timeMs <= ms) idx = i;
-			else break;
-		}
-		return idx;
-	});
+	const activeMs = $derived(activeTimeMs(lines, player.currentTimeMs));
 
 	function onScrubInput(e: Event) {
 		const input = e.currentTarget as HTMLInputElement;
@@ -145,7 +137,7 @@
 									type="button"
 									class={cn(
 										'w-full flex items-baseline gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
-										i === activeIndex
+										line.timeMs === activeMs
 											? 'bg-muted text-foreground font-medium'
 											: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
 									)}

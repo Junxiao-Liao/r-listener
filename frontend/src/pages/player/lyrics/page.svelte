@@ -2,7 +2,7 @@
 	import ArrowLeft from '@lucide/svelte/icons/arrow-left';
 	import * as m from '$shared/paraglide/messages';
 	import { Button } from '$shared/components/ui/button';
-	import { parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
+	import { activeTimeMs, parseSyncedLrc, type LrcLine } from '$shared/lyrics/lyrics';
 	import { formatDurationMs } from '$shared/format/duration';
 	import { cn } from '$shared/utils';
 	import { trackArtistDisplay } from '$shared/artists/artists';
@@ -16,15 +16,7 @@
 		return parseSyncedLrc(t.lyricsLrc);
 	});
 
-	const activeIndex = $derived.by(() => {
-		const ms = player.currentTimeMs;
-		let idx = -1;
-		for (let i = 0; i < lines.length; i++) {
-			if (lines[i]!.timeMs <= ms) idx = i;
-			else break;
-		}
-		return idx;
-	});
+	const activeMs = $derived(activeTimeMs(lines, player.currentTimeMs));
 
 	function onLineClick(line: LrcLine) {
 		player.seek(line.timeMs);
@@ -75,7 +67,7 @@
 							type="button"
 							class={cn(
 								'w-full flex items-baseline gap-3 rounded-md px-3 py-2 text-left text-sm transition-colors',
-								i === activeIndex
+								line.timeMs === activeMs
 									? 'bg-muted text-foreground font-medium'
 									: 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
 							)}

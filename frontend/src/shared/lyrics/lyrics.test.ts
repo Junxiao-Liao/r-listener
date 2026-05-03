@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { detectLyricsStatus, parseSyncedLrc, syltFramesToLrc } from './lyrics';
+import { activeTimeMs, detectLyricsStatus, parseSyncedLrc, syltFramesToLrc } from './lyrics';
 
 describe('detectLyricsStatus', () => {
 	it('returns none for null/empty/whitespace', () => {
@@ -131,5 +131,57 @@ describe('syltFramesToLrc', () => {
 
 	it('handles minutes >= 60 without overflowing', () => {
 		expect(syltFramesToLrc([{ timeMs: 3_660_000, text: 'far' }])).toBe('[61:00.00]far');
+	});
+});
+
+describe('activeTimeMs', () => {
+	const makeLine = (timeMs: number, text = 'x'): { timeMs: number; text: string } => ({
+		timeMs,
+		text
+	});
+
+	it('returns null when lines is empty', () => {
+		expect(activeTimeMs([], 1000)).toBeNull();
+	});
+
+	it('returns null when currentMs is before the first timeMs', () => {
+		expect(activeTimeMs([makeLine(500), makeLine(1000)], 0)).toBeNull();
+	});
+
+	it('returns the line timeMs when currentMs equals it exactly', () => {
+		expect(activeTimeMs([makeLine(1000)], 1000)).toBe(1000);
+	});
+
+	it('returns the latest timeMs <= currentMs for mid-song progression', () => {
+		const lines = [makeLine(1000), makeLine(2000), makeLine(3000), makeLine(4000)];
+		expect(activeTimeMs(lines, 2500)).toBe(2000);
+		expect(activeTimeMs(lines, 2000)).toBe(2000);
+		expect(activeTimeMs(lines, 3000)).toBe(3000);
+	});
+
+	it('returns the shared timeMs when multiple lines share it (ties)', () => {
+		const lines = [
+			makeLine(1000, 'original'),
+			makeLine(1000, 'romanised'),
+			makeLine(3000, 'next')
+		];
+		expect(activeTimeMs(lines, 1500)).toBe(1000);
+	});
+
+	it('returns the shared timeMs exactly at the boundary (currentMs === shared)', () => {
+		const lines = [
+			makeLine(1000, 'original'),
+			makeLine(1000, 'romanised')
+		];
+		expect(activeTimeMs(lines, 1000)).toBe(1000);
+	});
+
+	it('returns the last line timeMs when currentMs is past all lines', () => {
+		const lines = [makeLine(1000), makeLine(2000)];
+		expect(activeTimeMs(lines, 5000)).toBe(2000);
+	});
+
+	it('handles a line at timeMs: 0 with currentMs: 0 (returns 0, not null)', () => {
+		expect(activeTimeMs([makeLine(0)], 0)).toBe(0);
 	});
 });
